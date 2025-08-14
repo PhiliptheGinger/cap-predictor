@@ -17,6 +17,5 @@ def test_preprocess_price_data_scaling():
     processed, scaler = preprocess_price_data(df)
     assert processed["close"].min() >= 0
     assert processed["close"].max() <= 1
-    # ensure feature engineering added moving average columns
     assert "ma_10" in processed.columns
     assert "ma_30" in processed.columns
