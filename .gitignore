@@ -1,0 +1,7 @@
+__pycache__/
+*.log
+*.csv
+*.feather
+data/
+models/
+*processed_dir_path/
