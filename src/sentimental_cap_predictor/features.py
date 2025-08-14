@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import pandas as pd
+import numpy as np
 from loguru import logger
 from .config import RAW_DATA_DIR, PROCESSED_DATA_DIR, MODELING_DIR
 from pathlib import Path
@@ -134,6 +135,16 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
 
     logger.info(f"Final DataFrame prepared with shape: {df_final.shape}")
 
+    # Compute evaluation metrics
+    try:
+        valid_df = df_final.dropna(subset=['TrueValues', 'LNN_Predictions'])
+        rmse = np.sqrt(((valid_df['TrueValues'] - valid_df['LNN_Predictions']) ** 2).mean())
+        mape = (np.abs((valid_df['TrueValues'] - valid_df['LNN_Predictions']) / valid_df['TrueValues']).replace([np.inf, -np.inf], np.nan).dropna()).mean() * 100
+        logger.info(f"RMSE: {rmse:.4f}, MAPE: {mape:.2f}%")
+    except Exception as e:
+        logger.error(f"Error computing metrics: {e}")
+        rmse, mape = None, None
+
     # Saving the final DataFrame to CSV
     try:
         df_final.to_csv(csv_output_path, index=False)  # Save the DataFrame with the 'Date' column
@@ -142,6 +153,22 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
         logger.error(f"Error saving predictions to CSV file: {e}")
         logger.error(traceback.format_exc())
         return None
+
+    # Save metrics for future analysis
+    if rmse is not None and mape is not None:
+        metrics_path = processed_dir / f"{ticker}_{mode}_metrics.csv"
+        metrics_df = pd.DataFrame([
+            {
+                'Timestamp': pd.Timestamp.now(),
+                'RMSE': rmse,
+                'MAPE': mape,
+            }
+        ])
+        try:
+            metrics_df.to_csv(metrics_path, mode='a', header=not metrics_path.exists(), index=False)
+            logger.info(f"Metrics saved to {metrics_path}")
+        except Exception as e:
+            logger.error(f"Error saving metrics to file: {e}")
 
     return df_final
 
