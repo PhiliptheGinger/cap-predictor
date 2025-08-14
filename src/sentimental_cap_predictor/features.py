@@ -1,14 +1,15 @@
 import os
 import sys
 import time
-import numpy as np
 import pandas as pd
 from loguru import logger
-from .config import INTERIM_DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, MODELING_DIR
+from .config import RAW_DATA_DIR, PROCESSED_DATA_DIR, MODELING_DIR
 from pathlib import Path
 import warnings
 import traceback
-from sklearn.preprocessing import MinMaxScaler
+
+from .preprocessing import preprocess_price_data, merge_data
+from .model_training import train_and_predict
 
 # Load logging level from .env (defaults to 'INFO')
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -18,12 +19,8 @@ logger.add(sys.stdout, level=LOG_LEVEL)
 # Add MODELING_DIR to the Python path
 sys.path.append(str(MODELING_DIR))
 
-# Import necessary modules
 try:
-    from modeling.preprocessing import clean_data, handle_missing_values, feature_engineering
-    from modeling.time_series_deep_learner import build_liquid_model, train_model_with_rolling_window
     from modeling.sentiment_analysis import perform_sentiment_analysis
-    from modeling.bias_predictions import bias_predictions_with_sentiment
 except ImportError as e:
     logger.error(f"ImportError: {e}")
     sys.exit(1)
@@ -43,23 +40,6 @@ def print_nan_info(df, step_name):
     logger.info(df.head())
     logger.info(f"Datetime index range after {step_name}: {df.index.min()} to {df.index.max()}")
 
-# Function to merge new data into existing data
-def merge_data(existing_df: pd.DataFrame, new_df: pd.DataFrame, merge_on: str = 'Date') -> pd.DataFrame:
-    """Merge new data into the existing DataFrame, avoiding duplicates based on a merge key."""
-    # Ensure the 'Date' column is in datetime format for both DataFrames
-    if merge_on in existing_df.columns:
-        existing_df[merge_on] = pd.to_datetime(existing_df[merge_on], errors='coerce')
-    if merge_on in new_df.columns:
-        new_df[merge_on] = pd.to_datetime(new_df[merge_on], errors='coerce')
-
-    # Merge the DataFrames and drop duplicates based on the 'Date' column
-    if not existing_df.empty:
-        merged_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=[merge_on]).sort_values(by=merge_on).reset_index(drop=True)
-    else:
-        merged_df = new_df
-
-    return merged_df
-
 # Core function for generating predictions
 def generate_predictions(price_df, news_df, ticker, mode='train_test', prediction_days=None, processed_dir=Path(PROCESSED_DATA_DIR)):
     logger.info(f"Starting prediction process for ticker: {ticker} in {mode} mode")
@@ -77,24 +57,8 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
     logger.info("Price DataFrame before preprocessing:")
     print_nan_info(price_df, "loading data")
 
-    # Initialize MinMaxScaler and scale the 'close' prices
-    scaler = MinMaxScaler()
-    price_df['close'] = scaler.fit_transform(price_df[['close']])
-    logger.info("MinMax scaling applied to 'close' prices.")
-    print_nan_info(price_df, "scaling_close_prices")
-
-    # Clean data
-    price_df = clean_data(price_df)
-    print_nan_info(price_df, "clean_data")
-
-    # Handle missing values
-    price_df = handle_missing_values(price_df)
-    print_nan_info(price_df, "handle_missing_values")
-
-    # Perform feature engineering
-    logger.info("Performing feature engineering.")
-    price_df = feature_engineering(price_df)
-    print_nan_info(price_df, "feature_engineering")
+    price_df, scaler = preprocess_price_data(price_df)
+    print_nan_info(price_df, "preprocess_price_data")
 
     # Convert date column to datetime and set as index
     if 'date' in price_df.columns:
@@ -142,79 +106,9 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
         logger.error("Training data is empty. Exiting.")
         return None
 
-    last_true_value = price_df['close'].iloc[-1]
-    logger.debug(f"Last true value in the dataset: {last_true_value}")
-
-    # LNN Modeling (replaces LSTM)
-    logger.info("Applying Liquid Neural Network for non-linear feature extraction.")
     try:
-        timesteps = 1  # Ensure this matches your LNN input shape requirements
-
-        # Reshape the data for LNN
-        X_train = np.reshape(train_data['close'].values, (train_data.shape[0], timesteps, 1))
-        y_train = train_data['close'].values
-
-        if mode == 'train_test':
-            X_test = np.reshape(test_data['close'].values, (test_data.shape[0], timesteps, 1))
-            y_test = test_data['close'].values
-        else:
-            X_test = None
-            y_test = None
-
-        # Define the model
-        model = build_liquid_model(input_shape=(timesteps, 1))
-
-        # Train the model with validation data (for train_test mode)
-        if mode == 'train_test':
-            val_size = int(len(X_train) * 0.2)
-            X_val, y_val = X_train[-val_size:], y_train[-val_size:]
-
-            history = train_model_with_rolling_window(model, X_train[:-val_size], y_train[:-val_size], X_val, y_val, window_size=100)
-
-            # Predict on the test data for train_test mode
-            predictions = model.predict(X_test).flatten()
-            test_data['LNN_Predictions'] = predictions
-            price_df.loc[test_data.index, 'LNN_Predictions'] = predictions
-
-            # Apply bias from sentiment analysis on the test data
-            logger.info("Biasing predictions with sentiment data.")
-            test_data = bias_predictions_with_sentiment(test_data, sentiment_df)
-            price_df.update(test_data)
-
-        if mode == 'production':
-            # In production mode, we don't have validation data, so we just train the model
-            train_model_with_rolling_window(model, X_train, y_train)
-
-            # Use the last `timesteps` data points from the training data to predict the future
-            last_data = X_train[-timesteps:]  # Get the last few days (matching timesteps)
-            predictions = []
-
-            # Loop to predict the next `prediction_days` days
-            for _ in range(prediction_days):
-                # Predict the next day
-                next_pred = model.predict(last_data.reshape(1, timesteps, 1)).flatten()
-                predictions.append(next_pred[0])
-
-                # Shift the window: remove the first and add the predicted value at the end
-                last_data = np.append(last_data[1:], next_pred).reshape(timesteps, 1)
-
-            # Generate future dates starting from the last date in price_df
-            last_date = price_df.index[-1]
-            future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=prediction_days, freq='D')
-
-            # Create a new DataFrame to hold future dates and predictions
-            future_df = pd.DataFrame(index=future_dates, data=predictions, columns=['LNN_Predictions'])
-
-            # Append the predictions to the original price_df
-            price_df = pd.concat([price_df, future_df])
-
-            # Apply bias from sentiment analysis on the future data
-            logger.info("Biasing future predictions with sentiment data.")
-            future_df = bias_predictions_with_sentiment(future_df, sentiment_df)
-            price_df.update(future_df)
-
+        price_df = train_and_predict(price_df, train_data, test_data, mode, prediction_days, sentiment_df)
         print_nan_info(price_df, "deep_learning_predictions")
-
     except Exception as e:
         logger.error(f"Error during LNN model prediction: {e}")
         logger.error(traceback.format_exc())
