@@ -9,10 +9,10 @@
 ## Architecture
 ```mermaid
 flowchart TD
-    A[Data Collection<br/>(datasets)] --> B[Preprocessing]
-    B --> C[Feature Engineering]
-    C --> D[Model Training]
-    D --> E[Visualization & Trading]
+    A["Data Collection<br/>(datasets)"] --> B["Preprocessing"]
+    B --> C["Feature Engineering"]
+    C --> D["Model Training"]
+    D --> E["Visualization & Trading"]
 ```
 
 ## Workflow
