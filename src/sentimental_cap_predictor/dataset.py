@@ -11,6 +11,7 @@ import yfinance as yf
 from loguru import logger
 from typing_extensions import Annotated
 from colorama import Fore, Style, init
+from .preprocessing import merge_data
 
 load_dotenv()
 
@@ -104,14 +105,6 @@ def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     
     check_for_nan(df, "handling missing data")
     return df
-
-def merge_data(existing_df: pd.DataFrame, new_df: pd.DataFrame, merge_on: str) -> pd.DataFrame:
-    """Merge new data into the existing DataFrame, avoiding duplicates based on a merge key."""
-    if not existing_df.empty:
-        merged_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=[merge_on]).reset_index(drop=True)
-    else:
-        merged_df = new_df
-    return merged_df
 
 @app.command()
 def main(
