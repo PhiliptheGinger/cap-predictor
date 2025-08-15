@@ -1,3 +1,5 @@
-"""Data ingestion utilities."""
+"""Data utilities."""
 
-__all__ = ["ingest"]
+from . import ingest, news
+
+__all__ = ["ingest", "news"]
