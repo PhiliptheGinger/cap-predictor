@@ -15,6 +15,10 @@ dependencies = [
     "newspaper3k",
     "transformers",
     "tensorflow",
+    "python-dotenv",
+    "loguru",
+    "scikit-learn",
+    "statsmodels",
 ]
 
 [project.optional-dependencies]
