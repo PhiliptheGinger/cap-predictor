@@ -17,7 +17,13 @@ import typer
 from loguru import logger
 
 
-app = typer.Typer()
+app = typer.Typer(help="Utilities for strategy optimization")
+
+
+@app.callback()
+def main() -> None:
+    """Entry point for strategy optimizer commands."""
+    return None
 
 
 @dataclass
