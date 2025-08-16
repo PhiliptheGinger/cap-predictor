@@ -1,3 +1,4 @@
+
 """Baseline model training and evaluation CLI."""
 from __future__ import annotations
 
@@ -16,7 +17,6 @@ try:  # optional dependency
 except Exception:  # pragma: no cover - xgboost optional
     XGBClassifier = None
 
-from ..features.builder import build_features
 
 app = typer.Typer(help="Train baseline models and materialize evaluation CSVs")
 
