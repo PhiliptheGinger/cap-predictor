@@ -12,6 +12,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import TimeSeriesSplit
 
+from sentimental_cap_predictor.features.builder import build_features
+
 try:  # optional dependency
     from xgboost import XGBClassifier
 except Exception:  # pragma: no cover - xgboost optional
