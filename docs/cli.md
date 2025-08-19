@@ -49,3 +49,26 @@ containing overall evaluation metrics:
 
 Runs are logged to MLflow by default. Set environment variable
 `MLFLOW_DISABLED=1` to skip MLflow logging.
+
+## Daily Pipeline
+
+Run the full daily workflow:
+
+```bash
+python -m sentimental_cap_predictor.flows.daily_pipeline run NVDA
+```
+
+This downloads data, preprocesses it, trains the model, searches for an
+optimized moving‑average strategy, performs a backtest and writes a JSON summary
+to `data/processed/NVDA_daily_summary.json`.
+
+### Scheduling
+
+Use cron to execute the pipeline every weekday at 6am:
+
+```cron
+0 6 * * 1-5 python -m sentimental_cap_predictor.flows.daily_pipeline run NVDA >> logs/daily.log 2>&1
+```
+
+Make sure the virtual environment is activated or provide the full path to the
+Python interpreter in the cron entry.
