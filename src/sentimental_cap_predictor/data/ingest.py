@@ -91,10 +91,41 @@ app = typer.Typer(help="Download and prepare price data")
 
 
 @app.command()
-def main(ticker: str, period: str = "5y", interval: str = "1d") -> None:
-    """Fetch prices and materialize parquet/CSV files."""
+def main(
+    ticker: str,
+    period: str = "5y",
+    interval: str = "1d",
+    offline_path: Path | None = typer.Option(
+        None, help="Read prices from CSV instead of downloading via yfinance"
+    ),
+) -> None:
+    """Fetch prices and materialize parquet/CSV files.
 
-    df = fetch_prices(ticker, period=period, interval=interval)
+    When ``offline_path`` is provided the CSV is read and ``period`` / ``interval``
+    are ignored.
+    """
+
+    if offline_path is not None:
+        df = pd.read_csv(offline_path)
+        df = df.rename(columns=str.lower)
+        if "adj close" in df.columns:
+            df = df.rename(columns={"adj close": "adj_close"})
+        df["date"] = pd.to_datetime(df["date"], utc=True)
+        df = df.drop_duplicates(subset="date").sort_values("date")
+        df = df[EXPECTED_COLUMNS]
+        df = df.astype(
+            {
+                "open": "float64",
+                "high": "float64",
+                "low": "float64",
+                "close": "float64",
+                "adj_close": "float64",
+                "volume": "int64",
+            }
+        )
+    else:
+        df = fetch_prices(ticker, period=period, interval=interval)
+
     save_path = save_prices(df, ticker)
     csv_path = prices_to_csv_for_optimizer(df, ticker)
     typer.echo(f"Saved parquet to {save_path} and csv to {csv_path}")

@@ -12,6 +12,7 @@ TICKER = os.environ.get("TEST_TICKER", "AAPL")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_PROCESSED = REPO_ROOT / "data" / "processed"
 ENV = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "src"))
+OFFLINE = os.environ.get("OFFLINE_TEST") == "1"
 
 
 @pytest.mark.e2e
@@ -19,8 +20,30 @@ def test_end_to_end_pipeline_generates_plot_inputs(tmp_path):
     """Full pipeline: ingest -> train_eval -> plots
     Asserts the predictions + learning-curve CSVs exist and have rows."""
     # 1) Ingest
+    if OFFLINE:
+        fixture = REPO_ROOT / "tests" / "data" / f"{TICKER}_prices.csv"
+        cmd = [
+            "python",
+            "-m",
+            "sentimental_cap_predictor.data.ingest",
+            TICKER,
+            "--offline-path",
+            str(fixture),
+        ]
+    else:
+        cmd = [
+            "python",
+            "-m",
+            "sentimental_cap_predictor.data.ingest",
+            TICKER,
+            "--period",
+            "1Y",
+            "--interval",
+            "1d",
+        ]
+
     proc = subprocess.run(
-        ["python", "-m", "sentimental_cap_predictor.data.ingest", TICKER, "--period", "1Y", "--interval", "1d"],
+        cmd,
         env=ENV,
         capture_output=True,
         text=True,
