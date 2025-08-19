@@ -1,9 +1,11 @@
-"""Daily pipeline orchestrating data ingestion, preprocessing, model training,
-strategy optimization, backtesting and summary reporting.
+"""Daily pipeline orchestrating data ingestion, preprocessing,
+model training, strategy optimization, backtesting and summary reporting.
 
 The pipeline is intentionally lightweight so it can run as a scheduled job.
-It persists the final summary to ``data/processed/{ticker}_daily_summary.json``.
+It persists the final summary to
+``data/processed/{ticker}_daily_summary.json``.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,21 +15,16 @@ import pandas as pd
 import typer
 from loguru import logger
 
-from sentimental_cap_predictor.data.ingest import (
-    fetch_prices,
-    save_prices,
-    prices_to_csv_for_optimizer,
-)
-from sentimental_cap_predictor.preprocessing import preprocess_price_data
-from sentimental_cap_predictor.model_training import train_and_predict
-from sentimental_cap_predictor.trader_utils.strategy_optimizer import (
-    random_search,
-    moving_average_crossover,
-)
+from ..data import ingest as data_ingest
+from ..model_training import train_and_predict
+from ..preprocessing import preprocess_price_data
+from ..trader_utils import strategy_optimizer as strat_opt
 
 TRAIN_RATIO = 0.8
 
-app = typer.Typer(help="Chain ingestion, preprocessing, modeling and trading evaluation")
+app = typer.Typer(
+    help="Chain ingestion, preprocessing, modeling and trading evaluation"
+)
 
 
 def _summary_path(ticker: str) -> Path:
@@ -37,14 +34,17 @@ def _summary_path(ticker: str) -> Path:
 @app.command()
 def run(
     ticker: str = typer.Argument(..., help="Ticker symbol to process"),
-    period: str = typer.Option("5y", help="Lookback period for price download"),
+    period: str = typer.Option(
+        "5y",
+        help="Lookback period for price download",
+    ),
     interval: str = typer.Option("1d", help="Price interval"),
 ) -> None:
     """Execute the end-to-end daily pipeline for ``ticker``."""
     # Ingestion
-    prices = fetch_prices(ticker, period=period, interval=interval)
-    save_prices(prices, ticker)
-    prices_to_csv_for_optimizer(prices, ticker)
+    prices = data_ingest.fetch_prices(ticker, period=period, interval=interval)
+    data_ingest.save_prices(prices, ticker)
+    data_ingest.prices_to_csv_for_optimizer(prices, ticker)
 
     # Preprocessing
     processed, _ = preprocess_price_data(prices)
@@ -63,13 +63,17 @@ def run(
     )
 
     valid = preds.loc[test_df.index].dropna(subset=["predicted"])
-    rmse = float(((valid["close"] - valid["predicted"]) ** 2).mean() ** 0.5) if not valid.empty else None
+    rmse = (
+        float(((valid["close"] - valid["predicted"]) ** 2).mean() ** 0.5)
+        if not valid.empty
+        else None
+    )
 
     # Strategy optimization
-    opt = random_search(prices["close"])
+    opt = strat_opt.random_search(prices["close"])
 
     # Backtest with best parameters
-    backtest_return = moving_average_crossover(
+    backtest_return = strat_opt.moving_average_crossover(
         prices["close"], opt.short_window, opt.long_window
     )
 
