@@ -19,6 +19,7 @@ dependencies = [
     "loguru",
     "scikit-learn",
     "statsmodels",
+    "mlflow",
 ]
 
 [project.optional-dependencies]
