@@ -27,3 +27,11 @@ python -m sentimental_cap_predictor.data.ingest NVDA --period 1Y --interval 1d
 This saves:
 - `data/raw/NVDA_prices.parquet` with columns `date, open, high, low, close, adj_close, volume`
 - `data/processed/NVDA_prices.csv` containing only `date` and `close`
+
+To run without network access, supply a CSV with the expected columns:
+
+```bash
+python -m sentimental_cap_predictor.data.ingest AAPL --offline-path tests/data/AAPL_prices.csv
+```
+
+When `--offline-path` is used, the file is read directly and no `yfinance` call is made.
