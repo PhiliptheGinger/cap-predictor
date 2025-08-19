@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Cap Predictor Report</title>
+  </head>
+  <body>
+    <h1>Cap Predictor KPIs</h1>
+    <div id="kpis"></div>
+    <script src="kpis.json" type="application/json" id="kpi-data"></script>
+    <script>
+      const data = JSON.parse(document.getElementById('kpi-data').textContent || '{}');
+      const container = document.getElementById('kpis');
+      for (const [k, v] of Object.entries(data)) {
+        const p = document.createElement('p');
+        p.textContent = `${k}: ${v}`;
+        container.appendChild(p);
+      }
+    </script>
+  </body>
+</html>
