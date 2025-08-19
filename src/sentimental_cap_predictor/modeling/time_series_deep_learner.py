@@ -191,13 +191,13 @@ def generate_predictions(df, window_size, mode='train_test'):
         # Create a DataFrame for future predictions
         last_date = df.index[-1]
         future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=PREDICTION_DAYS)
-        future_df = pd.DataFrame({'LNN_Predictions': predictions}, index=future_dates)
+        future_df = pd.DataFrame({'predicted': predictions}, index=future_dates)
         df = pd.concat([df, future_df], axis=0)
     
     else:
         y_pred = model.predict(X_val).flatten()
         pred_dates = val_df.index[window_size:]  # Match prediction dates to the validation data
-        df_predictions = pd.DataFrame(data={'Date': pred_dates, 'LNN_Predictions': y_pred})
+        df_predictions = pd.DataFrame(data={'Date': pred_dates, 'predicted': y_pred})
         df_predictions.set_index('Date', inplace=True)
         df = df.join(df_predictions, how='left')
 

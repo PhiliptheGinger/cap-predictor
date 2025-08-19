@@ -67,9 +67,9 @@ def train_and_predict(
 
         predictions = model.predict(X_test).flatten()
         test_data = test_data.copy()
-        test_data["LNN_Predictions"] = predictions
+        test_data["predicted"] = predictions
         test_data = bias_predictions_with_sentiment(test_data, sentiment_df)
-        price_df.loc[test_data.index, "LNN_Predictions"] = predictions
+        price_df.loc[test_data.index, "predicted"] = predictions
         price_df.update(test_data)
     else:  # production mode
         train_model_with_rolling_window(model, X_train, y_train)
@@ -85,7 +85,7 @@ def train_and_predict(
             periods=prediction_days,
             freq="D",
         )
-        future_df = pd.DataFrame(index=future_dates, data=predictions, columns=["LNN_Predictions"])
+        future_df = pd.DataFrame(index=future_dates, data=predictions, columns=["predicted"])
         future_df = bias_predictions_with_sentiment(future_df, sentiment_df)
         price_df = pd.concat([price_df, future_df])
         price_df.update(future_df)

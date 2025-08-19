@@ -28,10 +28,16 @@ This saves:
 - `data/raw/NVDA_prices.parquet` with columns `date, open, high, low, close, adj_close, volume`
 - `data/processed/NVDA_prices.csv` containing only `date` and `close`
 
-To run without network access, supply a CSV with the expected columns:
+## Baseline Train/Eval
+
+Run simple benchmark models and write evaluation CSVs:
 
 ```bash
-python -m sentimental_cap_predictor.data.ingest AAPL --offline-path tests/data/AAPL_prices.csv
+python -m sentimental_cap_predictor.modeling.train_eval NVDA
 ```
 
-When `--offline-path` is used, the file is read directly and no `yfinance` call is made.
+This writes `data/processed/NVDA_train_test_predictions.csv` with columns:
+
+- `date` – trading date in YYYY-MM-DD format
+- `actual` – true target values
+- `predicted` – model predictions
