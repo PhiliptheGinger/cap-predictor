@@ -114,9 +114,9 @@ def main(
         logger.error(f"An error occurred while loading data: {e}")
         return
 
-    # Assuming that the dataframe has columns like 'TrueValues', 'SARIMA', etc.
+    # Assuming that the dataframe has columns like 'actual', 'SARIMA', etc.
     required_columns = [
-        'TrueValues', 'SARIMA', 'BrownianMotion', 
+        'actual', 'SARIMA', 'BrownianMotion',
         'TransformedBrownianMotion', 'CombinedModel', 'LNN', 'TransformedLNN'
     ]
     missing_columns = [col for col in required_columns if col not in df.columns]
@@ -126,8 +126,8 @@ def main(
     
     logger.info("Calculating errors and generating learning curve...")
     errors, learning_curve = get_errors_with_learning_curve(
-        df['TrueValues'], df['SARIMA'], df['BrownianMotion'], df['TransformedBrownianMotion'],
-        df['CombinedModel'], df['LNN'], df['TransformedLNN'], df['TrueValues'], lambda x: x, df['TrueValues']
+        df['actual'], df['SARIMA'], df['BrownianMotion'], df['TransformedBrownianMotion'],
+        df['CombinedModel'], df['LNN'], df['TransformedLNN'], df['actual'], lambda x: x, df['actual']
     )
 
     logger.info("Plotting learning curve...")

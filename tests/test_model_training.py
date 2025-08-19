@@ -59,7 +59,7 @@ def test_train_and_predict_calls_lnn_components(monkeypatch):
         sentiment_df=sentiment_df,
     )
 
-    assert "LNN_Predictions" in result.columns
+    assert "predicted" in result.columns
     assert build_calls
     assert train_calls
     assert bias_calls
