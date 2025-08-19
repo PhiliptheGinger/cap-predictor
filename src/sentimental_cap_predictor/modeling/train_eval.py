@@ -1,10 +1,10 @@
-
 """Baseline model training and evaluation CLI."""
+
 from __future__ import annotations
 
-from pathlib import Path
-from contextlib import nullcontext
 import os
+from contextlib import nullcontext
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,17 +12,12 @@ import typer
 from loguru import logger
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
+from sklearn.metrics import (accuracy_score, f1_score, precision_score,
+                             recall_score, roc_auc_score)
 from sklearn.model_selection import TimeSeriesSplit
 
-from sentimental_cap_predictor.features.builder import build_features
-from sentimental_cap_predictor.prep.pipeline import add_returns, add_tech_indicators
+from ..features.builder import build_features
+from ..prep.pipeline import add_returns, add_tech_indicators
 
 try:  # optional dependency
     import mlflow
@@ -35,14 +30,17 @@ except Exception:  # pragma: no cover - xgboost optional
     XGBClassifier = None
 
 
-app = typer.Typer(help="Train baseline models and materialize evaluation CSVs")
+app = typer.Typer(
+    help="Train baseline models and materialize evaluation CSVs",
+)
 
 
 @app.command()
 def main(ticker: str) -> None:
     """Train simple models and write prediction / learning curve CSVs."""
 
-    use_mlflow = mlflow is not None and os.environ.get("MLFLOW_DISABLED") != "1"
+    mlflow_enabled = os.environ.get("MLFLOW_DISABLED") != "1"
+    use_mlflow = mlflow is not None and mlflow_enabled
     run_ctx = mlflow.start_run() if use_mlflow else nullcontext()
 
     with run_ctx:
@@ -55,7 +53,8 @@ def main(ticker: str) -> None:
         df_ret = add_returns(df)
         df_ret = add_tech_indicators(df_ret)
         df_ret = df_ret.dropna().reset_index(drop=True)
-        returns_series = df_ret["ret_1d"].shift(-1).iloc[:-1].reset_index(drop=True)
+        returns_series = df_ret["ret_1d"].shift(-1).iloc[:-1]
+        returns_series = returns_series.reset_index(drop=True)
 
         X, y, dates = build_features(df, ticker=ticker)
         if len(returns_series) != len(y):
@@ -66,16 +65,22 @@ def main(ticker: str) -> None:
         split_idx = int(len(X) * 0.7)
         gap = 5
         X_train, y_train = X[:split_idx], y[:split_idx]
-        X_test, y_test = X[split_idx + gap :], y[split_idx + gap :]
-        test_dates = dates.iloc[split_idx + gap :].reset_index(drop=True)
-        test_returns = returns_series.iloc[split_idx + gap :].reset_index(drop=True)
+        start = split_idx + gap
+        X_test, y_test = X[start:], y[start:]
+        test_dates = dates.iloc[start:].reset_index(drop=True)
+        test_returns = returns_series.iloc[start:].reset_index(drop=True)
 
         models = [
             ("logreg", LogisticRegression(max_iter=1000)),
             ("rf", RandomForestClassifier(n_estimators=200, random_state=0)),
         ]
         if XGBClassifier is not None:
-            models.append(("xgb", XGBClassifier(random_state=0, eval_metric="logloss")))
+            models.append(
+                (
+                    "xgb",
+                    XGBClassifier(random_state=0, eval_metric="logloss"),
+                )
+            )
 
         best_acc = -1.0
         best_model = None
@@ -114,7 +119,10 @@ def main(ticker: str) -> None:
             running_max = equity_curve.cummax()
             drawdown = (equity_curve / running_max) - 1
             max_drawdown = float(drawdown.min())
-            mar_ratio = cagr / abs(max_drawdown) if max_drawdown != 0 else np.nan
+            if max_drawdown != 0:
+                mar_ratio = cagr / abs(max_drawdown)
+            else:
+                mar_ratio = np.nan
         else:
             mar_ratio = np.nan
 
@@ -155,9 +163,19 @@ def main(ticker: str) -> None:
         for train_idx, val_idx in tscv.split(X_train):
             model = best_model.__class__(**best_model.get_params())
             model.fit(X_train[train_idx], y_train[train_idx])
-            train_loss = 1 - accuracy_score(y_train[train_idx], model.predict(X_train[train_idx]))
-            val_loss = 1 - accuracy_score(y_train[val_idx], model.predict(X_train[val_idx]))
-            lc_rows.append({"Train Size": len(train_idx), "Train Loss": train_loss, "Validation Loss": val_loss})
+            train_loss = 1 - accuracy_score(
+                y_train[train_idx], model.predict(X_train[train_idx])
+            )
+            val_loss = 1 - accuracy_score(
+                y_train[val_idx], model.predict(X_train[val_idx])
+            )
+            lc_rows.append(
+                {
+                    "Train Size": len(train_idx),
+                    "Train Loss": train_loss,
+                    "Validation Loss": val_loss,
+                }
+            )
         lc_df = pd.DataFrame(lc_rows)
         lc_path = processed_dir / f"{ticker}_learning_curve_train_test.csv"
         lc_df.to_csv(lc_path, index=False)
