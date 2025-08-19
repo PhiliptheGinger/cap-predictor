@@ -170,8 +170,8 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
 
             # Predict on the test data for train_test mode
             predictions = model.predict(X_test).flatten()
-            test_data['LNN_Predictions'] = predictions
-            price_df.loc[test_data.index, 'LNN_Predictions'] = predictions
+            test_data['predicted'] = predictions
+            price_df.loc[test_data.index, 'predicted'] = predictions
 
             # Apply bias from sentiment analysis on the test data
             logger.info("Biasing predictions with sentiment data.")
@@ -200,7 +200,7 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
             future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=prediction_days, freq='D')
 
             # Create a new DataFrame to hold future dates and predictions
-            future_df = pd.DataFrame(index=future_dates, data=predictions, columns=['LNN_Predictions'])
+            future_df = pd.DataFrame(index=future_dates, data=predictions, columns=['predicted'])
 
             # Append the predictions to the original price_df
             price_df = pd.concat([price_df, future_df])
@@ -221,16 +221,16 @@ def generate_predictions(price_df, news_df, ticker, mode='train_test', predictio
     logger.info("Inverting MinMax scaling on all columns.")
     df_final = pd.DataFrame({
         'Date': price_df.index,  # Ensure the date is included
-        'TrueValues': scaler.inverse_transform(price_df[['close']]).flatten(),
-        'LNN_Predictions': scaler.inverse_transform(price_df[['LNN_Predictions']]).flatten(),
+        'actual': scaler.inverse_transform(price_df[['close']]).flatten(),
+        'predicted': scaler.inverse_transform(price_df[['predicted']]).flatten(),
     }, index=price_df.index)
 
     logger.info(f"Final DataFrame prepared with shape: {df_final.shape}")
 
     # Plotting predictions
     plt.figure(figsize=(14, 7))
-    plt.plot(df_final['Date'], df_final['TrueValues'], label='True Values', color='blue')
-    plt.plot(df_final['Date'], df_final['LNN_Predictions'], label='LNN Predictions', color='green')
+    plt.plot(df_final['Date'], df_final['actual'], label='True Values', color='blue')
+    plt.plot(df_final['Date'], df_final['predicted'], label='Predictions', color='green')
     plt.legend()
     plt.title(f'{ticker} - Predictions')
     plt.xlabel('Date')

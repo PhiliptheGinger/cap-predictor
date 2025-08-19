@@ -72,9 +72,8 @@ def main(ticker: str) -> None:
     pred_df = pd.DataFrame(
         {
             "date": test_dates,
-            "TrueValues": y_test,
-            "LNN_Predictions": best_pred,
-            "BiasedPrediction": best_pred,
+            "actual": y_test,
+            "predicted": best_pred,
         }
     )
     pred_path = processed_dir / f"{ticker}_train_test_predictions.csv"

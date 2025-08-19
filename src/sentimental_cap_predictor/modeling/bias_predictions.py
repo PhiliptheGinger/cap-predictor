@@ -53,13 +53,13 @@ def bias_predictions_with_sentiment(predictions_df, sentiment_df):
     logger.info(f"Sentiment DataFrame shape after date processing: {sentiment_df.shape}")
     logger.debug(f"Sentiment DataFrame index after processing: {sentiment_df.index}")
 
-    # Ensure 'LNN_Predictions' exists in predictions_df
-    if 'LNN_Predictions' not in predictions_df.columns:
-        logger.error("'LNN_Predictions' column not found in predictions DataFrame.")
+    # Ensure 'predicted' exists in predictions_df
+    if 'predicted' not in predictions_df.columns:
+        logger.error("'predicted' column not found in predictions DataFrame.")
         return predictions_df
 
-    # Initialize 'BiasedPrediction' with 'LNN_Predictions'
-    predictions_df['BiasedPrediction'] = predictions_df['LNN_Predictions'].fillna(0)
+    # Initialize 'BiasedPrediction' with 'predicted'
+    predictions_df['BiasedPrediction'] = predictions_df['predicted'].fillna(0)
 
     logger.debug(f"Columns after adding 'BiasedPrediction': {predictions_df.columns.tolist()}")
     logger.debug(f"Shape of predictions_df after adding 'BiasedPrediction': {predictions_df.shape}")
@@ -104,7 +104,7 @@ def bias_predictions_with_sentiment(predictions_df, sentiment_df):
                 logger.info(f"Date: {pred_date}, Original: {original_prediction}, Bias factor: {bias_factor}, Biased: {biased_prediction}")
 
     # Ensure all required dates are covered by filling any missing dates
-    biased_predictions = biased_predictions.reindex(predictions_df.index, fill_value=predictions_df['LNN_Predictions'])
+    biased_predictions = biased_predictions.reindex(predictions_df.index, fill_value=predictions_df['predicted'])
 
     # Assign the final biased predictions back to the original DataFrame
     predictions_df['BiasedPrediction'] = biased_predictions['BiasedPrediction']
