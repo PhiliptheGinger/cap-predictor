@@ -4,15 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import typer
 from loguru import logger
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import TimeSeriesSplit
 
 from sentimental_cap_predictor.features.builder import build_features
+from sentimental_cap_predictor.prep.pipeline import add_returns, add_tech_indicators
 
 try:  # optional dependency
     from xgboost import XGBClassifier
@@ -32,7 +40,15 @@ def main(ticker: str) -> None:
         raise FileNotFoundError(f"Missing raw price parquet at {raw_path}")
     df = pd.read_parquet(raw_path)
 
+    # Compute returns for MAR ratio alignment
+    df_ret = add_returns(df)
+    df_ret = add_tech_indicators(df_ret)
+    df_ret = df_ret.dropna().reset_index(drop=True)
+    returns_series = df_ret["ret_1d"].shift(-1).iloc[:-1].reset_index(drop=True)
+
     X, y, dates = build_features(df, ticker=ticker)
+    if len(returns_series) != len(y):
+        raise ValueError("Return series and labels misaligned")
     if len(X) < 30:
         raise ValueError("Not enough data for training")
 
@@ -41,6 +57,7 @@ def main(ticker: str) -> None:
     X_train, y_train = X[:split_idx], y[:split_idx]
     X_test, y_test = X[split_idx + gap :], y[split_idx + gap :]
     test_dates = dates.iloc[split_idx + gap :].reset_index(drop=True)
+    test_returns = returns_series.iloc[split_idx + gap :].reset_index(drop=True)
 
     models = [
         ("logreg", LogisticRegression(max_iter=1000)),
@@ -68,6 +85,28 @@ def main(ticker: str) -> None:
     assert best_model is not None and best_pred is not None
     logger.info("Best model: %s", best_name)
 
+    precision = precision_score(y_test, best_pred, zero_division=0)
+    recall = recall_score(y_test, best_pred, zero_division=0)
+    f1 = f1_score(y_test, best_pred, zero_division=0)
+    if hasattr(best_model, "predict_proba"):
+        probas = best_model.predict_proba(X_test)[:, 1]
+        roc_auc = roc_auc_score(y_test, probas)
+    else:  # pragma: no cover - all models currently support predict_proba
+        roc_auc = float("nan")
+
+    positions = np.where(best_pred > 0, 1, -1)
+    strategy_returns = positions * test_returns.to_numpy()
+    equity_curve = (1 + pd.Series(strategy_returns)).cumprod()
+    if len(equity_curve) > 1:
+        years = len(equity_curve) / 252
+        cagr = equity_curve.iloc[-1] ** (1 / years) - 1
+        running_max = equity_curve.cummax()
+        drawdown = (equity_curve / running_max) - 1
+        max_drawdown = float(drawdown.min())
+        mar_ratio = cagr / abs(max_drawdown) if max_drawdown != 0 else np.nan
+    else:
+        mar_ratio = np.nan
+
     processed_dir = Path("data/processed")
     processed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -81,6 +120,20 @@ def main(ticker: str) -> None:
     pred_path = processed_dir / f"{ticker}_train_test_predictions.csv"
     pred_df.to_csv(pred_path, index=False)
     logger.info("wrote %s", pred_path)
+
+    metrics_df = pd.DataFrame(
+        {
+            "accuracy": [best_acc],
+            "precision": [precision],
+            "recall": [recall],
+            "f1": [f1],
+            "roc_auc": [roc_auc],
+            "mar_ratio": [mar_ratio],
+        }
+    )
+    metrics_path = processed_dir / f"{ticker}_train_test_metrics.csv"
+    metrics_df.to_csv(metrics_path, index=False)
+    logger.info("wrote %s", metrics_path)
 
     # Learning curve via TimeSeriesSplit on training set
     tscv = TimeSeriesSplit(n_splits=5, gap=gap)

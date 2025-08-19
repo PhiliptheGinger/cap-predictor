@@ -60,13 +60,18 @@ def test_end_to_end_pipeline_generates_plot_inputs(tmp_path):
 
     pred_csv = DATA_PROCESSED / f"{TICKER}_train_test_predictions.csv"
     lc_csv = DATA_PROCESSED / f"{TICKER}_learning_curve_train_test.csv"
+    metrics_csv = DATA_PROCESSED / f"{TICKER}_train_test_metrics.csv"
 
     assert pred_csv.exists(), f"Missing {pred_csv}"
     assert lc_csv.exists(), f"Missing {lc_csv}"
+    assert metrics_csv.exists(), f"Missing {metrics_csv}"
 
     df_pred = pd.read_csv(pred_csv)
     df_lc = pd.read_csv(lc_csv)
-    assert len(df_pred) > 0 and len(df_lc) > 0
+    df_metrics = pd.read_csv(metrics_csv)
+    assert len(df_pred) > 0 and len(df_lc) > 0 and len(df_metrics) == 1
+    expected_cols = {"accuracy", "precision", "recall", "f1", "roc_auc", "mar_ratio"}
+    assert expected_cols.issubset(df_metrics.columns)
 
     # 3) Plots should run without crashing
     subprocess.run(["python", "-m", "sentimental_cap_predictor.plots", TICKER], check=True, env=ENV)

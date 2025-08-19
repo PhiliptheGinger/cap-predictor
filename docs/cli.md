@@ -41,3 +41,8 @@ This writes `data/processed/NVDA_train_test_predictions.csv` with columns:
 - `date` – trading date in YYYY-MM-DD format
 - `actual` – true target values
 - `predicted` – model predictions
+
+Additionally, `data/processed/NVDA_train_test_metrics.csv` is generated
+containing overall evaluation metrics:
+
+- `accuracy`, `precision`, `recall`, `f1`, `roc_auc` and `mar_ratio`.
