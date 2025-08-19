@@ -46,3 +46,6 @@ Additionally, `data/processed/NVDA_train_test_metrics.csv` is generated
 containing overall evaluation metrics:
 
 - `accuracy`, `precision`, `recall`, `f1`, `roc_auc` and `mar_ratio`.
+
+Runs are logged to MLflow by default. Set environment variable
+`MLFLOW_DISABLED=1` to skip MLflow logging.
