@@ -68,13 +68,22 @@ def fetch_prices(ticker: str, period: str = "5y", interval: str = "1d") -> pd.Da
 
 
 def save_prices(df: pd.DataFrame, ticker: str) -> Path:
-    """Save raw prices to ``data/raw/{ticker}_prices.parquet``."""
+    """Save raw prices to ``data/raw/{ticker}_prices.parquet``.
+
+    Falls back to CSV when a parquet engine is unavailable.
+    """
 
     raw_dir = Path("data/raw")
     raw_dir.mkdir(parents=True, exist_ok=True)
-    path = raw_dir / f"{ticker}_prices.parquet"
-    df.to_parquet(path, index=False)
-    return path
+
+    parquet_path = raw_dir / f"{ticker}_prices.parquet"
+    try:
+        df.to_parquet(parquet_path, index=False)
+        return parquet_path
+    except ImportError:
+        csv_path = raw_dir / f"{ticker}_prices.csv"
+        df.to_csv(csv_path, index=False)
+        return csv_path
 
 
 def prices_to_csv_for_optimizer(df: pd.DataFrame, ticker: str) -> Path:
@@ -128,7 +137,7 @@ def main(
 
     save_path = save_prices(df, ticker)
     csv_path = prices_to_csv_for_optimizer(df, ticker)
-    typer.echo(f"Saved parquet to {save_path} and csv to {csv_path}")
+    typer.echo(f"Saved prices to {save_path} and csv to {csv_path}")
 
 
 if __name__ == "__main__":  # pragma: no cover - manual invocation
