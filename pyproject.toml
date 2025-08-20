@@ -23,6 +23,7 @@ dependencies = [
     "statsmodels>=0.14,<1",
     "mlflow>=2.7,<3",
     "SQLAlchemy>=2.0,<3",
+    "psutil>=5.9,<6",
 ]
 
 [project.optional-dependencies]
