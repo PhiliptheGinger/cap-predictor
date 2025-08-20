@@ -19,13 +19,14 @@ def backtest(
 ) -> BacktestResult:
     """Run a minimal backtest for ``strategy`` using ``data``.
 
-    Signals are interpreted as target position (number of units) in the first
-    column of ``data.prices``.  Trades are executed at the same bar with optional
-    fixed transaction cost and proportional slippage.
+    Signals are interpreted as target weights for the first asset in
+    ``data.prices``.  Trades are executed at the same bar with optional fixed
+    transaction cost and proportional slippage.
     """
 
     prices = data.prices.iloc[:, 0]
-    signals = strategy.generate_signals(data).reindex(prices.index).fillna(0)
+    weights = strategy.generate_signals(data).reindex(prices.index).fillna(0)
+    weight_series = weights.iloc[:, 0]
 
     position = 0.0
     cash = initial_capital
@@ -37,7 +38,9 @@ def backtest(
     entry_date: Optional[pd.Timestamp] = None
 
     for date, price in prices.items():
-        desired = signals.loc[date]
+        desired_weight = weight_series.loc[date]
+        equity = cash + position * price
+        desired = desired_weight * equity / price
         if desired != position:
             trade_size = desired - position
             trade_price = price * (1 + slippage if trade_size > 0 else 1 - slippage)
