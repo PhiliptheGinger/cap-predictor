@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import builtins
 import multiprocessing as mp
-import resource
+import psutil
 from typing import Dict
 
 # flake8: noqa
@@ -38,8 +38,14 @@ MAX_LOOP_ITERATIONS = 10_000
 
 
 def _exec(code: str, queue: mp.Queue, cpu_time: int, mem_limit: int) -> None:
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu_time, cpu_time))
-    resource.setrlimit(resource.RLIMIT_AS, (mem_limit, mem_limit))
+    proc = psutil.Process()
+    try:
+        if hasattr(psutil, "RLIMIT_CPU"):
+            proc.rlimit(psutil.RLIMIT_CPU, (cpu_time, cpu_time))
+        if hasattr(psutil, "RLIMIT_AS"):
+            proc.rlimit(psutil.RLIMIT_AS, (mem_limit, mem_limit))
+    except Exception:
+        pass
     env: Dict[str, object] = {"__builtins__": SAFE_BUILTINS}
     try:
         exec(code, env)
@@ -96,9 +102,10 @@ def run_code(
     """Run ``code`` in a subprocess with limited builtins and imports."""
 
     _validate(code)
-    queue: mp.Queue = mp.Queue()
+    ctx = mp.get_context("spawn")
+    queue: mp.Queue = ctx.Queue()
     cpu = cpu_time or timeout
-    proc = mp.Process(target=_exec, args=(code, queue, cpu, mem_limit))
+    proc = ctx.Process(target=_exec, args=(code, queue, cpu, mem_limit))
     proc.start()
     proc.join(timeout)
     if proc.is_alive():
