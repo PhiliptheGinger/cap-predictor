@@ -32,6 +32,8 @@ _DENY_IMPORTS: set[str] = {
     "http",
     "pathlib",
     "open",
+    "eval",
+    "exec",
 }
 
 _DENY_ATTRS: set[str] = {"__subclasses__", "__mro__", "__globals__"}
@@ -68,6 +70,16 @@ class _SafetyVisitor(ast.NodeVisitor):
     ) -> None:  # pragma: no cover
         if node.attr in _DENY_ATTRS:
             raise SandboxError(f"Access to '{node.attr}' denied")
+        if node.attr in {"eval", "exec"}:
+            raise SandboxError(f"Use of '{node.attr}' denied")
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:  # pragma: no cover
+        func = node.func
+        if isinstance(func, ast.Name) and func.id in {"eval", "exec"}:
+            raise SandboxError(f"Use of '{func.id}' denied")
+        if isinstance(func, ast.Attribute) and func.attr in {"eval", "exec"}:
+            raise SandboxError(f"Use of '{func.attr}' denied")
         self.generic_visit(node)
 
 
@@ -105,13 +117,19 @@ def _build_runner(
             level=0,
         ):
             root = name.split('.')[0]
-            if root in _banned:
+            if root in _banned or any(item in _banned for item in fromlist):
                 raise ImportError(f"blocked module: {{name}}")
             return __import__(name, globals, locals, fromlist, level)
 
         builtins.__import__ = _blocked_import
         builtins.open = lambda *a, **k: (_ for _ in ()).throw(
             PermissionError('open disabled')
+        )
+        builtins.eval = lambda *a, **k: (_ for _ in ()).throw(
+            PermissionError('eval disabled')
+        )
+        builtins.exec = lambda *a, **k: (_ for _ in ()).throw(
+            PermissionError('exec disabled')
         )
 
         resource.setrlimit(resource.RLIMIT_CPU, ({cpu_limit}, {cpu_limit}))
