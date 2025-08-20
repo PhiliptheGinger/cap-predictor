@@ -76,7 +76,12 @@ def _ast_safety_check(source: str) -> None:
     _SafetyVisitor().visit(tree)
 
 
-def _build_runner(payload: str, cpu_limit: int, mem_limit: int) -> str:
+def _build_runner(
+    payload: str,
+    cpu_limit: int,
+    mem_limit: int,
+    op_limit: int,
+) -> str:
     """Return the Python source executed in the sandboxed subprocess."""
 
     deny_imports = [i for i in _DENY_IMPORTS if i != "open"]
@@ -112,6 +117,19 @@ def _build_runner(payload: str, cpu_limit: int, mem_limit: int) -> str:
         resource.setrlimit(resource.RLIMIT_CPU, ({cpu_limit}, {cpu_limit}))
         resource.setrlimit(resource.RLIMIT_AS, ({mem_limit}, {mem_limit}))
 
+        _op_limit = {op_limit}
+        _ops = 0
+
+        def _trace(frame, event, arg):
+            global _ops
+            if event == 'line':
+                _ops += 1
+                if _ops > _op_limit:
+                    raise RuntimeError('operation limit exceeded')
+            return _trace
+
+        sys.settrace(_trace)
+
         source, data, idea, ctx = pickle.loads(base64.b64decode({payload!r}))
         globals_dict = {{'__builtins__': builtins}}
         locals_dict = {{}}
@@ -122,6 +140,7 @@ def _build_runner(payload: str, cpu_limit: int, mem_limit: int) -> str:
         from sentimental_cap_predictor.research.engine import simple_backtester
         backtester = simple_backtester(strategy)
         result = backtester(data, idea, ctx)
+        sys.settrace(None)
         sys.stdout.write(base64.b64encode(pickle.dumps(result)).decode())
         """
     )
@@ -134,6 +153,7 @@ def run_strategy_source(
     ctx: BacktestContext | None = None,
     cpu_seconds: int = 5,
     memory_bytes: int = 256 * 1024 * 1024,
+    max_ops: int = 100_000,
 ) -> BacktestResult:
     """Execute ``source`` defining a ``strategy`` in a sandbox.
 
@@ -146,6 +166,8 @@ def run_strategy_source(
         Inputs forwarded to the backtester.
     cpu_seconds, memory_bytes:
         Resource limits for the subprocess.
+    max_ops:
+        Maximum number of traced line events allowed during execution.
     """
 
     _ast_safety_check(source)
@@ -154,7 +176,7 @@ def run_strategy_source(
 
     payload_data = pickle.dumps((source, data, idea, ctx))
     payload = base64.b64encode(payload_data).decode()
-    runner = _build_runner(payload, cpu_seconds, memory_bytes)
+    runner = _build_runner(payload, cpu_seconds, memory_bytes, max_ops)
 
     env = {"PYTHONPATH": os.getcwd(), **os.environ}
     proc = subprocess.run(
