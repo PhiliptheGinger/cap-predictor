@@ -1,10 +1,11 @@
-from __future__ import annotations
 """Utilities for loading market, sentiment and fundamental data."""
+
+from __future__ import annotations
 
 import pandas as pd
 import yfinance as yf
 
-from ..research.types import DataBundle
+from sentimental_cap_predictor.data_bundle import DataBundle
 
 
 def load_prices(ticker: str, start: str | pd.Timestamp, end: str | pd.Timestamp) -> pd.DataFrame:
@@ -95,5 +96,10 @@ def make_bundle(ticker: str, start: str | pd.Timestamp, end: str | pd.Timestamp)
     sentiment = align_daily(sentiment, prices.index)
     fundamentals = align_pit_fundamentals(fundamentals_raw, prices.index)
     meta = {"ticker": ticker, "start": str(start), "end": str(end)}
-    return DataBundle(prices=prices, sentiment=sentiment, fundamentals=fundamentals, meta=meta)
+    return DataBundle(
+        prices=prices,
+        features=fundamentals,
+        sentiment=sentiment,
+        metadata=meta,
+    ).validate()
 

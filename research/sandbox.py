@@ -11,10 +11,10 @@ import pickle
 import subprocess
 import textwrap
 
+from sentimental_cap_predictor.data_bundle import DataBundle
 from sentimental_cap_predictor.research.types import (
     BacktestContext,
     BacktestResult,
-    DataBundle,
     Idea,
 )
 

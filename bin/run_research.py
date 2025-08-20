@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from sentimental_cap_predictor.data.loader import make_bundle
+from sentimental_cap_predictor.data_bundle import DataBundle
 from sentimental_cap_predictor.research.engine import simple_backtester
 from sentimental_cap_predictor.research.idea_schema import Idea
 from sentimental_cap_predictor.research.optimize import grid_optimize
 from sentimental_cap_predictor.research.sandbox import run_strategy_source
 from sentimental_cap_predictor.research.search_space import ParamSpec, SearchSpace
 from sentimental_cap_predictor.research.tracking import get_tracker
-from sentimental_cap_predictor.research.types import BacktestContext, DataBundle
+from sentimental_cap_predictor.research.types import BacktestContext
 
 
 DEFAULT_OBJECTIVE = (
@@ -60,13 +61,31 @@ def _split_bundle(bundle: DataBundle, split: float) -> tuple[DataBundle, DataBun
 
     prices_tr, prices_te = _slice(bundle.prices)
     sent_tr, sent_te = _slice(bundle.sentiment)
-    fund_tr, fund_te = _slice(bundle.fundamentals)
+    feat_tr, feat_te = _slice(bundle.features)
 
-    meta_tr = dict(bundle.meta)
-    meta_te = dict(bundle.meta)
+    if bundle.publication_times:
+        pub_tr = {k: v.iloc[:cut].copy() for k, v in bundle.publication_times.items()}
+        pub_te = {k: v.iloc[cut:].copy() for k, v in bundle.publication_times.items()}
+    else:
+        pub_tr = pub_te = None
+
+    meta_tr = dict(bundle.metadata or {})
+    meta_te = dict(bundle.metadata or {})
     return (
-        DataBundle(prices_tr, sent_tr, fund_tr, meta_tr),
-        DataBundle(prices_te, sent_te, fund_te, meta_te),
+        DataBundle(
+            prices=prices_tr,
+            features=feat_tr,
+            sentiment=sent_tr,
+            publication_times=pub_tr,
+            metadata=meta_tr,
+        ).validate(),
+        DataBundle(
+            prices=prices_te,
+            features=feat_te,
+            sentiment=sent_te,
+            publication_times=pub_te,
+            metadata=meta_te,
+        ).validate(),
     )
 
 

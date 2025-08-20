@@ -26,7 +26,7 @@ def test_multi_asset_next_bar_and_costs():
         },
         index=index,
     )
-    bundle = DataBundle(prices=prices)
+    bundle = DataBundle(prices=prices).validate()
 
     weights = pd.DataFrame(
         [[1, -1], [0, 0], [0, 0]], index=index, columns=["AAPL", "MSFT"]
@@ -58,7 +58,7 @@ def test_multi_asset_next_bar_and_costs():
 def test_backtest_generates_metrics_and_trades():
     index = pd.date_range('2024-01-01', periods=3, freq='D')
     prices = pd.DataFrame({('AAPL', 'close'): [10, 11, 12]}, index=index)
-    bundle = DataBundle(prices=prices)
+    bundle = DataBundle(prices=prices).validate()
 
     weights = pd.DataFrame([1.0, 0.0, 0.0], index=index, columns=['AAPL'])
     strat = DummyStrategy(weights)
