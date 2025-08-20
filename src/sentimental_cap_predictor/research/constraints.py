@@ -41,7 +41,10 @@ def max_turnover(
 ) -> tuple[bool, str]:
     """Check that portfolio turnover is within ``limit``."""
 
-    positions = result.positions
+    positions = result.parameters.get("positions")
+    if positions is None:
+        return True, "No positions data"
+
     if isinstance(positions, pd.DataFrame):
         turnover = float(positions.diff().abs().sum().sum())
     else:

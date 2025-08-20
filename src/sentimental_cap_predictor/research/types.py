@@ -9,11 +9,13 @@ inputs, passing configuration to backtests and capturing their results.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Protocol
+from typing import Protocol
 
 import pandas as pd
 
+from sentimental_cap_predictor import backtest_result
 from sentimental_cap_predictor.data_bundle import DataBundle
+
 from .idea_schema import Idea
 
 
@@ -51,39 +53,17 @@ class Trade:
     note: str = ""
 
 
-@dataclass
-class BacktestResult:
-    """Outcome of a backtesting run.
-
-    Attributes
-    ----------
-    idea_name:
-        Name of the idea or strategy being evaluated.
-    equity_curve:
-        ``pandas.Series`` representing cumulative equity over time.
-    trades:
-        Executed trades captured during the backtest.
-    positions:
-        Position sizes through time as a ``Series`` or ``DataFrame`` when
-        multiple instruments are involved.
-    metrics:
-        Dictionary of performance metrics such as CAGR or Sharpe ratio.
-    artifacts:
-        Additional objects produced during the run (plots, tables, etc.).
-    """
-
-    idea_name: str
-    equity_curve: pd.Series
-    trades: List[Trade]
-    positions: pd.Series | pd.DataFrame
-    metrics: Dict[str, Any]
-    artifacts: Dict[str, float | Any]
+# Re-export BacktestResult from the core module so research utilities operate
+# on the same unified dataclass used across the project.
+BacktestResult = backtest_result.BacktestResult
 
 
 class Strategy(Protocol):
     """Protocol that all trading strategies must implement."""
 
-    def generate_signals(self, data: DataBundle, idea: Idea) -> pd.Series | pd.DataFrame:
+    def generate_signals(
+        self, data: DataBundle, idea: Idea
+    ) -> pd.Series | pd.DataFrame:
         """Return trading signals for ``idea`` based on ``data``.
 
         Parameters
