@@ -18,7 +18,7 @@ from .idea_schema import Idea
 
 @dataclass
 class DataBundle:
-    """Collection of market and optional sentiment data.
+    """Collection of market, sentiment and fundamental data.
 
     Attributes
     ----------
@@ -27,6 +27,9 @@ class DataBundle:
     sentiment:
         Optional ``pandas.DataFrame`` containing sentiment features aligned with
         ``prices``.
+    fundamentals:
+        Optional ``pandas.DataFrame`` of point-in-time fundamental data aligned
+        to ``prices``.
     meta:
         Arbitrary metadata describing the data set such as ticker, source or
         preprocessing information.
@@ -34,6 +37,7 @@ class DataBundle:
 
     prices: pd.DataFrame
     sentiment: pd.DataFrame | None = None
+    fundamentals: pd.DataFrame | None = None
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -63,11 +67,12 @@ class BacktestContext:
 class Trade:
     """Representation of a single executed trade."""
 
-    ts: pd.Timestamp
+    symbol: str
     side: str
     qty: float
     price: float
-    reason: str = ""
+    fees: float = 0.0
+    note: str = ""
 
 
 @dataclass
@@ -96,7 +101,7 @@ class BacktestResult:
     trades: List[Trade]
     positions: pd.Series | pd.DataFrame
     metrics: Dict[str, Any]
-    artifacts: Dict[str, Any]
+    artifacts: Dict[str, float | Any]
 
 
 class Strategy(Protocol):

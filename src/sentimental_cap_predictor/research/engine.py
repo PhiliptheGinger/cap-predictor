@@ -90,10 +90,22 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
         equity_curve = (1.0 + strategy_returns).cumprod()
 
         trade_list: List[Trade] = []
+        symbol = data.meta.get("ticker", "")
         pos_diff = positions.diff().fillna(positions)
         for ts, change in pos_diff[pos_diff != 0].items():
             side = "buy" if change > 0 else "sell"
-            trade_list.append(Trade(ts=ts, side=side, qty=float(change), price=float(opens.loc[ts])))
+            fees = float(abs(change) * cost_per_trade)
+            note = str(ts)
+            trade_list.append(
+                Trade(
+                    symbol=symbol,
+                    side=side,
+                    qty=float(change),
+                    price=float(opens.loc[ts]),
+                    fees=fees,
+                    note=note,
+                )
+            )
 
         n_days = len(opens)
         cagr = float(equity_curve.iloc[-1] ** (252 / n_days) - 1) if n_days > 0 else 0.0
