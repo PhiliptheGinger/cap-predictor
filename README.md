@@ -45,3 +45,17 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
 
 Run `--help` with any module for detailed options.
+
+## Offline Testing
+
+Some tests require downloading market data. To run them without making
+network calls, set `OFFLINE_TEST=1`. When this flag is enabled the suite reads
+prices from `tests/data/<TICKER>_prices.csv` instead of contacting external
+APIs. Select which ticker to use via the `TEST_TICKER` environment variable
+(defaults to `AAPL`).
+
+Example:
+
+```bash
+OFFLINE_TEST=1 TEST_TICKER=AAPL pytest tests/test_plots_e2e.py
+```
