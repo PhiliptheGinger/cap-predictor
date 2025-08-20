@@ -17,10 +17,14 @@ if TYPE_CHECKING:  # pragma: no cover - for type checkers only
 
 
 def _returns(result: "BacktestResult") -> pd.Series:
-    """Return daily percentage returns of the equity curve."""
+    """Return daily strategy returns.
 
-    equity = result.equity_curve.astype(float)
-    return equity.pct_change().dropna()
+    Returns are retrieved from ``result.artifacts['strat_ret']`` which
+    contains the backtest's daily percentage returns.
+    """
+
+    rets = pd.Series(result.artifacts["strat_ret"], dtype=float)
+    return rets.dropna()
 
 
 def sharpe(result: "BacktestResult") -> float:
@@ -51,7 +55,7 @@ def calmar(result: "BacktestResult") -> float:
     n = len(equity)
     if n == 0:
         return float("nan")
-    cagr = float(equity.iloc[-1] ** (252 / n) - 1)
+    cagr = float((equity.iloc[-1] / equity.iloc[0]) ** (252 / n) - 1)
     cumulative_max = equity.cummax()
     drawdown = equity / cumulative_max - 1.0
     maxdd = float(drawdown.min())
