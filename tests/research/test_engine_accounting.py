@@ -1,9 +1,10 @@
 import pandas as pd
 import pytest
 
+from sentimental_cap_predictor.data_bundle import DataBundle
 from sentimental_cap_predictor.research.engine import simple_backtester
-from sentimental_cap_predictor.research.types import BacktestContext, DataBundle
 from sentimental_cap_predictor.research.idea_schema import Idea
+from sentimental_cap_predictor.research.types import BacktestContext
 
 
 class AlwaysLong:
@@ -14,7 +15,7 @@ class AlwaysLong:
 def test_constant_weight_pnl_and_cost_impact():
     index = pd.date_range('2020-01-01', periods=3, freq='D')
     prices = pd.DataFrame({'open': [100, 100, 100], 'close': [101, 101, 101]}, index=index)
-    data = DataBundle(prices=prices)
+    data = DataBundle(prices=prices).validate()
     idea = Idea(name='long')
     ctx = BacktestContext(fees_bps=1, slip_bps=2)
 

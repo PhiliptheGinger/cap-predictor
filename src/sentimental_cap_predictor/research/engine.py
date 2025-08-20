@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Lightweight backtesting utilities for research workflows.
 
 This module exposes a convenience function :func:`simple_backtester` that
@@ -16,20 +14,17 @@ simple basis-point specification.  Common performance metrics are reported in a
 ``Strategy`` protocol combining price momentum with optional sentiment filters.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Callable, List, Dict
 
 import numpy as np
 import pandas as pd
 
+from sentimental_cap_predictor.data_bundle import DataBundle
 from .idea_schema import Idea
-from .types import (
-    BacktestContext,
-    BacktestResult,
-    DataBundle,
-    Strategy,
-    Trade,
-)
+from .types import BacktestContext, BacktestResult, Strategy, Trade
 
 
 @dataclass
@@ -88,7 +83,7 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
         equity_curve = (1.0 + strategy_returns).cumprod()
 
         trade_list: List[Trade] = []
-        symbol = data.meta.get("ticker", "")
+        symbol = (data.metadata or {}).get("ticker", "")
         for ts, change in pos_diff[pos_diff != 0].items():
             side = "buy" if change > 0 else "sell"
             fees = float(abs(change) * cost_per_trade)

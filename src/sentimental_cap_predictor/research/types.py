@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Core type definitions used across research workflows.
 
 This module centralises small data containers and protocols that are shared
@@ -8,37 +6,15 @@ structures provide a consistent interface for handling market and sentiment
 inputs, passing configuration to backtests and capturing their results.
 """
 
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Any, Dict, List, Protocol
 
 import pandas as pd
 
+from sentimental_cap_predictor.data_bundle import DataBundle
 from .idea_schema import Idea
-
-
-@dataclass
-class DataBundle:
-    """Collection of market, sentiment and fundamental data.
-
-    Attributes
-    ----------
-    prices:
-        ``pandas.DataFrame`` of price data indexed by datetime.
-    sentiment:
-        Optional ``pandas.DataFrame`` containing sentiment features aligned with
-        ``prices``.
-    fundamentals:
-        Optional ``pandas.DataFrame`` of point-in-time fundamental data aligned
-        to ``prices``.
-    meta:
-        Arbitrary metadata describing the data set such as ticker, source or
-        preprocessing information.
-    """
-
-    prices: pd.DataFrame
-    sentiment: pd.DataFrame | None = None
-    fundamentals: pd.DataFrame | None = None
-    meta: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
