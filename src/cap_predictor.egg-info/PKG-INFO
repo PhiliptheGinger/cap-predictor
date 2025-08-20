@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: cap-predictor
+Version: 0.1.0
+Requires-Python: >=3.10
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: typer
+Requires-Dist: yfinance
+Requires-Dist: requests
+Requires-Dist: newspaper3k
+Requires-Dist: transformers
+Requires-Dist: tensorflow
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
