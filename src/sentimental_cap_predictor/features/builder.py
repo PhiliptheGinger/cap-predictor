@@ -40,9 +40,8 @@ def build_features(df: pd.DataFrame, ticker: str | None = None):
     df = df.dropna().reset_index(drop=True)
 
     # Target is next-day direction
-    y = (df["ret_1d"].shift(-1) > 0).astype(int)
-    df = df.iloc[:-1].copy()
-    y = y.iloc[:-1]
+    y = (df["ret_1d"].iloc[1:] > 0).astype(int).reset_index(drop=True)
+    df = df.iloc[:-1].copy().reset_index(drop=True)
 
     feature_cols = [c for c in FEATURE_COLUMNS if c in df.columns]
     X = df[feature_cols].to_numpy()
