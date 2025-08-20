@@ -98,21 +98,53 @@ def simple_backtester(
         equity_curve = (1.0 + strategy_returns).cumprod()
 
         trade_list: List[Trade] = []
+        trade_pnls: List[float] = []
+        holding_periods: List[float] = []
         symbol = (data.metadata or {}).get("ticker", "")
+        position = 0.0
+        entry_price: float | None = None
+        entry_ts: pd.Timestamp | int | None = None
+
         for ts, change in pos_diff[pos_diff != 0].items():
+            price = float(opens.loc[ts])
             side = "buy" if change > 0 else "sell"
             fees = float(abs(change) * cost_per_trade)
             note = str(ts)
+
+            pnl = 0.0
+            holding = 0.0
+            closing = position != 0 and (position + change) * position <= 0
+            if closing and entry_price is not None and entry_ts is not None:
+                pnl = (price - entry_price) * position
+                delta = ts - entry_ts
+                holding = (
+                    delta.days if isinstance(delta, pd.Timedelta) else float(delta)
+                )
+
             trade_list.append(
                 Trade(
                     symbol=symbol,
                     side=side,
                     qty=float(change),
-                    price=float(opens.loc[ts]),
+                    price=price,
                     fees=fees,
                     note=note,
                 )
             )
+            trade_pnls.append(float(pnl))
+            holding_periods.append(float(holding))
+
+            position += change
+            if position != 0 and closing:
+                # flipped position: treat current price as new entry
+                entry_price = price
+                entry_ts = ts
+            elif position != 0 and entry_price is None:
+                entry_price = price
+                entry_ts = ts
+            elif position == 0:
+                entry_price = None
+                entry_ts = None
 
         n_days = len(opens)
         if n_days > 0:
@@ -148,14 +180,16 @@ def simple_backtester(
                 columns=["symbol", "side", "qty", "price", "fees", "note"]
             )
         )
+        trade_pnls_series = pd.Series(trade_pnls, dtype=float)
+        holding_series = pd.Series(holding_periods, dtype=float)
         params = {"idea_name": idea.name, "positions": positions}
         return BacktestResult(
             trades=trades_df,
             equity_curve=equity_curve,
             metrics=metrics,
             parameters=params,
-            trade_pnls=pd.Series(dtype=float),
-            holding_periods=pd.Series(dtype=float),
+            trade_pnls=trade_pnls_series,
+            holding_periods=holding_series,
         )
 
     return _run
