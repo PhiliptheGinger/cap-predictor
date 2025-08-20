@@ -12,6 +12,7 @@ from loguru import logger
 from typing_extensions import Annotated
 from colorama import Fore, Style, init
 from .preprocessing import merge_data
+from .data_bundle import DataBundle
 
 load_dotenv()
 
@@ -105,6 +106,43 @@ def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     
     check_for_nan(df, "handling missing data")
     return df
+
+
+def load_data_bundle(ticker: str) -> DataBundle:
+    """Load price and news data for ``ticker`` into a :class:`DataBundle`.
+
+    The function expects that :mod:`dataset.main` has previously stored point-in-
+    time price and news data in ``RAW_DATA_DIR``.  It converts the ``date``
+    column to a ``DatetimeIndex`` and ensures both frames are aligned before
+    returning the validated bundle.  Any rows with timestamps in the future are
+    dropped to guard against look-ahead bias.
+    """
+
+    price_path = RAW_DATA_DIR / f"{ticker}.feather"
+    news_path = RAW_DATA_DIR / f"{ticker}_news.feather"
+
+    price_df = pd.read_feather(price_path)
+    if 'date' in price_df.columns:
+        price_df['date'] = pd.to_datetime(price_df['date'])
+        price_df = price_df[price_df['date'] <= pd.Timestamp.utcnow()]
+        price_df.set_index('date', inplace=True)
+
+    if news_path.exists():
+        news_df = pd.read_feather(news_path)
+        if 'date' in news_df.columns:
+            news_df['date'] = pd.to_datetime(news_df['date'], errors='coerce')
+            news_df = news_df[news_df['date'] <= pd.Timestamp.utcnow()]
+            news_df.set_index('date', inplace=True)
+        else:
+            news_df.index = pd.to_datetime(news_df.index)
+    else:
+        news_df = pd.DataFrame(index=price_df.index)
+
+    # Align news data to price index to avoid accidental look-ahead
+    news_df = news_df.reindex(price_df.index).fillna(method='ffill')
+
+    bundle = DataBundle(prices=price_df, sentiment=news_df, metadata={'ticker': ticker})
+    return bundle.validate()
 
 @app.command()
 def main(
