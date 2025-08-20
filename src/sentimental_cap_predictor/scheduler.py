@@ -1,0 +1,104 @@
+"""Simple command line scheduler for updating data sources and indexes."""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List
+
+import typer
+from loguru import logger
+
+from . import connectors
+from .indexer import build_index
+
+STATE_PATH = Path("state.json")
+DATA_DIR = Path("data")
+
+app = typer.Typer(
+    add_completion=False,
+    help="Data update and indexing scheduler",
+)
+
+
+def _load_state() -> Dict[str, str]:
+    if STATE_PATH.exists():
+        try:
+            return json.loads(STATE_PATH.read_text())
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _save_state(state: Dict[str, str]) -> None:
+    STATE_PATH.write_text(json.dumps(state, indent=2))
+
+
+@app.command("update:papers")
+def update_papers() -> None:
+    """Fetch paper metadata from arXiv and OpenAlex."""
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    arxiv_path = DATA_DIR / "arxiv_papers.json"
+    openalex_path = DATA_DIR / "openalex_papers.json"
+    connectors.arxiv_connector.update_store(arxiv_path)
+    connectors.openalex_connector.update_store(openalex_path)
+    state = _load_state()
+    state["papers_updated"] = datetime.utcnow().isoformat()
+    _save_state(state)
+    logger.info("Paper sources updated")
+
+
+@app.command("update:fred")
+def update_fred(series_id: str = "GDP") -> None:
+    """Fetch a FRED time series."""
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    fred_path = DATA_DIR / f"fred_{series_id}.json"
+    connectors.fred_connector.update_store(series_id, fred_path)
+    state = _load_state()
+    state[f"fred_{series_id}_updated"] = datetime.utcnow().isoformat()
+    _save_state(state)
+    logger.info("FRED series %s updated", series_id)
+
+
+@app.command("update:edgar")
+def update_edgar(cik: str) -> None:
+    """Fetch SEC EDGAR filings for *cik*."""
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    edgar_path = DATA_DIR / f"edgar_{cik}.json"
+    connectors.edgar_connector.update_store(cik, edgar_path)
+    state = _load_state()
+    state[f"edgar_{cik}_updated"] = datetime.utcnow().isoformat()
+    _save_state(state)
+    logger.info("EDGAR filings for %s updated", cik)
+
+
+@app.command("index:papers")
+def index_papers() -> None:
+    """Build a FAISS index over all stored papers."""
+
+    arxiv_path = DATA_DIR / "arxiv_papers.json"
+    openalex_path = DATA_DIR / "openalex_papers.json"
+    papers: List[dict] = []
+    for path in (arxiv_path, openalex_path):
+        if path.exists():
+            papers.extend(json.loads(path.read_text()))
+    if not papers:
+        raise RuntimeError("No paper data available; run update:papers first")
+
+    metadata_path = DATA_DIR / "papers.json"
+    metadata_path.write_text(json.dumps(papers, indent=2))
+    index_path = DATA_DIR / "papers.index"
+    build_index(papers, index_path)
+
+    state = _load_state()
+    state["papers_indexed"] = datetime.utcnow().isoformat()
+    _save_state(state)
+    logger.info("Paper index rebuilt")
+
+
+if __name__ == "__main__":  # pragma: no cover - manual invocation
+    app()
