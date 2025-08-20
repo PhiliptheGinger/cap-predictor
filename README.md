@@ -45,3 +45,23 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
 
 Run `--help` with any module for detailed options.
+
+## Testing
+
+1. **Install development dependencies**
+   ```bash
+   pip install -e .[dev]
+   ```
+2. **Run linters and formatters**
+   ```bash
+   pre-commit run --all-files
+   ```
+3. **Execute tests**
+   ```bash
+   pytest
+   ```
+   `make test` is also supported.
+
+Environment variables such as `TEST_TICKER` (to choose a ticker for integration
+tests) and `OFFLINE_TEST` (to disable external data fetching) may be required for
+certain test scenarios.
