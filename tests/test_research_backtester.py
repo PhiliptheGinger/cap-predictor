@@ -51,3 +51,11 @@ def test_simple_backtester_trades_and_equity():
         result.trades.reset_index(drop=True),
         expected_trades,
     )
+    expected_pnls = pd.Series([0.0, 1.0])
+    expected_holding = pd.Series([0.0, 1.0])
+    pd.testing.assert_series_equal(
+        result.trade_pnls.reset_index(drop=True), expected_pnls
+    )
+    pd.testing.assert_series_equal(
+        result.holding_periods.reset_index(drop=True), expected_holding
+    )
