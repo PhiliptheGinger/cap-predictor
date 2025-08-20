@@ -25,4 +25,6 @@ def test_backtester_interprets_weights():
     strategy = BuyAndHoldStrategy()
     result = backtest(bundle, strategy, initial_capital=1_000.0)
 
-    assert result.equity_curve.iloc[-1] == 3_000.0
+    # With next-bar execution the long position is entered at price 2 and
+    # remains open at the end of the sample.
+    assert result.equity_curve.iloc[-1] == 1_500.0
