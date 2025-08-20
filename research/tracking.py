@@ -32,6 +32,15 @@ class Metric(Base):
     step = Column(Integer, nullable=True)
 
 
+class Param(Base):
+    __tablename__ = "params"
+
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String, index=True)
+    key = Column(String)
+    value = Column(String)
+
+
 class LocalTracker:
     """A simple SQLite-backed experiment tracker."""
 
@@ -43,7 +52,7 @@ class LocalTracker:
         self.SessionLocal = sessionmaker(bind=self.engine)
         self._current_run: Optional[str] = None
 
-    def start_run(self) -> str:
+    def start_run(self, params: Optional[Dict[str, Any]] = None) -> str:
         run_id = uuid.uuid4().hex
         run_dir = self.root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -51,6 +60,8 @@ class LocalTracker:
             session.add(Run(run_id=run_id, start_time=datetime.utcnow()))
             session.commit()
         self._current_run = run_id
+        if params:
+            self.log_params(params)
         return run_id
 
     def log_metrics(
@@ -66,6 +77,20 @@ class LocalTracker:
                         key=key,
                         value=float(value),
                         step=step,
+                    )
+                )
+            session.commit()
+
+    def log_params(self, params: Dict[str, Any]) -> None:
+        if self._current_run is None:
+            raise RuntimeError("No active run. Call start_run() first.")
+        with self.SessionLocal() as session:
+            for key, value in params.items():
+                session.add(
+                    Param(
+                        run_id=self._current_run,
+                        key=key,
+                        value=str(value),
                     )
                 )
             session.commit()
