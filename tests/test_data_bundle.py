@@ -46,3 +46,25 @@ def test_validate_rejects_misaligned_and_future_data():
     future_prices = pd.DataFrame({'close': [1]}, index=future_index)
     with pytest.raises(ValueError):
         DataBundle(prices=future_prices).validate()
+
+
+def test_weekly_sentiment_resampled_to_daily_prices_without_lookahead():
+    daily_index = pd.date_range('2019-12-30', periods=14, freq='D')
+    prices = pd.DataFrame({'close': range(len(daily_index))}, index=daily_index)
+
+    sent_index = pd.to_datetime(['2020-01-01', '2020-01-08'])
+    weekly_sent = pd.DataFrame({'score': [0.1, 0.2]}, index=sent_index)
+
+    bundle = DataBundle(prices=prices, sentiment=weekly_sent).validate(
+        resample_method='ffill'
+    )
+
+    # Sentiment frame should be aligned to the daily index
+    assert bundle.sentiment.index.equals(prices.index)
+
+    # No lookahead: days before first sentiment release remain NaN
+    assert bundle.sentiment.loc['2019-12-30':'2019-12-31', 'score'].isna().all()
+
+    # Forward-filled between weekly releases
+    assert (bundle.sentiment.loc['2020-01-01':'2020-01-07', 'score'] == 0.1).all()
+    assert (bundle.sentiment.loc['2020-01-08':, 'score'] == 0.2).all()
