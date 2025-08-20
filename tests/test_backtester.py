@@ -54,3 +54,26 @@ def test_multi_asset_next_bar_and_costs():
     # Portfolio equity after closing positions
     assert result.equity_curve.iloc[-1] == pytest.approx(1077.6842105263)
 
+
+def test_backtest_generates_metrics_and_trades():
+    index = pd.date_range('2024-01-01', periods=3, freq='D')
+    prices = pd.DataFrame({('AAPL', 'close'): [10, 11, 12]}, index=index)
+    bundle = DataBundle(prices=prices)
+
+    weights = pd.DataFrame([1.0, 0.0, 0.0], index=index, columns=['AAPL'])
+    strat = DummyStrategy(weights)
+
+    result = backtest(bundle, strat, initial_capital=1_000.0)
+
+    # One completed trade with expected dates and pnl
+    trades = result.trades
+    assert len(trades) == 1
+    trade = trades.iloc[0]
+    assert trade['entry_date'] == index[1]
+    assert trade['exit_date'] == index[2]
+    assert trade['pnl'] == pytest.approx(90.9091, rel=1e-4)
+
+    # Metrics reflect equity growth and trade count
+    assert result.metrics['total_return'] == pytest.approx(0.090909, rel=1e-4)
+    assert result.metrics['trade_count'] == 1
+

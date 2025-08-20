@@ -31,3 +31,18 @@ def test_publication_timestamps_enforce_no_lookahead():
     pub_bad = pd.DataFrame({('AAPL', 'close'): index + pd.Timedelta(days=1)}, index=index)
     with pytest.raises(ValueError):
         DataBundle(prices=prices, publication_times={'prices': pub_bad}).validate()
+
+
+def test_validate_rejects_misaligned_and_future_data():
+    base = pd.date_range('2024-01-01', periods=2, freq='D')
+    prices = pd.DataFrame({'close': [1, 2]}, index=base)
+    # Features misaligned on index
+    features = pd.DataFrame({'feat': [0, 1]}, index=base + pd.Timedelta(days=1))
+    with pytest.raises(ValueError):
+        DataBundle(prices=prices, features=features).validate()
+
+    # Prices containing future timestamps should fail
+    future_index = pd.date_range('2050-01-01', periods=1, freq='D')
+    future_prices = pd.DataFrame({'close': [1]}, index=future_index)
+    with pytest.raises(ValueError):
+        DataBundle(prices=future_prices).validate()

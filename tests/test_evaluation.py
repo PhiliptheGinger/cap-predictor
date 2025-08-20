@@ -44,3 +44,13 @@ def test_rank_strategies_orders_by_objective():
     }
     ranked = rank_strategies(strategies, expression="sharpe_ratio + max_drawdown")
     assert list(ranked["strategy"]) == ["A", "B"]
+
+
+def test_rank_strategies_applies_constraints():
+    strategies = {
+        "good": {"sharpe_ratio": 1.0, "max_drawdown": -0.1, "trade_count": 20},
+        "bad": {"sharpe_ratio": 2.0, "max_drawdown": -0.5, "trade_count": 5},
+    }
+    cons = Constraints(max_drawdown=0.2, min_trades=10)
+    ranked = rank_strategies(strategies, constraints=cons)
+    assert list(ranked["strategy"]) == ["good"]
