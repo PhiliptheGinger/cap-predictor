@@ -53,8 +53,7 @@ def main(ticker: str) -> None:
         df_ret = add_returns(df)
         df_ret = add_tech_indicators(df_ret)
         df_ret = df_ret.dropna().reset_index(drop=True)
-        returns_series = df_ret["ret_1d"].shift(-1).iloc[:-1]
-        returns_series = returns_series.reset_index(drop=True)
+        returns_series = df_ret["ret_1d"].iloc[1:].reset_index(drop=True)
 
         X, y, dates = build_features(df, ticker=ticker)
         if len(returns_series) != len(y):

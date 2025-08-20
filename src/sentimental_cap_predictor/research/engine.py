@@ -34,31 +34,25 @@ from .types import (
 
 @dataclass
 class SmaSentStrategy:
-    """Simple moving-average and sentiment crossover strategy.
+    """Price above moving-average with optional sentiment filter.
 
-    This reference strategy goes long when a short moving average is above a
-    long moving average and optional sentiment scores are positive.
-    The moving-average windows and sentiment column can be supplied via
-    ``Idea.params`` using keys ``short_window``, ``long_window`` and
-    ``sentiment_col`` respectively.
+    The strategy goes long when the ``close`` price is above a simple moving
+    average of length ``ma_window``.  If sentiment data are supplied the signal
+    is only active when the sentiment value exceeds ``sent_thr``.  Both
+    parameters are read from ``Idea.params``.
     """
 
     def generate_signals(self, data: DataBundle, idea: Idea) -> pd.Series:
         prices = data.prices.iloc[:, 0].astype(float)
-        short_window = int(idea.params.get("short_window", 20))
-        long_window = int(idea.params.get("long_window", 50))
+        ma_window = int(idea.params.get("ma_window", 20))
+        sent_thr = float(idea.params.get("sent_thr", 0.0))
 
-        short_ma = prices.rolling(window=short_window, min_periods=1).mean()
-        long_ma = prices.rolling(window=long_window, min_periods=1).mean()
-        signals = (short_ma > long_ma).astype(float)
+        ma = prices.rolling(window=ma_window, min_periods=1).mean()
+        signals = (prices > ma).astype(float)
 
         if data.sentiment is not None and not data.sentiment.empty:
-            sent_col = idea.params.get("sentiment_col")
-            if sent_col and sent_col in data.sentiment:
-                sentiment = data.sentiment[sent_col]
-            else:
-                sentiment = data.sentiment.iloc[:, 0]
-            signals = signals.where(sentiment > 0, 0.0)
+            sentiment = data.sentiment.iloc[:, 0].astype(float)
+            signals = signals.where(sentiment > sent_thr, 0.0)
 
         return signals
 
@@ -76,14 +70,18 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
 
         prices = data.prices.copy()
         open_col = next((c for c in prices.columns if c.lower().startswith("open")), None)
+        close_col = next((c for c in prices.columns if c.lower().startswith("close")), None)
         opens = prices[open_col] if open_col else prices.iloc[:, 0]
+        closes = prices[close_col] if close_col else prices.iloc[:, -1]
         opens = opens.astype(float)
+        closes = closes.astype(float)
 
         signals = strategy.generate_signals(data, idea).reindex(opens.index).fillna(0.0).astype(float)
         positions = signals.shift(1).fillna(0.0)
-        returns = opens.pct_change().shift(-1).fillna(0.0)
+        returns = (closes / opens - 1.0).fillna(0.0)
 
-        trades = positions.diff().abs().fillna(0.0)
+        pos_diff = positions.diff().fillna(positions)
+        trades = pos_diff.abs()
         cost_per_trade = (ctx.fees_bps + ctx.slip_bps) / 1e4
         costs = trades * cost_per_trade
         strategy_returns = positions * returns - costs
@@ -91,7 +89,6 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
 
         trade_list: List[Trade] = []
         symbol = data.meta.get("ticker", "")
-        pos_diff = positions.diff().fillna(positions)
         for ts, change in pos_diff[pos_diff != 0].items():
             side = "buy" if change > 0 else "sell"
             fees = float(abs(change) * cost_per_trade)
@@ -109,17 +106,22 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
 
         n_days = len(opens)
         cagr = float(equity_curve.iloc[-1] ** (252 / n_days) - 1) if n_days > 0 else 0.0
-        sharpe = float(np.sqrt(252) * strategy_returns.mean() / strategy_returns.std(ddof=0)) if strategy_returns.std(ddof=0) > 0 else np.nan
+        ret_std = strategy_returns.std(ddof=0)
+        sharpe = float(np.sqrt(252) * strategy_returns.mean() / ret_std) if ret_std > 0 else np.nan
+        vol = float(ret_std * np.sqrt(252))
         cumulative_max = equity_curve.cummax()
         drawdown = equity_curve / cumulative_max - 1.0
         maxdd = float(drawdown.min())
-        turnover = float(trades.sum())
+        mean_turnover = float(trades.mean())
+        trade_count = float((trades > 0).sum())
 
         metrics: Dict[str, float] = {
             "CAGR": cagr,
             "Sharpe": sharpe,
+            "Vol": vol,
             "MaxDD": maxdd,
-            "Turnover": turnover,
+            "Turnover": mean_turnover,
+            "TradeCount": trade_count,
         }
 
         return BacktestResult(
@@ -128,7 +130,7 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
             trades=trade_list,
             positions=positions,
             metrics=metrics,
-            artifacts={},
+            artifacts={"strat_ret": strategy_returns},
         )
 
     return _run
