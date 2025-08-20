@@ -73,13 +73,51 @@ class DataBundle:
             raise KeyError("no sentiment data available")
         return self._get_from_frame(self.sentiment, asset, field)
 
-    def validate(self) -> "DataBundle":
+    def _align_frame(
+        self, frame: pd.DataFrame, base_index: pd.DatetimeIndex, method: str
+    ) -> pd.DataFrame:
+        """Align ``frame`` to ``base_index`` using ``method``.
+
+        ``method`` may be ``'ffill'`` which reindexes to ``base_index`` and
+        forward fills values, or ``'resample'`` which resamples the frame to the
+        inferred frequency of ``base_index`` before forward filling.  The method
+        never propagates values backwards in time, preventing lookahead bias.
+        """
+
+        if method == "ffill":
+            return frame.reindex(base_index, method="ffill")
+        if method == "resample":
+            freq = pd.infer_freq(base_index)
+            if freq is None:
+                raise ValueError("cannot infer base index frequency for resampling")
+            return (
+                frame.resample(freq).ffill().reindex(base_index, method="ffill")
+            )
+        raise ValueError(f"unknown resample_method '{method}'")
+
+    def validate(self, resample_method: str | None = None) -> "DataBundle":
         """Validate that all included data are aligned by timestamp.
 
-        Returns the bundle itself so callers can use ``bundle.validate()`` when
-        constructing the object.  The check is intentionally lightweight – it
-        ensures that all frames share the same, monotonically increasing
-        ``DatetimeIndex`` and that no timestamps lie in the future.
+        Parameters
+        ----------
+        resample_method:
+            Optional alignment strategy. When provided, frames whose index does
+            not match ``prices`` will be aligned to the price index using this
+            method. Supported values are ``'ffill'`` and ``'resample'``.
+
+        Returns
+        -------
+        DataBundle
+            The bundle itself so callers can use ``bundle.validate()`` when
+            constructing the object.
+
+        Notes
+        -----
+        The check is intentionally lightweight – it ensures that all frames
+        share the same, monotonically increasing ``DatetimeIndex`` and that no
+        timestamps lie in the future.  When ``resample_method`` is provided any
+        alignment is performed in a way that prevents lookahead by only
+        forward-filling past observations.
         """
 
         base_index = self.prices.index
@@ -102,7 +140,10 @@ class DataBundle:
             if not isinstance(frame.index, pd.DatetimeIndex):
                 raise ValueError("all DataFrames must use pandas.DatetimeIndex")
             if not frame.index.equals(base_index):
-                raise ValueError("DataFrames must be aligned on the same index")
+                if resample_method is None:
+                    raise ValueError("DataFrames must be aligned on the same index")
+                frame = self._align_frame(frame, base_index, resample_method)
+                setattr(self, name, frame)
             if (frame.index > now).any():
                 raise ValueError("data contains timestamps in the future")
 
