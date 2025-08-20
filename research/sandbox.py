@@ -102,7 +102,7 @@ def _build_runner(
         import base64
         import builtins
         import pickle
-        import resource
+        import psutil
         import sys
 
         _banned = (
@@ -132,8 +132,14 @@ def _build_runner(
             PermissionError('exec disabled')
         )
 
-        resource.setrlimit(resource.RLIMIT_CPU, ({cpu_limit}, {cpu_limit}))
-        resource.setrlimit(resource.RLIMIT_AS, ({mem_limit}, {mem_limit}))
+        proc = psutil.Process()
+        try:
+            if hasattr(psutil, "RLIMIT_CPU"):
+                proc.rlimit(psutil.RLIMIT_CPU, ({cpu_limit}, {cpu_limit}))
+            if hasattr(psutil, "RLIMIT_AS"):
+                proc.rlimit(psutil.RLIMIT_AS, ({mem_limit}, {mem_limit}))
+        except Exception:
+            pass
 
         _op_limit = {op_limit}
         _ops = 0
