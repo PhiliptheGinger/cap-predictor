@@ -6,21 +6,21 @@ from sentimental_cap_predictor.research import objectives
 from sentimental_cap_predictor.research.types import BacktestResult
 
 
-def _make_result(returns: pd.Series, equity: pd.Series) -> BacktestResult:
+def _make_result(equity: pd.Series) -> BacktestResult:
     return BacktestResult(
-        idea_name="test",
+        trades=pd.DataFrame(),
         equity_curve=equity,
-        trades=[],
-        positions=pd.Series(dtype=float),
         metrics={},
-        artifacts={"strat_ret": returns},
+        parameters={},
+        trade_pnls=pd.Series(dtype=float),
+        holding_periods=pd.Series(dtype=float),
     )
 
 
-def test_sharpe_and_sortino_use_artifact_returns():
-    returns = pd.Series([0.02, -0.01, 0.03, -0.02])
-    equity = pd.Series(1.0, index=returns.index)  # flat equity
-    result = _make_result(returns, equity)
+def test_sharpe_and_sortino_use_returns():
+    equity = pd.Series([1.0, 1.02, 1.0098, 1.040094, 1.019292])
+    result = _make_result(equity)
+    returns = result.return_series()
 
     expected_sharpe = np.sqrt(252) * returns.mean() / returns.std(ddof=0)
     downside = returns[returns < 0].std(ddof=0)
@@ -31,9 +31,8 @@ def test_sharpe_and_sortino_use_artifact_returns():
 
 
 def test_calmar_uses_equity_curve():
-    returns = pd.Series([0.02, -0.01, 0.03, -0.02])
-    equity = (1 + returns).cumprod()
-    result = _make_result(returns, equity)
+    equity = pd.Series([1.0, 1.02, 1.0098, 1.040094, 1.019292])
+    result = _make_result(equity)
 
     n = len(equity)
     cagr = (equity.iloc[-1] / equity.iloc[0]) ** (252 / n) - 1

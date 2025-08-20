@@ -1,13 +1,14 @@
 """Lightweight backtesting utilities for research workflows.
 
 This module exposes a convenience function :func:`simple_backtester` that
-creates a callable executing a basic daily backtest.  It operates on a
+creates a callable executing a basic daily backtest. It operates on a
 :class:`~sentimental_cap_predictor.research.types.DataBundle` and a
 :class:`~sentimental_cap_predictor.research.idea_schema.Idea`, generating
-trading signals via a provided :class:`~sentimental_cap_predictor.research.types.Strategy`.
+trading signals via a provided
+:class:`~sentimental_cap_predictor.research.types.Strategy`.
 
 The backtest assumes next-day ``open`` fills and models transaction costs via a
-simple basis-point specification.  Common performance metrics are reported in a
+simple basis-point specification. Common performance metrics are reported in a
 :class:`~sentimental_cap_predictor.research.types.BacktestResult` dataclass.
 
 ``SmaSentStrategy`` is provided as a minimal reference implementation of the
@@ -16,13 +17,14 @@ simple basis-point specification.  Common performance metrics are reported in a
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, List, Dict
+from dataclasses import asdict, dataclass
+from typing import Callable, Dict, List
 
 import numpy as np
 import pandas as pd
 
 from sentimental_cap_predictor.data_bundle import DataBundle
+
 from .idea_schema import Idea
 from .types import BacktestContext, BacktestResult, Strategy, Trade
 
@@ -52,26 +54,39 @@ class SmaSentStrategy:
         return signals
 
 
-def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, BacktestContext], BacktestResult]:
+def simple_backtester(
+    strategy: Strategy,
+) -> Callable[[DataBundle, Idea, BacktestContext], BacktestResult]:
     """Create a function that backtests ``strategy`` over provided data.
 
     The returned callable performs a daily backtest using ``DataBundle.prices``
-    with trades executed at the next day's open.  Transaction costs are modelled
+    with trades executed at the next day's open. Transaction costs are modelled
     as ``(fees_bps + slip_bps)/1e4`` per unit of turnover.
     """
 
-    def _run(data: DataBundle, idea: Idea, ctx: BacktestContext | None = None) -> BacktestResult:
+    def _run(
+        data: DataBundle, idea: Idea, ctx: BacktestContext | None = None
+    ) -> BacktestResult:
         ctx = ctx or BacktestContext()
 
         prices = data.prices.copy()
-        open_col = next((c for c in prices.columns if c.lower().startswith("open")), None)
-        close_col = next((c for c in prices.columns if c.lower().startswith("close")), None)
+        open_col = next(
+            (c for c in prices.columns if c.lower().startswith("open")), None
+        )
+        close_col = next(
+            (c for c in prices.columns if c.lower().startswith("close")), None
+        )
         opens = prices[open_col] if open_col else prices.iloc[:, 0]
         closes = prices[close_col] if close_col else prices.iloc[:, -1]
         opens = opens.astype(float)
         closes = closes.astype(float)
 
-        signals = strategy.generate_signals(data, idea).reindex(opens.index).fillna(0.0).astype(float)
+        signals = (
+            strategy.generate_signals(data, idea)
+            .reindex(opens.index)
+            .fillna(0.0)
+            .astype(float)
+        )
         positions = signals.shift(1).fillna(0.0)
         returns = (closes / opens - 1.0).fillna(0.0)
 
@@ -100,9 +115,16 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
             )
 
         n_days = len(opens)
-        cagr = float(equity_curve.iloc[-1] ** (252 / n_days) - 1) if n_days > 0 else 0.0
+        if n_days > 0:
+            cagr = float(equity_curve.iloc[-1] ** (252 / n_days) - 1)
+        else:
+            cagr = 0.0
         ret_std = strategy_returns.std(ddof=0)
-        sharpe = float(np.sqrt(252) * strategy_returns.mean() / ret_std) if ret_std > 0 else np.nan
+        sharpe = (
+            float(np.sqrt(252) * strategy_returns.mean() / ret_std)
+            if ret_std > 0
+            else np.nan
+        )
         vol = float(ret_std * np.sqrt(252))
         cumulative_max = equity_curve.cummax()
         drawdown = equity_curve / cumulative_max - 1.0
@@ -119,13 +141,21 @@ def simple_backtester(strategy: Strategy) -> Callable[[DataBundle, Idea, Backtes
             "TradeCount": trade_count,
         }
 
+        trades_df = (
+            pd.DataFrame([asdict(t) for t in trade_list])
+            if trade_list
+            else pd.DataFrame(
+                columns=["symbol", "side", "qty", "price", "fees", "note"]
+            )
+        )
+        params = {"idea_name": idea.name, "positions": positions}
         return BacktestResult(
-            idea_name=idea.name,
+            trades=trades_df,
             equity_curve=equity_curve,
-            trades=trade_list,
-            positions=positions,
             metrics=metrics,
-            artifacts={"strat_ret": strategy_returns},
+            parameters=params,
+            trade_pnls=pd.Series(dtype=float),
+            holding_periods=pd.Series(dtype=float),
         )
 
     return _run
