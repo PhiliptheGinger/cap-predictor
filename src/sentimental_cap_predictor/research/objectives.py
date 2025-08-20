@@ -19,11 +19,10 @@ if TYPE_CHECKING:  # pragma: no cover - for type checkers only
 def _returns(result: "BacktestResult") -> pd.Series:
     """Return daily strategy returns.
 
-    Returns are retrieved from ``result.artifacts['strat_ret']`` which
-    contains the backtest's daily percentage returns.
+    Returns are derived from the equity curve of ``result``.
     """
 
-    rets = pd.Series(result.artifacts["strat_ret"], dtype=float)
+    rets = result.return_series().astype(float)
     return rets.dropna()
 
 

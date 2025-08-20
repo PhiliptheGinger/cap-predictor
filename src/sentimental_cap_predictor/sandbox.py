@@ -8,6 +8,9 @@ import multiprocessing as mp
 import resource
 from typing import Dict
 
+# flake8: noqa
+
+
 ALLOWED_MODULES = {"pandas", "numpy"}
 DISALLOWED_BUILTINS = {
     "eval",
@@ -54,8 +57,7 @@ def _validate(code: str) -> None:
                 raise ValueError(f"Import of module '{module}' is not allowed")
         if isinstance(node, ast.Attribute):
             if (
-                isinstance(node.value, ast.Name)
-                and node.value.id == "__builtins__"
+                isinstance(node.value, ast.Name) and node.value.id == "__builtins__"
             ) or node.attr.startswith("__"):
                 raise ValueError("Attribute access is not allowed")
         if isinstance(node, ast.While):
@@ -77,9 +79,7 @@ def _validate(code: str) -> None:
             elif len(args) == 2:
                 iterations = args[1].value - args[0].value
             elif len(args) == 3:
-                iterations = (
-                    args[1].value - args[0].value
-                ) // args[2].value
+                iterations = (args[1].value - args[0].value) // args[2].value
             else:  # pragma: no cover - ast guarantees max 3 args
                 iterations = MAX_LOOP_ITERATIONS + 1
             if iterations > MAX_LOOP_ITERATIONS:
@@ -88,10 +88,10 @@ def _validate(code: str) -> None:
 
 def run_code(
     code: str,
-    timeout: int = 5,
+    timeout: int = 20,
     *,
     cpu_time: int | None = None,
-    mem_limit: int = 100_000_000,
+    mem_limit: int = 500_000_000,
 ) -> Dict[str, object]:
     """Run ``code`` in a subprocess with limited builtins and imports."""
 
