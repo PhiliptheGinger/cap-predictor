@@ -13,3 +13,18 @@ def backtest(idea: Idea):
 idea = Idea(name="My idea", params={"window": 5})
 result = apply_idea(idea, backtest)
 ```
+
+## Experiment Tracking
+
+The `LocalTracker` offers lightweight experiment logging without requiring an
+external service. Parameters can be recorded alongside metrics and later joined
+for analysis.
+
+```python
+from research.tracking import LocalTracker
+
+tracker = LocalTracker(root="./runs")
+tracker.start_run({"window": 5})
+tracker.log_metrics({"accuracy": 0.9})
+tracker.end_run()
+```
