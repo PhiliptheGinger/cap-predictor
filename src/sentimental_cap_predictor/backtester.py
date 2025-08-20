@@ -31,6 +31,10 @@ def backtest(
     cash = initial_capital
     equity_curve = []
     trades = []
+    trade_pnls = []
+    holding_periods = []
+    entry_price: Optional[float] = None
+    entry_date: Optional[pd.Timestamp] = None
 
     for date, price in prices.items():
         desired = signals.loc[date]
@@ -39,11 +43,51 @@ def backtest(
             trade_price = price * (1 + slippage if trade_size > 0 else 1 - slippage)
             cash -= trade_size * trade_price
             cash -= cost_per_trade
-            trades.append({"date": date, "size": trade_size, "price": trade_price})
+
+            if position != 0:
+                pnl = (trade_price - entry_price) * position  # type: ignore
+                trade_pnls.append(pnl)
+                holding = (date - entry_date).days if isinstance(date, pd.Timestamp) else date - entry_date  # type: ignore
+                holding_periods.append(holding)
+                trades.append(
+                    {
+                        "entry_date": entry_date,
+                        "exit_date": date,
+                        "size": position,
+                        "entry_price": entry_price,
+                        "exit_price": trade_price,
+                        "pnl": pnl,
+                        "holding_period": holding,
+                    }
+                )
+
+            if desired != 0:
+                entry_price = trade_price
+                entry_date = date
+            else:
+                entry_price = None
+                entry_date = None
+
             position = desired
+
         equity_curve.append({"date": date, "equity": cash + position * price})
 
     equity_series = pd.Series([e["equity"] for e in equity_curve], index=prices.index)
     trades_df = pd.DataFrame(trades)
+    trade_pnls_series = pd.Series(trade_pnls)
+    holding_series = pd.Series(holding_periods)
     metrics = compute_metrics(equity_series, trades_df)
-    return BacktestResult(trades=trades_df, equity_curve=equity_series, metrics=metrics)
+    parameters = {
+        "initial_capital": initial_capital,
+        "cost_per_trade": cost_per_trade,
+        "slippage": slippage,
+        "strategy": strategy.__class__.__name__,
+    }
+    return BacktestResult(
+        trades=trades_df,
+        equity_curve=equity_series,
+        metrics=metrics,
+        parameters=parameters,
+        trade_pnls=trade_pnls_series,
+        holding_periods=holding_series,
+    )
