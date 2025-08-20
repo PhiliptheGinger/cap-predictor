@@ -11,6 +11,8 @@ import traceback
 
 from .preprocessing import preprocess_price_data, merge_data
 from .model_training import train_and_predict
+from .data_bundle import DataBundle
+from .dataset import load_data_bundle
 
 # Load logging level from .env (defaults to 'INFO')
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -42,11 +44,11 @@ def print_nan_info(df, step_name):
     logger.info(f"Datetime index range after {step_name}: {df.index.min()} to {df.index.max()}")
 
 # Core function for generating predictions
-def generate_predictions(price_df, news_df, ticker, mode='train_test', prediction_days=None, processed_dir=Path(PROCESSED_DATA_DIR)):
+def generate_predictions(bundle: DataBundle, ticker, mode='train_test', prediction_days=None, processed_dir=Path(PROCESSED_DATA_DIR)):
     logger.info(f"Starting prediction process for ticker: {ticker} in {mode} mode")
-    # Check types to verify inputs
-    logger.info(f"Type of price_df: {type(price_df)}")
-    logger.info(f"Type of news_df: {type(news_df)}")
+
+    price_df = bundle.prices.copy()
+    news_df = bundle.sentiment.copy() if bundle.sentiment is not None else pd.DataFrame(index=price_df.index)
 
     # If prediction_days isn't provided, fallback to DEFAULT_PREDICTION_DAYS
     prediction_days = prediction_days or DEFAULT_PREDICTION_DAYS
@@ -184,28 +186,15 @@ if __name__ == "__main__":
     prediction_days = int(sys.argv[3]) if len(sys.argv) > 3 and mode == 'production' else DEFAULT_PREDICTION_DAYS
 
     try:
-        # Load price data
-        df_path = Path(RAW_DATA_DIR) / f"{ticker}.feather"
-        price_df = pd.read_feather(df_path)
-        logger.info(f"Loaded price data from {df_path}, shape: {price_df.shape}")
+        bundle = load_data_bundle(ticker)
     except Exception as e:
-        logger.error(f"Error loading Feather file for {ticker}: {e}")
-        logger.error(traceback.format_exc())
-        sys.exit(1)
-
-    try:
-        # Load news data
-        news_path = Path(RAW_DATA_DIR) / f"{ticker}_news.feather"
-        news_df = pd.read_feather(news_path)
-        logger.info(f"Loaded news data from {news_path}, shape: {news_df.shape}")
-    except Exception as e:
-        logger.error(f"Error loading news Feather file for {ticker}: {e}")
+        logger.error(f"Error loading data bundle for {ticker}: {e}")
         logger.error(traceback.format_exc())
         sys.exit(1)
 
     try:
         # Generate predictions using the main function
-        result = generate_predictions(price_df, news_df, ticker, mode, prediction_days)
+        result = generate_predictions(bundle, ticker, mode, prediction_days)
         if result is not None:
             logger.info("Result DataFrame:")
             print(result.head())
