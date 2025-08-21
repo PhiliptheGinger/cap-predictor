@@ -1,8 +1,9 @@
 import os
-from dotenv import load_dotenv
-from pathlib import Path
-from loguru import logger
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+from loguru import logger
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,8 +15,12 @@ logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
 
 DATA_DIR = PROJ_ROOT / "data"
 RAW_DATA_DIR = Path(os.getenv("RAW_DATA_DIR", DATA_DIR / "raw"))
-INTERIM_DATA_DIR = Path(os.getenv("INTERIM_DATA_DIR", DATA_DIR / "interim"))
-PROCESSED_DATA_DIR = Path(os.getenv("PROCESSED_DATA_DIR", DATA_DIR / "processed"))
+INTERIM_DATA_DIR = Path(
+    os.getenv("INTERIM_DATA_DIR", DATA_DIR / "interim"),
+)
+PROCESSED_DATA_DIR = Path(
+    os.getenv("PROCESSED_DATA_DIR", DATA_DIR / "processed"),
+)
 EXTERNAL_DATA_DIR = DATA_DIR / "external"
 
 MODELS_DIR = PROJ_ROOT / "models"
@@ -36,8 +41,12 @@ TRAIN_RATIO = float(os.getenv("TRAIN_RATIO", 0.8))
 
 # SARIMA model parameters
 SARIMA_ORDER = tuple(map(int, os.getenv("SARIMA_ORDER", "1,1,1").split(",")))
-SARIMA_SEASONAL_ORDER = tuple(map(int, os.getenv("SARIMA_SEASONAL_ORDER", "1,1,1,7").split(",")))
-SEASONAL_ORDER = tuple(map(int, os.getenv("SEASONAL_ORDER", "1,1,1,12").split(",")))
+SARIMA_SEASONAL_ORDER = tuple(
+    map(int, os.getenv("SARIMA_SEASONAL_ORDER", "1,1,1,7").split(","))
+)
+SEASONAL_ORDER = tuple(
+    map(int, os.getenv("SEASONAL_ORDER", "1,1,1,12").split(",")),
+)
 
 # FFT Analysis
 PREDICTION_DAYS = int(os.getenv("PREDICTION_DAYS", 14))
@@ -49,18 +58,26 @@ DATA_PATH = os.getenv("DATA_PATH", "./data/your_data.csv")
 # Logging level
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-# Remove log handlers only if they exist
-if logger._core.handlers:
+# Remove existing log handlers without accessing private attributes
+try:
     logger.remove()
+except ValueError:
+    # No handlers were configured yet
+    pass
 
-logger.add(sys.stdout, level=LOG_LEVEL)
+# Capture handler ID for the standard output
+stdout_handler_id = logger.add(sys.stdout, level=LOG_LEVEL)
 
 # tqdm integration with loguru
 try:
     from tqdm import tqdm
-    if logger._core.handlers:
-        logger.remove(next(iter(logger._core.handlers.keys())))  # Safely remove first handler
-    logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True)
+
+    # Replace the standard output handler with one compatible with tqdm
+    logger.remove(stdout_handler_id)
+    tqdm_handler_id = logger.add(
+        lambda msg: tqdm.write(msg, end=""),
+        colorize=True,
+    )
 except ModuleNotFoundError:
     pass
 
@@ -74,12 +91,12 @@ TICKER_LIST_MISC = os.getenv("TICKER_LIST_MISC", "").split(",")
 
 # Combine all ticker lists
 TICKER_LIST = (
-    TICKER_LIST_TECH +
-    TICKER_LIST_ENERGY +
-    TICKER_LIST_HEALTH +
-    TICKER_LIST_AUTO +
-    TICKER_LIST_FINANCIAL +
-    TICKER_LIST_MISC
+    TICKER_LIST_TECH
+    + TICKER_LIST_ENERGY
+    + TICKER_LIST_HEALTH
+    + TICKER_LIST_AUTO
+    + TICKER_LIST_FINANCIAL
+    + TICKER_LIST_MISC
 )
 
 # Clean up any extra spaces or empty strings
