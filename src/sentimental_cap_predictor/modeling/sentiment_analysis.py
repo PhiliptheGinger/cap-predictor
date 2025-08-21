@@ -150,21 +150,15 @@ def aggregate_sentiment_by_date(analyzed_df: pd.DataFrame) -> pd.DataFrame:
     # Group by date and calculate the weighted mean sentiment
     # and mean confidence
     aggregated_df = (
-        analyzed_df.groupby("date")
-        .apply(
-            lambda x: pd.Series(
-                {
-                    "bias_factor": (
-                        x["weighted_confidence"].sum() / x["confidence"].sum()
-                        if x["confidence"].sum() != 0
-                        else 0
-                    ),
-                    "mean_confidence": x["confidence"].mean(),
-                }
-            )
+        analyzed_df.groupby("date").agg(
+            bias_factor=(
+                "weighted_confidence",
+                lambda x: x.sum()
+                / analyzed_df.loc[x.index, "confidence"].sum(),
+            ),
+            mean_confidence=("confidence", "mean"),
         )
-        .reset_index()
-    )
+    ).reset_index()
 
     # Determine the final sentiment label based on the bias factor
     aggregated_df["final_sentiment"] = aggregated_df["bias_factor"].apply(
