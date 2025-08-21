@@ -16,7 +16,7 @@ from .data_bundle import DataBundle
 
 load_dotenv()
 
-from config import RAW_DATA_DIR
+from .config import RAW_DATA_DIR
 
 # Initialize colorama
 init(autoreset=True)
