@@ -24,8 +24,7 @@ dependencies = [
     "mlflow>=2.7,<3",
     "SQLAlchemy>=2.0,<3",
     "psutil>=5.9,<6",
-    "optuna>=3,<4",
-    "fastapi>=0.110,<1"
+    "optuna>=3,<4"
 ]
 
 [project.optional-dependencies]
@@ -33,9 +32,6 @@ dev = [
     "pytest>=7.4,<8",
     "ruff>=0.1.5,<0.2",
     "pre-commit>=3.5,<4",
-]
-ui = [
-    "streamlit>=1,<2",
 ]
 
 [tool.setuptools]
