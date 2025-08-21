@@ -1,4 +1,4 @@
-.PHONY: install lint format test streamlit
+.PHONY: install lint format test
 
 install:
 	pip install -e .[dev]
@@ -11,6 +11,3 @@ format:
 
 test:
         pytest
-
-streamlit:
-        streamlit run src/sentimental_cap_predictor/ui/streamlit_app.py
