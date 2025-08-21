@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
-from dataclasses import asdict
 
 import typer
 from loguru import logger
@@ -52,6 +52,21 @@ def update_papers() -> None:
     logger.info("Paper sources updated")
 
 
+@app.command("update:pubmed")
+def update_pubmed(query: str = "cancer", max_results: int = 10) -> None:
+    """Fetch article metadata from PubMed."""
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    pubmed_path = DATA_DIR / "pubmed_papers.json"
+    connectors.pubmed_connector.update_store(
+        pubmed_path, query=query, max_results=max_results
+    )
+    state = _load_state()
+    state["pubmed_updated"] = datetime.utcnow().isoformat()
+    _save_state(state)
+    logger.info("PubMed articles updated")
+
+
 @app.command("update:fred")
 def update_fred(series_id: str = "GDP") -> None:
     """Fetch a FRED time series."""
@@ -84,8 +99,9 @@ def index_papers() -> None:
 
     arxiv_path = DATA_DIR / "arxiv_papers.json"
     openalex_path = DATA_DIR / "openalex_papers.json"
+    pubmed_path = DATA_DIR / "pubmed_papers.json"
     papers: List[dict] = []
-    for path in (arxiv_path, openalex_path):
+    for path in (arxiv_path, openalex_path, pubmed_path):
         if path.exists():
             papers.extend(json.loads(path.read_text()))
     if not papers:
@@ -103,7 +119,12 @@ def index_papers() -> None:
 
 
 @app.command("ideas:generate")
-def generate(topic: str, model_id: str = "mistralai/Mistral-7B-v0.1", n: int = 3, output: Path | None = None) -> None:
+def generate(
+    topic: str,
+    model_id: str = "mistralai/Mistral-7B-v0.1",
+    n: int = 3,
+    output: Path | None = None,
+) -> None:
     """Generate trading ideas using a local language model.
 
     The resulting ideas are printed to STDOUT or written to ``output`` if
