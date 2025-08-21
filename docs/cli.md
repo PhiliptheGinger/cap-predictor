@@ -72,3 +72,8 @@ Use cron to execute the pipeline every weekday at 6am:
 
 Make sure the virtual environment is activated or provide the full path to the
 Python interpreter in the cron entry.
+
+## Additional Resources
+
+- [User Manual](user_manual.md) – step-by-step setup and workflows
+- [Documentation Index](index.md) – links to all project guides

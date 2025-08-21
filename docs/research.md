@@ -28,3 +28,8 @@ tracker.start_run({"window": 5})
 tracker.log_metrics({"accuracy": 0.9})
 tracker.end_run()
 ```
+
+## Additional Resources
+
+- [User Manual](user_manual.md) – end-to-end usage guide
+- [Documentation Index](index.md) – list of all documentation topics
