@@ -6,4 +6,5 @@ __all__ = [
     "fred_connector",
     "edgar_connector",
     "pubmed_connector",
+    "github_connector",
 ]
