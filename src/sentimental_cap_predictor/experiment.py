@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List
 
 import typer
-
 from loguru import logger
 
 DB_PATH = Path("experiments.db")
@@ -41,13 +41,16 @@ class ExperimentTracker:
     ) -> int:
         """Log a new experiment run.
 
-        Returns the database row id for the newly created run so that additional
-        artifacts can be added later.
+        Returns the database row id for the newly created run so that
+        additional artifacts can be added later.
         """
 
         code_hash = hashlib.sha256(code.encode()).hexdigest()
         cursor = self.conn.execute(
-            "INSERT INTO runs(code_hash, params, metrics, artifacts) VALUES (?, ?, ?, ?)",
+            (
+                "INSERT INTO runs(code_hash, params, metrics, artifacts) "
+                "VALUES (?, ?, ?, ?)"
+            ),
             (
                 code_hash,
                 json.dumps(params, default=str),
@@ -79,7 +82,10 @@ class ExperimentTracker:
         """List all recorded experiment runs."""
 
         cursor = self.conn.execute(
-            "SELECT id, code_hash, params, metrics, artifacts, timestamp FROM runs ORDER BY id DESC"
+            (
+                "SELECT id, code_hash, params, metrics, artifacts, timestamp "
+                "FROM runs ORDER BY id DESC"
+            )
         )
         return [self._deserialize(row) for row in cursor.fetchall()]
 
@@ -87,7 +93,10 @@ class ExperimentTracker:
         """Retrieve a single run by id."""
 
         cursor = self.conn.execute(
-            "SELECT id, code_hash, params, metrics, artifacts, timestamp FROM runs WHERE id=?",
+            (
+                "SELECT id, code_hash, params, metrics, artifacts, timestamp "
+                "FROM runs WHERE id=?"
+            ),
             (run_id,),
         )
         row = cursor.fetchone()
@@ -123,7 +132,8 @@ class ExperimentTracker:
         try:
             return artifacts[name]
         except KeyError as exc:
-            raise KeyError(f"Artifact {name!r} not found for run {run_id}") from exc
+            msg = f"Artifact {name!r} not found for run {run_id}"
+            raise KeyError(msg) from exc
 
     def load_artifact(self, run_id: int, name: str, mode: str = "r") -> Any:
         """Load the contents of an artifact.
@@ -154,7 +164,8 @@ def cli_list_runs() -> None:
 
     tracker = ExperimentTracker()
     for run in tracker.list_runs():
-        typer.echo(f"{run['id']}: params={run['params']} metrics={run['metrics']}")
+        msg = f"{run['id']}: params={run['params']} metrics={run['metrics']}"
+        typer.echo(msg)
 
 
 @app.command()
@@ -178,6 +189,64 @@ def compare(first: int, second: int) -> None:
         a = run_a["metrics"].get(key)
         b = run_b["metrics"].get(key)
         typer.echo(f"{key}: {a} vs {b}")
+
+
+def _compare_explanation(
+    tracker: ExperimentTracker, first: int, second: int, metric: str
+) -> str:
+    """Generate a textual comparison for two runs on a metric.
+
+    The explanation cites the metric values so the reasoning can be audited.
+    """
+
+    run_a = tracker.get_run(first)
+    run_b = tracker.get_run(second)
+    a = run_a["metrics"].get(metric)
+    b = run_b["metrics"].get(metric)
+    if a is None or b is None:
+        return f"Metric {metric!r} missing for one of the runs."
+    if a > b:
+        winner = first
+    elif b > a:
+        winner = second
+    else:
+        return (
+            f"Runs {first} and {second} tie on {metric}: "
+            f"{a} vs {b}. Source: experiment tracker"
+        )
+    loser = second if winner == first else first
+    return (
+        f"Run {winner} favored over {loser} on {metric}: {a} vs {b}. "
+        f"Source: experiment tracker"
+    )
+
+
+def _handle_question(message: str, tracker: ExperimentTracker) -> str:
+    """Very small chatbot brain for answering comparison questions."""
+
+    match = re.search(r"compare\s+(\d+)\s+(\d+)\s+metric=(\w+)", message, re.I)
+    if not match:
+        msg = "I can compare runs. Ask: 'compare <id1> <id2> metric=<metric>'."
+        return msg
+    first, second, metric = match.groups()
+    return _compare_explanation(tracker, int(first), int(second), metric)
+
+
+@app.command()
+def chat() -> None:
+    """Interactive chatbot for explaining experiment comparisons."""
+
+    tracker = ExperimentTracker()
+    typer.echo(
+        "Experiment chatbot ready. Type 'exit' to quit.\n"
+        "Ask: compare <id1> <id2> metric=<metric>"
+    )
+    while True:
+        question = typer.prompt("You")
+        if question.strip().lower() in {"exit", "quit"}:
+            break
+        answer = _handle_question(question, tracker)
+        typer.echo(f"Bot: {answer}")
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
