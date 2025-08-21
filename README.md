@@ -49,7 +49,8 @@ Run `--help` with any module for detailed options.
 ## Documentation
 
 See the [User Manual](docs/user_manual.md) for environment setup, workflow
-descriptions, and testing guidance.
+descriptions, and testing guidance. For topic-specific guides, browse the
+[Documentation Index](docs/index.md).
 
 ## Offline Testing
 
