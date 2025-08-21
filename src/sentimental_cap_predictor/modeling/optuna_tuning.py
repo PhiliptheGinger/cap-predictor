@@ -10,13 +10,28 @@ model construction and training helpers defined in
 from __future__ import annotations
 
 import os
+import types
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
-import optuna
 import pandas as pd
 from dotenv import set_key
 from loguru import logger
+
+try:  # pragma: no cover - handle optional dependency at import time
+    import optuna  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - replaced in tests
+    # monkeypatch in tests
+
+    def _missing_optuna(*_args, **_kwargs):
+        msg = "optuna is required for tuning; install it with `pip install optuna`."  # noqa: E501
+        raise ModuleNotFoundError(msg)
+
+    optuna = types.SimpleNamespace(create_study=_missing_optuna)
+
+if TYPE_CHECKING:  # pragma: no cover - used only for type checkers
+    import optuna as optuna  # noqa: F401
 
 from .time_series_deep_learner import (
     build_liquid_model,
@@ -34,7 +49,7 @@ def _load_series(data_path: str) -> pd.DataFrame:
     return df
 
 
-def tune(data_path: str | None = None, n_trials: int = 40) -> optuna.Study:
+def tune(data_path: str | None = None, n_trials: int = 40) -> "optuna.Study":
     """Run Optuna hyperparameter search.
 
     Parameters
@@ -52,7 +67,7 @@ def tune(data_path: str | None = None, n_trials: int = 40) -> optuna.Study:
     train_df = df.iloc[:train_size]
     val_df = df.iloc[train_size:]
 
-    def objective(trial: optuna.Trial) -> float:
+    def objective(trial: "optuna.Trial") -> float:
         window = trial.suggest_int("WINDOW_SIZE", 5, 60, step=5)
         units = trial.suggest_categorical("LNN_UNITS", [32, 64, 96, 128, 192])
         drp = trial.suggest_float("DROPOUT_RATE", 0.0, 0.5)
