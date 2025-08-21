@@ -2,7 +2,11 @@
 
 A `DataBundle` groups time-aligned market and alternative data used by the
 library.  All contained :class:`pandas.DataFrame` instances must share the same
-`DatetimeIndex`.
+`DatetimeIndex`.  If some frames are sampled at a lower frequency (e.g., weekly
+sentiment scores combined with daily prices) the
+:py:meth:`~sentimental_cap_predictor.data_bundle.DataBundle.validate` method can
+optionally resample or forward‑fill these data to the price index by passing
+``resample_method="ffill"`` or ``"resample"``.
 
 For **multi‑asset** bundles the columns should use a two‑level
 :class:`pandas.MultiIndex` with the first level being the asset identifier and

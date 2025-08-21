@@ -3,6 +3,7 @@ import pandas as pd
 from sentimental_cap_predictor.trader_utils.strategy_optimizer import (
     moving_average_crossover,
     random_search,
+    walk_forward_eval,
 )
 
 
@@ -20,6 +21,16 @@ def test_random_search_returns_parameters():
         short_range=(1, 3),
         long_range=(4, 6),
         seed=42,
+        lambda_drawdown=0.5,
     )
     assert res.short_window < res.long_window
-    assert isinstance(res.total_return, float)
+    assert isinstance(res.score, float)
+    assert isinstance(res.mean_return, float)
+    assert isinstance(res.mean_drawdown, float)
+
+
+def test_walk_forward_eval_outputs_floats():
+    prices = pd.Series(range(1, 21), dtype=float)
+    mean_ret, mean_dd = walk_forward_eval(prices, 1, 2, n_splits=3)
+    assert isinstance(mean_ret, float)
+    assert isinstance(mean_dd, float)

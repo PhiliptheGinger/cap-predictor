@@ -15,3 +15,60 @@ The CSV must contain two columns:
 - `close` – closing price for the instrument
 
 Example above runs optimizer on an NVDA CSV.
+
+## Data Ingestion
+
+Fetch price history and create optimizer-ready CSV:
+
+```bash
+python -m sentimental_cap_predictor.data.ingest NVDA --period 1Y --interval 1d
+```
+
+This saves:
+- `data/raw/NVDA_prices.parquet` with columns `date, open, high, low, close, adj_close, volume`
+- `data/processed/NVDA_prices.csv` containing only `date` and `close`
+
+## Baseline Train/Eval
+
+Run simple benchmark models and write evaluation CSVs:
+
+```bash
+python -m sentimental_cap_predictor.modeling.train_eval NVDA
+```
+
+This writes `data/processed/NVDA_train_test_predictions.csv` with columns:
+
+- `date` – trading date in YYYY-MM-DD format
+- `actual` – true target values
+- `predicted` – model predictions
+
+Additionally, `data/processed/NVDA_train_test_metrics.csv` is generated
+containing overall evaluation metrics:
+
+- `accuracy`, `precision`, `recall`, `f1`, `roc_auc` and `mar_ratio`.
+
+Runs are logged to MLflow by default. Set environment variable
+`MLFLOW_DISABLED=1` to skip MLflow logging.
+
+## Daily Pipeline
+
+Run the full daily workflow:
+
+```bash
+python -m sentimental_cap_predictor.flows.daily_pipeline run NVDA
+```
+
+This downloads data, preprocesses it, trains the model, searches for an
+optimized moving‑average strategy, performs a backtest and writes a JSON summary
+to `data/processed/NVDA_daily_summary.json`.
+
+### Scheduling
+
+Use cron to execute the pipeline every weekday at 6am:
+
+```cron
+0 6 * * 1-5 python -m sentimental_cap_predictor.flows.daily_pipeline run NVDA >> logs/daily.log 2>&1
+```
+
+Make sure the virtual environment is activated or provide the full path to the
+Python interpreter in the cron entry.
