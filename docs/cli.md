@@ -72,3 +72,19 @@ Use cron to execute the pipeline every weekday at 6am:
 
 Make sure the virtual environment is activated or provide the full path to the
 Python interpreter in the cron entry.
+
+## Idea Generation
+
+Produce candidate trading ideas with a local language model and optionally
+write them to a JSON file:
+
+```bash
+python -m sentimental_cap_predictor.scheduler ideas:generate "interest rate regimes" --output ideas.json
+```
+
+This command can be scheduled with cron in the same way as the daily pipeline.
+
+## Additional Resources
+
+- [User Manual](user_manual.md) – step-by-step setup and workflows
+- [Documentation Index](index.md) – links to all project guides

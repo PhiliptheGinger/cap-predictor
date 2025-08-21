@@ -23,3 +23,8 @@ index               AAPL                  MSFT
 Single‑asset bundles may keep a flat column index with only field names.  Any
 optional publication timestamps must mirror the shape of the corresponding data
 frames and must not be later than the data's timestamp.
+
+## Additional Resources
+
+- [User Manual](user_manual.md) – project setup and workflows
+- [Documentation Index](index.md) – overview of all documentation

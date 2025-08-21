@@ -40,3 +40,8 @@ schtasks /Create /SC DAILY /ST 02:00 /TN "Cap Predictor Nightly" ^
 The task will run the pipeline nightly and append output to
 `logs\nightly.log`. Adjust the start time, ticker symbol, or environment
 variables as needed for your setup.
+
+## Additional Resources
+
+- [User Manual](user_manual.md) – complete usage guide
+- [Documentation Index](index.md) – overview of all docs
