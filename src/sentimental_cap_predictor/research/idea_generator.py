@@ -14,8 +14,6 @@ import json
 from functools import lru_cache
 from typing import List
 
-from transformers import pipeline
-
 from .idea_schema import Idea
 
 
@@ -29,9 +27,22 @@ _DEFAULT_PROMPT = (
 def _get_pipeline(model_id: str):
     """Return a text-generation pipeline for ``model_id``.
 
-    The pipeline is cached to avoid re-loading weights when ``generate_ideas``
-    is called multiple times within the same process.
+    The heavy ``transformers`` import is done lazily here so that merely
+    importing this module does not require the optional deep learning
+    frameworks (e.g. TensorFlow) that ``transformers`` tries to load by
+    default.  This keeps test environments lightweight and avoids import-time
+    errors when those libraries are unavailable.
     """
+
+    # ``TRANSFORMERS_NO_TF`` prevents ``transformers`` from attempting to load
+    # TensorFlow, which is not a dependency of this project.  The environment
+    # variable must be set before importing the library.
+    import os
+
+    os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
+    os.environ.setdefault("TRANSFORMERS_NO_FLAX", "1")
+
+    from transformers import pipeline
 
     return pipeline("text-generation", model=model_id, tokenizer=model_id)
 
