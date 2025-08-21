@@ -6,6 +6,7 @@ import ast
 import builtins
 import multiprocessing as mp
 import psutil
+import time
 from typing import Dict
 
 # flake8: noqa
@@ -107,7 +108,13 @@ def run_code(
     cpu = cpu_time or timeout
     proc = ctx.Process(target=_exec, args=(code, queue, cpu, mem_limit))
     proc.start()
-    proc.join(timeout)
+    proc_ps = psutil.Process(proc.pid)
+    start = time.time()
+    while proc.is_alive() and time.time() - start < timeout:
+        if proc_ps.memory_info().rss > mem_limit:
+            proc.terminate()
+            raise RuntimeError("Strategy execution exceeded memory limit")
+        proc.join(timeout=0.1)
     if proc.is_alive():
         proc.terminate()
         raise TimeoutError("Strategy execution timed out")
