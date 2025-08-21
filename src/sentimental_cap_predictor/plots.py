@@ -37,7 +37,7 @@ def plot_results(df, output_graph_path):
         return
     
     # Ensure required columns exist
-    required_columns = ['TrueValues']
+    required_columns = ['actual']
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         logger.error(f"Missing required columns: {missing_columns}")
@@ -49,11 +49,11 @@ def plot_results(df, output_graph_path):
     plt.xlim(date_min, date_max)
 
     # Plot true values
-    plt.plot(df.index, df['TrueValues'], label="True Values", color="blue")
+    plt.plot(df.index, df['actual'], label="True Values", color="blue")
 
     # Plot predictions if they exist
-    if 'LNN_Predictions' in df.columns:
-        plt.plot(df.index, df['LNN_Predictions'], label="LNN Predictions", color="orange")
+    if 'predicted' in df.columns:
+        plt.plot(df.index, df['predicted'], label="Predictions", color="orange")
     elif 'LSTM_Predictions' in df.columns:
         plt.plot(df.index, df['LSTM_Predictions'], label="LSTM Predictions", color="orange")
 
@@ -154,12 +154,12 @@ def main(
             return
 
     # Ensure required columns are present in prediction data
-    required_columns = ['TrueValues', 'LNN_Predictions', 'BiasedPrediction']
+    required_columns = ['actual', 'predicted']
     missing_columns = [col for col in required_columns if col not in prediction_df.columns]
 
     # Allow for either LNN or LSTM predictions
-    if 'LNN_Predictions' not in prediction_df.columns and 'LSTM_Predictions' not in prediction_df.columns:
-        logger.error(f"Neither 'LNN_Predictions' nor 'LSTM_Predictions' found in the prediction dataset.")
+    if 'predicted' not in prediction_df.columns and 'LSTM_Predictions' not in prediction_df.columns:
+        logger.error(f"Neither 'predicted' nor 'LSTM_Predictions' found in the prediction dataset.")
         return
     
     # Display the first few lines of the prediction CSV file

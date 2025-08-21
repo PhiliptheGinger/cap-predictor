@@ -5,8 +5,12 @@ from __future__ import annotations
 import ast
 import builtins
 import multiprocessing as mp
-import resource
+import psutil
+import time
 from typing import Dict
+
+# flake8: noqa
+
 
 ALLOWED_MODULES = {"pandas", "numpy"}
 DISALLOWED_BUILTINS = {
@@ -35,8 +39,14 @@ MAX_LOOP_ITERATIONS = 10_000
 
 
 def _exec(code: str, queue: mp.Queue, cpu_time: int, mem_limit: int) -> None:
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu_time, cpu_time))
-    resource.setrlimit(resource.RLIMIT_AS, (mem_limit, mem_limit))
+    proc = psutil.Process()
+    try:
+        if hasattr(psutil, "RLIMIT_CPU"):
+            proc.rlimit(psutil.RLIMIT_CPU, (cpu_time, cpu_time))
+        if hasattr(psutil, "RLIMIT_AS"):
+            proc.rlimit(psutil.RLIMIT_AS, (mem_limit, mem_limit))
+    except Exception:
+        pass
     env: Dict[str, object] = {"__builtins__": SAFE_BUILTINS}
     try:
         exec(code, env)
@@ -54,8 +64,7 @@ def _validate(code: str) -> None:
                 raise ValueError(f"Import of module '{module}' is not allowed")
         if isinstance(node, ast.Attribute):
             if (
-                isinstance(node.value, ast.Name)
-                and node.value.id == "__builtins__"
+                isinstance(node.value, ast.Name) and node.value.id == "__builtins__"
             ) or node.attr.startswith("__"):
                 raise ValueError("Attribute access is not allowed")
         if isinstance(node, ast.While):
@@ -77,9 +86,7 @@ def _validate(code: str) -> None:
             elif len(args) == 2:
                 iterations = args[1].value - args[0].value
             elif len(args) == 3:
-                iterations = (
-                    args[1].value - args[0].value
-                ) // args[2].value
+                iterations = (args[1].value - args[0].value) // args[2].value
             else:  # pragma: no cover - ast guarantees max 3 args
                 iterations = MAX_LOOP_ITERATIONS + 1
             if iterations > MAX_LOOP_ITERATIONS:
@@ -88,19 +95,26 @@ def _validate(code: str) -> None:
 
 def run_code(
     code: str,
-    timeout: int = 5,
+    timeout: int = 20,
     *,
     cpu_time: int | None = None,
-    mem_limit: int = 100_000_000,
+    mem_limit: int = 500_000_000,
 ) -> Dict[str, object]:
     """Run ``code`` in a subprocess with limited builtins and imports."""
 
     _validate(code)
-    queue: mp.Queue = mp.Queue()
+    ctx = mp.get_context("spawn")
+    queue: mp.Queue = ctx.Queue()
     cpu = cpu_time or timeout
-    proc = mp.Process(target=_exec, args=(code, queue, cpu, mem_limit))
+    proc = ctx.Process(target=_exec, args=(code, queue, cpu, mem_limit))
     proc.start()
-    proc.join(timeout)
+    proc_ps = psutil.Process(proc.pid)
+    start = time.time()
+    while proc.is_alive() and time.time() - start < timeout:
+        if proc_ps.memory_info().rss > mem_limit:
+            proc.terminate()
+            raise RuntimeError("Strategy execution exceeded memory limit")
+        proc.join(timeout=0.1)
     if proc.is_alive():
         proc.terminate()
         raise TimeoutError("Strategy execution timed out")

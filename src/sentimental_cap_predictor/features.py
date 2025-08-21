@@ -128,8 +128,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
     # Invert scaling on all columns and create a new DataFrame
     df_final = pd.DataFrame({
         'Date': price_df.index,  # Ensure the date is included
-        'TrueValues': scaler.inverse_transform(price_df[['close']]).flatten(),
-        'LNN_Predictions': scaler.inverse_transform(price_df[['LNN_Predictions']]).flatten(),
+        'actual': scaler.inverse_transform(price_df[['close']]).flatten(),
+        'predicted': scaler.inverse_transform(price_df[['predicted']]).flatten(),
     }, index=price_df.index)
 
     # Merge new predictions with the existing data
@@ -139,9 +139,9 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
 
     # Compute evaluation metrics
     try:
-        valid_df = df_final.dropna(subset=['TrueValues', 'LNN_Predictions'])
-        rmse = np.sqrt(((valid_df['TrueValues'] - valid_df['LNN_Predictions']) ** 2).mean())
-        mape = (np.abs((valid_df['TrueValues'] - valid_df['LNN_Predictions']) / valid_df['TrueValues']).replace([np.inf, -np.inf], np.nan).dropna()).mean() * 100
+        valid_df = df_final.dropna(subset=['actual', 'predicted'])
+        rmse = np.sqrt(((valid_df['actual'] - valid_df['predicted']) ** 2).mean())
+        mape = (np.abs((valid_df['actual'] - valid_df['predicted']) / valid_df['actual']).replace([np.inf, -np.inf], np.nan).dropna()).mean() * 100
         logger.info(f"RMSE: {rmse:.4f}, MAPE: {mape:.2f}%")
     except Exception as e:
         logger.error(f"Error computing metrics: {e}")
