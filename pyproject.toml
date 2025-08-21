@@ -24,7 +24,8 @@ dependencies = [
     "mlflow>=2.7,<3",
     "SQLAlchemy>=2.0,<3",
     "psutil>=5.9,<6",
-    "optuna>=3,<4"
+    "optuna>=3,<4",
+    "openai>=1,<2"
 ]
 
 [project.optional-dependencies]

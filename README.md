@@ -43,6 +43,7 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.dataset` – download price and news data
 - `sentimental_cap_predictor.plots` – visualize processed data
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
+- `sentimental_cap_predictor.chatbot` – chat with an OpenAI-powered assistant that consults main and experimental models and explains its decisions (requires `OPENAI_API_KEY`)
 
 Run `--help` with any module for detailed options.
 

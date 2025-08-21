@@ -84,6 +84,20 @@ python -m sentimental_cap_predictor.scheduler ideas:generate "interest rate regi
 
 This command can be scheduled with cron in the same way as the daily pipeline.
 
+## Chatbot
+
+Interact with an OpenAI-powered assistant from the terminal. The chatbot
+queries both a *main* and an *experimental* model for every question and
+explains which answer was chosen:
+
+```bash
+python -m sentimental_cap_predictor.chatbot chat \
+    --main-model gpt-3.5-turbo \
+    --experimental-model gpt-4o-mini
+```
+
+Set `OPENAI_API_KEY` in your environment before using the command.
+
 ## GitHub Repository Data
 
 Utilities that pull information from the GitHub API can optionally use a
