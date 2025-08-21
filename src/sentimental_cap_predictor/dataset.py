@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import requests
 import pandas as pd
-from newspaper import Article
+from newspaper import Article, Config
 from datetime import datetime as dt, timedelta
 from pathlib import Path
 from typing import Optional
@@ -61,9 +61,21 @@ def query_gdelt_for_news(ticker: str, start_date: str, end_date: str) -> pd.Data
         return pd.DataFrame()
 
 def extract_article_content(url: str, use_headless: bool = False) -> Optional[str]:
-    """Extract the main content from a news article URL using newspaper3k in headed or headless mode."""
+    """Extract the main content from a news article URL using newspaper3k.
+
+    The ``use_headless`` flag switches the user agent to mimic a headless
+    browser, which can help when sites block default requests.  A small request
+    timeout is also applied to avoid hanging when articles are unreachable.
+    """
     try:
-        article = Article(url, browser_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3", keep_article_html=True)
+        config = Config()
+        config.browser_user_agent = (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/120.0.0 Safari/537.36"
+            if use_headless
+            else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
+        config.request_timeout = 10
+        article = Article(url, config=config, keep_article_html=True)
         article.download()
         article.parse()
         return article.text
