@@ -1,8 +1,13 @@
 import pandas as pd
-
-from sentimental_cap_predictor.data.news import FileSource, fetch_news
-from sentimental_cap_predictor import dataset
 import pytest
+import requests
+
+from sentimental_cap_predictor import dataset
+from sentimental_cap_predictor.data.news import (
+    FileSource,
+    GDELTSource,
+    fetch_news,
+)
 
 
 def test_fetch_news_returns_columns():
@@ -28,8 +33,46 @@ def test_file_source_reads_csv(tmp_path):
     assert list(df.columns) == ["date", "headline", "source"]
 
 
-@pytest.mark.parametrize("use_headless, expected", [(True, "HeadlessChrome"), (False, "Chrome/58")])
-def test_extract_article_content_user_agent(monkeypatch, use_headless, expected):
+def test_gdelt_source_fetch(monkeypatch):
+    payload = {
+        "articles": [
+            {
+                "seendate": "2024-01-01T00:00:00Z",
+                "title": "Example",
+                "source": "Feed",
+            }
+        ]
+    }
+
+    class DummyResponse:
+        def json(self):
+            return payload
+
+        def raise_for_status(self):  # pragma: no cover - no-op
+            pass
+
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        assert params["query"] == "NVDA"
+        return DummyResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    source = GDELTSource(days=1, max_records=1)
+    df = source.fetch("NVDA")
+    assert list(df.columns) == ["date", "headline", "source"]
+    assert df.iloc[0]["headline"] == "Example"
+    assert df.iloc[0]["source"] == "Feed"
+
+
+@pytest.mark.parametrize(
+    "use_headless, expected",
+    [(True, "HeadlessChrome"), (False, "Chrome/58")],
+)
+def test_extract_article_content_user_agent(
+    monkeypatch,
+    use_headless,
+    expected,
+):
     captured = {}
 
     class DummyArticle:
@@ -46,7 +89,9 @@ def test_extract_article_content_user_agent(monkeypatch, use_headless, expected)
 
     monkeypatch.setattr(dataset, "Article", DummyArticle)
 
-    text = dataset.extract_article_content("http://example.com", use_headless=use_headless)
+    text = dataset.extract_article_content(
+        "http://example.com", use_headless=use_headless
+    )
     assert text == "body"
     assert expected in captured["ua"]
     assert captured["timeout"] == 10
