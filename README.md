@@ -46,6 +46,11 @@ Each module exposes a Typer application:
 
 Run `--help` with any module for detailed options.
 
+## Documentation
+
+See the [User Manual](docs/user_manual.md) for environment setup, workflow
+descriptions, and testing guidance.
+
 ## Offline Testing
 
 Some tests require downloading market data. To run them without making
