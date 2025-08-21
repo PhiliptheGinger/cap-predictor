@@ -28,7 +28,13 @@ def test_dangerous_builtin_not_available():
 
 
 def test_memory_limit():
-    code = "x = 'a' * 200_000_000"
+    code = (
+        "x = []\n"
+        "for i in range(100):\n"
+        "    x.append('a' * 3_000_000)\n"
+        "    for j in range(10000):\n"
+        "        pass\n"
+    )
     with pytest.raises(RuntimeError):
         run_code(code, mem_limit=10_000_000)
 
