@@ -84,6 +84,13 @@ python -m sentimental_cap_predictor.scheduler ideas:generate "interest rate regi
 
 This command can be scheduled with cron in the same way as the daily pipeline.
 
+## GitHub Repository Data
+
+Utilities that pull information from the GitHub API can optionally use a
+personal access token to increase rate limits.  Set the token via the
+`GITHUB_TOKEN` environment variable or supply it on the command line with
+`--token <TOKEN>` when available.
+
 ## Additional Resources
 
 - [User Manual](user_manual.md) – step-by-step setup and workflows
