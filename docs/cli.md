@@ -89,14 +89,14 @@ the same way as the daily pipeline.
 
 ## Chatbot
 
-Interact with a local Mistral-powered assistant from the terminal. The
+Interact with a small Qwen-powered assistant from the terminal. The
 chatbot queries both a *main* and an *experimental* model for every question
 and explains which answer was chosen:
 
 ```bash
 python -m sentimental_cap_predictor.chatbot \
-    --main-model mistralai/Mistral-7B-v0.1 \
-    --experimental-model mistralai/Mistral-7B-Instruct-v0.2
+    --main-model Qwen/Qwen2-0.5B-Instruct \
+    --experimental-model Qwen/Qwen2-0.5B
 ```
 
 ## GitHub Repository Data

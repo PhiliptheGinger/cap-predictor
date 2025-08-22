@@ -1,4 +1,4 @@
-"""Simple command-line chatbot powered by local Mistral models."""
+"""Simple command-line chatbot powered by small Qwen models."""
 
 import typer
 
@@ -61,8 +61,8 @@ def _summarize_decision(main_reply: str, exp_reply: str) -> str:
 
 @app.command()
 def chat(
-    main_model: str = "mistralai/Mistral-7B-v0.1",
-    experimental_model: str = "mistralai/Mistral-7B-Instruct-v0.2",
+    main_model: str = "Qwen/Qwen2-0.5B-Instruct",
+    experimental_model: str = "Qwen/Qwen2-0.5B",
 ) -> None:  # pragma: no cover - CLI wrapper
     """Start an interactive chat session consulting two local models.
 
