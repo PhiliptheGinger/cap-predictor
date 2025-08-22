@@ -121,6 +121,7 @@ CLI_USAGE = (
 ALLOWED_MODULES = {
     "dataset",
     "data.ingest",
+    "flows.daily_pipeline",
     "backtest.engine",
     "modeling.sentiment_analysis",
     "modeling.train_eval",
@@ -132,6 +133,7 @@ ALLOWED_MODULES = {
 LOADING_MESSAGES = {
     "dataset": "Analyzing dataset...",
     "data.ingest": "Ingesting data...",
+    "flows.daily_pipeline": "Running daily pipeline...",
     "backtest.engine": "Running back-testing engine...",
     "modeling.sentiment_analysis": "Analyzing sentiment...",
     "modeling.train_eval": "Training and evaluating model...",

@@ -62,6 +62,12 @@ This downloads data, preprocesses it, trains the model, searches for an
 optimized moving‑average strategy, performs a backtest and writes a JSON summary
 to `data/processed/NVDA_daily_summary.json`.
 
+From the chatbot, prefix the same command with `CMD:` to trigger it:
+
+```text
+CMD: python -m sentimental_cap_predictor.flows.daily_pipeline run NVDA
+```
+
 ### Scheduling
 
 Use cron to execute the pipeline every weekday at 6am:
