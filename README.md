@@ -41,8 +41,11 @@ flowchart TD
 ## Typer CLI Usage
 Each module exposes a Typer application:
 - `sentimental_cap_predictor.dataset` – download price and news data
-- `sentimental_cap_predictor.plots` – visualize processed data
+- `sentimental_cap_predictor.data.ingest` – pull fresh raw or interim stock data into the pipeline
+- `sentimental_cap_predictor.backtest.engine` – run a strategy across historical data
+- `sentimental_cap_predictor.modeling.train_eval` – train and validate predictive models
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
+- `sentimental_cap_predictor.plots` – visualize processed data
 - `sentimental_cap_predictor.chatbot` – chat with a local Qwen-powered assistant that consults main and experimental models, explains its decisions, and can execute shell commands when a reply starts with `CMD:`. Only commands for the modules listed here are run, and their output is shown before the assistant's final response.
 
 Run `--help` with any module for detailed options.

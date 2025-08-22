@@ -79,17 +79,21 @@ SYSTEM_PROMPT = (
 )
 
 CLI_USAGE = (
-    "System: Available CLI modules include dataset, plots, "
-    "modeling.sentiment_analysis and chatbot. They can be invoked with "
-    "'python -m sentimental_cap_predictor.<module>'. Only these commands "
-    "will be executed."
+    "System: Available CLI modules include dataset, data.ingest, "
+    "backtest.engine, modeling.sentiment_analysis, modeling.train_eval, plots "
+    "and chatbot. They can be invoked with 'python -m "
+    "sentimental_cap_predictor.<module>'. Only these commands will be "
+    "executed."
 )
 
 
 ALLOWED_MODULES = {
     "dataset",
-    "plots",
+    "data.ingest",
+    "backtest.engine",
     "modeling.sentiment_analysis",
+    "modeling.train_eval",
+    "plots",
     "chatbot",
 }
 
@@ -114,8 +118,7 @@ def _run_shell(command: str) -> str:
             env = os.environ.copy()
             env["PYTHONPATH"] = f"{src_dir}:{env.get('PYTHONPATH', '')}"
             result = subprocess.run(
-                command,
-                shell=True,
+                parts,
                 check=False,
                 capture_output=True,
                 text=True,
