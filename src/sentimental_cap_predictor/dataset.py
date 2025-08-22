@@ -187,14 +187,29 @@ def main(
     ticker: str,
     period: Annotated[
         str,
-        typer.Argument(
-            help="Period for data collection (e.g., '1Y', '1M', '1W', or 'max')"
+        typer.Option(
+            "--period",
+            "-p",
+            help=(
+                "Period for data collection (e.g., '1Y', '1M', '1W', or 'max'). "
+                "Can also be provided positionally for backward compatibility."
+            ),
         ),
     ] = "max",
+    period_arg: Annotated[
+        str | None,
+        typer.Argument(
+            metavar="PERIOD",
+            help="Period for data collection (legacy positional form)",
+            show_default=False,
+        ),
+    ] = None,
     output_path: Optional[Path] = None,
     news_output_path: Optional[Path] = None,
     use_headless: bool = False,
 ) -> None:
+    if period_arg is not None:
+        period = period_arg
     logger.info(
         f"{Fore.YELLOW}Starting data collection for ticker: {ticker}.{Style.RESET_ALL}"
     )
