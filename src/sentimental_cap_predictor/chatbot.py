@@ -14,12 +14,12 @@ def _get_pipeline(model_id: str):
 
     # Disable optional backends that can trigger heavy imports or incompatibilities
     # on systems where TensorFlow or Flax are installed but not fully configured.
-    # Using ``setdefault`` would keep any pre-existing environment values and may
-    # therefore fail to turn off those frameworks. Assigning explicitly ensures
-    # the flag is always honored, preventing unexpected TensorFlow imports such as
-    # the one causing a ``google.protobuf.runtime_version`` error.
-    os.environ["TRANSFORMERS_NO_TF"] = "1"
-    os.environ["TRANSFORMERS_NO_FLAX"] = "1"
+    # ``transformers`` checks the ``USE_TF`` and ``USE_FLAX`` environment
+    # variables when deciding whether to import those frameworks. Setting them
+    # to ``0`` prevents expensive imports that can lead to protobuf runtime
+    # errors on machines that happen to have TensorFlow installed.
+    os.environ.setdefault("USE_TF", "0")
+    os.environ.setdefault("USE_FLAX", "0")
     from transformers import pipeline
 
     return pipeline("text-generation", model=model_id, tokenizer=model_id)
