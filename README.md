@@ -27,9 +27,10 @@ flowchart TD
    ```
 3. **Collect data**
    ```bash
-   python -m sentimental_cap_predictor.dataset TICKER 1Y
+   python -m sentimental_cap_predictor.dataset TICKER --period 1Y
    ```
-   The `period` argument is positional and defaults to `max` if omitted.
+   The `period` can be passed with `--period` (shown above) or as a positional
+   argument for backward compatibility and defaults to `max` if omitted.
 4. **Generate plots**
    ```bash
    python -m sentimental_cap_predictor.plots TICKER
