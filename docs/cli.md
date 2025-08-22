@@ -91,7 +91,7 @@ chatbot queries both a *main* and an *experimental* model for every question
 and explains which answer was chosen:
 
 ```bash
-python -m sentimental_cap_predictor.chatbot chat \
+python -m sentimental_cap_predictor.chatbot \
     --main-model mistralai/Mistral-7B-v0.1 \
     --experimental-model mistralai/Mistral-7B-Instruct-v0.2
 ```
