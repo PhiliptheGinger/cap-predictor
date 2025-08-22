@@ -99,6 +99,10 @@ python -m sentimental_cap_predictor.chatbot \
     --experimental-model Qwen/Qwen2-0.5B
 ```
 
+The interface color-codes user, assistant, system, command, and error messages.
+Select `--theme high-contrast` for a brighter palette or disable colors with
+`--no-color`.
+
 ## GitHub Repository Data
 
 Utilities that pull information from the GitHub API can optionally use a
