@@ -66,6 +66,7 @@ def promote_model(src: str, dst: str) -> str:
 
 def get_registry() -> Dict[str, Command]:
     """Return mapping of command names to :class:`Command` entries."""
+    from sentimental_cap_predictor.agent import coding_agent
 
     return {
         "data.ingest": Command(
@@ -162,6 +163,13 @@ def get_registry() -> Dict[str, Command]:
             handler=system_status,
             summary="Report basic system information",
             params_schema={},
+        ),
+        "code.implement": Command(
+            name="code.implement",
+            handler=coding_agent.apply_changes,
+            summary="Apply a code patch generated elsewhere",
+            params_schema={"patch": "str"},
+            dangerous=True,
         ),
         "shell.run": Command(
             name="shell.run",
