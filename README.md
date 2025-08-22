@@ -46,7 +46,7 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.modeling.train_eval` – train and validate predictive models
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
 - `sentimental_cap_predictor.plots` – visualize processed data
-- `sentimental_cap_predictor.chatbot` – chat with a local Qwen-powered assistant that consults main and experimental models, explains its decisions, and can execute shell commands when a reply starts with `CMD:`. Output is color-coded for readability and accessibility; choose a theme with `--theme` or disable colors with `--no-color`. Only commands for the modules listed here are run, and their output is shown before the assistant's final response.
+- `sentimental_cap_predictor.chatbot` – chat with a local Qwen-powered assistant that consults main and experimental models, explains its decisions, and can execute shell commands when a reply starts with `CMD:`. Output is color-coded for readability and accessibility; choose a theme with `--theme` or disable colors with `--no-color`. Only commands for the modules listed here are run, and their output is shown before the assistant's final response. Suggestions or code blocks without `CMD:` are examples and are not executed automatically.
 
 When the assistant executes a command it prints a short status message (e.g.,
 "Ingesting data..." or "Running back-testing engine...") so you know work is

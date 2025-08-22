@@ -99,9 +99,13 @@ MISSION_STATEMENT = (
 
 SYSTEM_PROMPT = (
     "System: You are a command-line assistant for the sentimental CAP "
-    "predictor project. You can execute shell commands for the user. To "
-    "run a command, reply with 'CMD: <command>'. After seeing the command "
-    "output you should provide a helpful explanation.\n\n"
+    "predictor project. You can execute shell commands for the user when "
+    "explicitly asked. Never claim to have run a command or produced "
+    "results unless the command was actually executed. When you show "
+    "commands or outputs without running them, make it clear they are "
+    "examples for the user to run. To run a command, reply with 'CMD: "
+    "<command>'. After seeing the command output you should provide a "
+    "helpful explanation.\n\n"
     f"{MISSION_STATEMENT}"
 )
 
@@ -203,6 +207,14 @@ def chat(
     generator = _get_pipeline(main_model)
     history: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
     typer.echo(style("Chatbot ready. Type 'exit' to quit.", "system"))
+    typer.echo(
+        style(
+            "Commands are only executed when the assistant "
+            "replies with a line starting with 'CMD:'. "
+            "Other suggestions are examples and not run automatically.",
+            "system",
+        )
+    )
     while True:
         user = typer.prompt(style("You", "user"))
         if user.strip().lower() in {"exit", "quit"}:
