@@ -1,6 +1,7 @@
 import pytest
 
 from sentimental_cap_predictor.chatbot import (
+    MISSION_STATEMENT,
     SYSTEM_PROMPT,
     _run_shell,
     _summarize_decision,
@@ -45,3 +46,7 @@ def test_run_shell_blocks_injection():
 
 def test_system_prompt_mentions_cli():
     assert "command-line assistant" in SYSTEM_PROMPT.lower()
+
+
+def test_system_prompt_mentions_mission():
+    assert MISSION_STATEMENT in SYSTEM_PROMPT
