@@ -12,6 +12,7 @@ from sentimental_cap_predictor.chatbot import (
     [
         ("chatbot", "Thinking..."),
         ("data.ingest", "Ingesting data..."),
+        ("flows.daily_pipeline", "Running daily pipeline..."),
     ],
 )
 def test_run_shell_executes_command(capsys, module, expected):

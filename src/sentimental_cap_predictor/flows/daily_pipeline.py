@@ -16,7 +16,6 @@ import typer
 from loguru import logger
 
 from ..data import ingest as data_ingest
-from ..model_training import train_and_predict
 from ..preprocessing import preprocess_price_data
 from ..trader_utils import strategy_optimizer as strat_opt
 
@@ -41,6 +40,7 @@ def run(
     interval: str = typer.Option("1d", help="Price interval"),
 ) -> None:
     """Execute the end-to-end daily pipeline for ``ticker``."""
+    from ..model_training import train_and_predict
     # Ingestion
     prices = data_ingest.fetch_prices(ticker, period=period, interval=interval)
     data_ingest.save_prices(prices, ticker)
