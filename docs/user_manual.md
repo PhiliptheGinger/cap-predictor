@@ -13,9 +13,10 @@
 ## Data Ingestion and Sentiment Analysis
 - Download price and news data for a ticker:
   ```bash
-  python -m sentimental_cap_predictor.dataset TICKER 1Y
+  python -m sentimental_cap_predictor.dataset TICKER --period 1Y
   ```
-  The `period` argument is positional and defaults to `max` if omitted.
+  The `period` can be supplied with `--period` or as a positional argument for
+  backward compatibility. It defaults to `max` when omitted.
 - Generate plots or other visualizations:
   ```bash
   python -m sentimental_cap_predictor.plots TICKER
