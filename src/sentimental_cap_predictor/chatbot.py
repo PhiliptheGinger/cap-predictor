@@ -9,6 +9,7 @@ final explanation.
 import os
 import shlex
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import typer
@@ -16,6 +17,24 @@ import typer
 app = typer.Typer(
     help="Interactive chatbot using local Hugging Face models",
 )
+
+
+THEMES = {
+    "default": {
+        "user": {"fg": typer.colors.CYAN},
+        "bot": {"fg": typer.colors.GREEN},
+        "system": {"fg": typer.colors.YELLOW},
+        "command": {"fg": typer.colors.MAGENTA},
+        "error": {"fg": typer.colors.RED},
+    },
+    "high-contrast": {
+        "user": {"fg": typer.colors.BRIGHT_CYAN, "bold": True},
+        "bot": {"fg": typer.colors.BRIGHT_GREEN, "bold": True},
+        "system": {"fg": typer.colors.BRIGHT_YELLOW, "bold": True},
+        "command": {"fg": typer.colors.BRIGHT_MAGENTA, "bold": True},
+        "error": {"fg": typer.colors.BRIGHT_RED, "bold": True},
+    },
+}
 
 
 def _get_pipeline(model_id: str):
@@ -80,9 +99,13 @@ MISSION_STATEMENT = (
 
 SYSTEM_PROMPT = (
     "System: You are a command-line assistant for the sentimental CAP "
-    "predictor project. You can execute shell commands for the user. To "
-    "run a command, reply with 'CMD: <command>'. After seeing the command "
-    "output you should provide a helpful explanation.\n\n"
+    "predictor project. You can execute shell commands for the user when "
+    "explicitly asked. Never claim to have run a command or produced "
+    "results unless the command was actually executed. When you show "
+    "commands or outputs without running them, make it clear they are "
+    "examples for the user to run. To run a command, reply with 'CMD: "
+    "<command>'. After seeing the command output you should provide a "
+    "helpful explanation.\n\n"
     f"{MISSION_STATEMENT}"
 )
 
@@ -117,13 +140,23 @@ LOADING_MESSAGES = {
 }
 
 
-def _run_shell(command: str) -> str:
+def _run_shell(
+    command: str,
+    style: Callable[[str, str], str] | None = None,
+) -> str:
     """Execute ``command`` in the system shell and return its output.
 
     Only ``python -m sentimental_cap_predictor.<module>`` commands where
     ``<module>`` is in :data:`ALLOWED_MODULES` are permitted. Any other
     command returns an error message without being executed.
     """
+
+    if style is None:
+
+        def style_fn(text: str, role: str = "system") -> str:
+            return text
+
+        style = style_fn
 
     parts = shlex.split(command)
     if len(parts) >= 3 and parts[0] == "python" and parts[1] == "-m":
@@ -132,7 +165,8 @@ def _run_shell(command: str) -> str:
             parts[2].startswith("sentimental_cap_predictor.")
             and module in ALLOWED_MODULES
         ):
-            typer.echo(LOADING_MESSAGES.get(module, "Thinking..."))
+            message = LOADING_MESSAGES.get(module, "Thinking...")
+            typer.echo(style(message, "system"))
             src_dir = Path(__file__).resolve().parents[1]
             project_root = src_dir.parent
             env = os.environ.copy()
@@ -152,26 +186,45 @@ def _run_shell(command: str) -> str:
 @app.command()
 def chat(
     main_model: str = "Qwen/Qwen2-0.5B-Instruct",
+    theme: str = typer.Option(
+        "default", help="Color theme for output (default or high-contrast)."
+    ),
+    no_color: bool = typer.Option(False, help="Disable colored output."),
 ) -> None:  # pragma: no cover - CLI wrapper
     """Start an interactive chat session using a single local model.
 
-    The chatbot queries an instruct-tuned model for each question. Type ``exit``
-    or ``quit`` to end the session.
+    The chatbot queries an instruct-tuned model for each question.
+    Type ``exit`` or ``quit`` to end the session.
     """
+
+    theme_styles = THEMES.get(theme.lower(), THEMES["default"])
+
+    def style(text: str, role: str) -> str:
+        if no_color:
+            return text
+        return typer.style(text, **theme_styles[role])
 
     generator = _get_pipeline(main_model)
     history: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
-    typer.echo("Chatbot ready. Type 'exit' to quit.")
+    typer.echo(style("Chatbot ready. Type 'exit' to quit.", "system"))
+    typer.echo(
+        style(
+            "Commands are only executed when the assistant "
+            "replies with a line starting with 'CMD:'. "
+            "Other suggestions are examples and not run automatically.",
+            "system",
+        )
+    )
     while True:
-        user = typer.prompt("You")
+        user = typer.prompt(style("You", "user"))
         if user.strip().lower() in {"exit", "quit"}:
             break
         try:
             reply, history = _ask(generator, history, user)
             if reply.startswith("CMD:"):
                 cmd = reply.removeprefix("CMD:").strip()
-                cmd_output = _run_shell(cmd)
-                typer.echo(cmd_output)
+                cmd_output = _run_shell(cmd, style)
+                typer.echo(style(cmd_output, "command"))
                 history.append(f"System: Command output:\n{cmd_output}")
                 reply, history = _ask(
                     generator,
@@ -179,9 +232,9 @@ def chat(
                     "Command executed.",
                 )
         except Exception as exc:  # pragma: no cover - model failure
-            typer.echo(f"Error: {exc}")
+            typer.echo(style(f"Error: {exc}", "error"))
             break
-        typer.echo(f"Bot: {reply}")
+        typer.echo(style(f"Bot: {reply}", "bot"))
 
 
 if __name__ == "__main__":  # pragma: no cover - entry point

@@ -6,6 +6,7 @@ from sentimental_cap_predictor.chatbot import (
     _run_shell,
 )
 
+
 @pytest.mark.parametrize(
     "module,expected",
     [
@@ -38,3 +39,7 @@ def test_system_prompt_mentions_cli():
 
 def test_system_prompt_mentions_mission():
     assert MISSION_STATEMENT in SYSTEM_PROMPT
+
+
+def test_system_prompt_warns_about_examples():
+    assert "never claim to have run a command" in SYSTEM_PROMPT.lower()
