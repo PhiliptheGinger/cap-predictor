@@ -19,12 +19,40 @@ def _sample_download(*args, **kwargs):
     )
 
 
+def _intraday_download(*args, **kwargs):
+    cols = pd.MultiIndex.from_tuples(
+        [
+            ("Datetime", ""),
+            ("Open", "NVDA"),
+            ("High", "NVDA"),
+            ("Low", "NVDA"),
+            ("Close", "NVDA"),
+            ("Adj Close", "NVDA"),
+            ("Volume", "NVDA"),
+        ],
+        names=["Price", "Ticker"],
+    )
+    data = [
+        [pd.Timestamp("2024-01-01 13:30", tz="US/Eastern"), 1, 1, 1, 1, 1, 100],
+        [pd.Timestamp("2024-01-01 14:30", tz="US/Eastern"), 2, 2, 2, 2, 2, 200],
+    ]
+    return pd.DataFrame(data, columns=cols)
+
+
 def test_fetch_prices_schema(monkeypatch):
     monkeypatch.setattr(yf, "download", _sample_download)
     df = ingest.fetch_prices("NVDA")
     assert list(df.columns) == ingest.EXPECTED_COLUMNS
     assert str(df["date"].dt.tz) == "UTC"
     assert df["volume"].dtype == "int64"
+
+
+def test_fetch_prices_intraday(monkeypatch):
+    monkeypatch.setattr(yf, "download", _intraday_download)
+    df = ingest.fetch_prices("NVDA", interval="1h")
+    assert list(df.columns) == ingest.EXPECTED_COLUMNS
+    assert len(df) == 2
+    assert str(df["date"].dt.tz) == "UTC"
 
 
 def test_fetch_prices_empty(monkeypatch):
