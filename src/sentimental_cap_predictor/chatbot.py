@@ -219,6 +219,15 @@ def chat(
         user = typer.prompt(style("You", "user"))
         if user.strip().lower() in {"exit", "quit"}:
             break
+        if user.startswith("CMD:"):
+            cmd = user.removeprefix("CMD:").strip()
+            cmd_output = _run_shell(cmd, style)
+            typer.echo(style(cmd_output, "command"))
+            history.extend([
+                f"User: CMD: {cmd}",
+                f"System: Command output:\n{cmd_output}",
+            ])
+            continue
         try:
             reply, history = _ask(generator, history, user)
             if reply.startswith("CMD:"):
