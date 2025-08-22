@@ -1,20 +1,26 @@
 """Idea generation using a local Hugging Face model.
 
 This module intentionally avoids any network API calls by running a
-Hugging Face ``text-generation`` pipeline locally.  The default model id can
-be overridden to use any compatible base model that is available on disk or
-through the Hugging Face hub.  The model is prompted to return a JSON list of
-ideas which are converted into :class:`~sentimental_cap_predictor.research.idea_schema.Idea`
-instances.
+Hugging Face ``text-generation`` pipeline locally. The model ID defaults to
+the ``MAIN_MODEL`` environment variable or ``Qwen/Qwen2-7B-Instruct`` if it is
+unset. The default can be overridden to use any compatible base model that is
+available on disk or through the Hugging Face hub. The model is prompted to
+return a JSON list of ideas which are converted into
+:class:`~sentimental_cap_predictor.research.idea_schema.Idea` instances.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from typing import List
 
+from dotenv import load_dotenv
+
 from .idea_schema import Idea
+
+load_dotenv()
 
 
 _DEFAULT_PROMPT = (
@@ -48,7 +54,10 @@ def _get_pipeline(model_id: str):
 
 
 def generate_ideas(
-    topic: str, *, model_id: str = "mistralai/Mistral-7B-v0.1", n: int = 3
+    topic: str,
+    *,
+    model_id: str = os.getenv("MAIN_MODEL", "Qwen/Qwen2-7B-Instruct"),
+    n: int = 3,
 ) -> List[Idea]:
     """Generate research ideas from ``topic`` using a local language model.
 
@@ -57,7 +66,9 @@ def generate_ideas(
     topic:
         Short text describing the market, asset class, or research question.
     model_id:
-        Hugging Face model identifier or local path to load.
+        Hugging Face model identifier or local path to load. Defaults to the
+        ``MAIN_MODEL`` environment variable or ``Qwen/Qwen2-7B-Instruct`` if
+        unset.
     n:
         Number of ideas to request from the model.
 
@@ -69,12 +80,13 @@ def generate_ideas(
 
     generator = _get_pipeline(model_id)
     user_prompt = (
-        f"{_DEFAULT_PROMPT}\n\nPropose {n} new quantitative trading ideas about: {topic}. "
-        "Respond in JSON list where each item has fields 'name', 'description', and 'params'."
+        f"{_DEFAULT_PROMPT}\n\nPropose {n} new quantitative trading ideas "
+        f"about: {topic}. Respond in JSON list where each item has fields "
+        "'name', 'description', and 'params'."
     )
-    result = generator(user_prompt, max_new_tokens=512, do_sample=True, temperature=0.2)[0][
-        "generated_text"
-    ]
+    result = generator(
+        user_prompt, max_new_tokens=512, do_sample=True, temperature=0.2
+    )[0]["generated_text"]
     try:
         raw = json.loads(result)
     except json.JSONDecodeError as exc:  # pragma: no cover - depends on model
@@ -84,4 +96,3 @@ def generate_ideas(
 
 
 __all__ = ["generate_ideas"]
-

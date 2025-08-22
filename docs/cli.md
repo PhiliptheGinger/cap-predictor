@@ -82,9 +82,10 @@ write them to a JSON file:
 python -m sentimental_cap_predictor.scheduler ideas:generate "interest rate regimes" --output ideas.json
 ```
 
-This command can be scheduled with cron in the same way as the daily pipeline.
-The underlying model defaults to the value of the `MAIN_MODEL` environment
-variable or `Qwen/Qwen2-7B-Instruct` if the variable is unset.
+The model ID defaults to the `MAIN_MODEL` environment variable or
+`Qwen/Qwen2-7B-Instruct` if the variable is unset. Override it for a single
+run with the `--model-id` option. This command can be scheduled with cron in
+the same way as the daily pipeline.
 
 ## Chatbot
 
