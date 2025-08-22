@@ -83,6 +83,8 @@ python -m sentimental_cap_predictor.scheduler ideas:generate "interest rate regi
 ```
 
 This command can be scheduled with cron in the same way as the daily pipeline.
+The underlying model defaults to the value of the `MAIN_MODEL` environment
+variable or `Qwen/Qwen2-7B-Instruct` if the variable is unset.
 
 ## Chatbot
 
