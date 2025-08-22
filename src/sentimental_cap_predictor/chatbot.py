@@ -53,24 +53,6 @@ def _ask(generator, history: list[str], user: str) -> tuple[str, list[str]]:
     return reply, history
 
 
-def _summarize_decision(main_reply: str, exp_reply: str) -> str:
-    """Explain how the final response was selected.
-
-    The function compares outputs from the main and experimental models and
-    returns a human-readable explanation describing any differences and which
-    response was chosen.
-    """
-
-    if main_reply.strip() == exp_reply.strip():
-        return f"Both models agree: {main_reply}"
-    return (
-        "Main model replied: {main}.\nExperimental model replied: {exp}.\n"
-        "Decision: opting for the main model's answer because it is the "
-        "production model while the experimental model is still under "
-        "evaluation."
-    ).format(main=main_reply, exp=exp_reply)
-
-
 MISSION_STATEMENT = (
     "A Model for the Community\n\n"
     "We build this model not only to predict markets, but to reclaim our most "
@@ -170,42 +152,36 @@ def _run_shell(command: str) -> str:
 @app.command()
 def chat(
     main_model: str = "Qwen/Qwen2-0.5B-Instruct",
-    experimental_model: str = "Qwen/Qwen2-0.5B",
 ) -> None:  # pragma: no cover - CLI wrapper
-    """Start an interactive chat session consulting two local models.
+    """Start an interactive chat session using a single local model.
 
-    The chatbot queries both a *main* and an *experimental* model for every
-    question and reports which answer was chosen and why. Type ``exit`` or
-    ``quit`` to end the session.
+    The chatbot queries an instruct-tuned model for each question. Type ``exit``
+    or ``quit`` to end the session.
     """
 
-    main_gen = _get_pipeline(main_model)
-    exp_gen = _get_pipeline(experimental_model)
-    main_hist: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
-    exp_hist: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
+    generator = _get_pipeline(main_model)
+    history: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
     typer.echo("Chatbot ready. Type 'exit' to quit.")
     while True:
         user = typer.prompt("You")
         if user.strip().lower() in {"exit", "quit"}:
             break
         try:
-            main_reply, main_hist = _ask(main_gen, main_hist, user)
-            if main_reply.startswith("CMD:"):
-                cmd = main_reply.removeprefix("CMD:").strip()
+            reply, history = _ask(generator, history, user)
+            if reply.startswith("CMD:"):
+                cmd = reply.removeprefix("CMD:").strip()
                 cmd_output = _run_shell(cmd)
                 typer.echo(cmd_output)
-                main_hist.append(f"System: Command output:\n{cmd_output}")
-                main_reply, main_hist = _ask(
-                    main_gen,
-                    main_hist,
+                history.append(f"System: Command output:\n{cmd_output}")
+                reply, history = _ask(
+                    generator,
+                    history,
                     "Command executed.",
                 )
-            exp_reply, exp_hist = _ask(exp_gen, exp_hist, user)
         except Exception as exc:  # pragma: no cover - model failure
             typer.echo(f"Error: {exc}")
             break
-        summary = _summarize_decision(main_reply, exp_reply)
-        typer.echo(f"Bot: {summary}")
+        typer.echo(f"Bot: {reply}")
 
 
 if __name__ == "__main__":  # pragma: no cover - entry point
