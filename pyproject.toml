@@ -25,6 +25,7 @@ dependencies = [
     "SQLAlchemy>=2.0,<3",
     "psutil>=5.9,<6",
     "optuna>=3,<4",
+    "lxml-html-clean>=0.4,<1",
 ]
 
 [project.optional-dependencies]
