@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
 import typer
+from dotenv import load_dotenv
 from loguru import logger
 
 from . import connectors
 from .indexer import build_index
 from .research.idea_generator import generate_ideas
+
+load_dotenv()
+
+MODEL_HELP = "Model ID to use. Defaults to MAIN_MODEL or 'Qwen/Qwen2-7B-Instruct'."  # noqa: E501
 
 STATE_PATH = Path("state.json")
 DATA_DIR = Path("data")
@@ -121,15 +127,19 @@ def index_papers() -> None:
 @app.command("ideas:generate")
 def generate(
     topic: str,
-    model_id: str = "mistralai/Mistral-7B-v0.1",
+    model_id: str = typer.Option(
+        os.getenv("MAIN_MODEL", "Qwen/Qwen2-7B-Instruct"),
+        help=MODEL_HELP,
+    ),
     n: int = 3,
     output: Path | None = None,
 ) -> None:
     """Generate trading ideas using a local language model.
 
-    The resulting ideas are printed to STDOUT or written to ``output`` if
-    provided.  This makes the command easy to schedule via cron or other
-    systems.
+    The model ID defaults to the ``MAIN_MODEL`` environment variable or
+    ``Qwen/Qwen2-7B-Instruct`` if unset.  The resulting ideas are printed to
+    STDOUT or written to ``output`` if provided.  This makes the command easy
+    to schedule via cron or other systems.
     """
 
     ideas = generate_ideas(topic, model_id=model_id, n=n)
