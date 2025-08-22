@@ -6,7 +6,10 @@ output is appended to the conversation history before asking the model for a
 final explanation.
 """
 
+import os
+import shlex
 import subprocess
+from pathlib import Path
 
 import typer
 
@@ -76,19 +79,66 @@ SYSTEM_PROMPT = (
 )
 
 CLI_USAGE = (
-    "System: Available CLI modules include dataset, plots, "
-    "modeling.sentiment_analysis and chatbot. They can be invoked with "
-    "'python -m sentimental_cap_predictor.<module>'."
+    "System: Available CLI modules include dataset, data.ingest, "
+    "backtest.engine, modeling.sentiment_analysis, modeling.train_eval, plots "
+    "and chatbot. They can be invoked with 'python -m "
+    "sentimental_cap_predictor.<module>'. Only these commands will be "
+    "executed."
 )
 
 
-def _run_shell(command: str) -> str:
-    """Execute ``command`` in the system shell and return its output."""
+ALLOWED_MODULES = {
+    "dataset",
+    "data.ingest",
+    "backtest.engine",
+    "modeling.sentiment_analysis",
+    "modeling.train_eval",
+    "plots",
+    "chatbot",
+}
 
-    result = subprocess.run(
-        command, shell=True, check=False, capture_output=True, text=True
-    )
-    return f"{result.stdout}{result.stderr}".strip()
+
+LOADING_MESSAGES = {
+    "dataset": "Analyzing dataset...",
+    "data.ingest": "Ingesting data...",
+    "backtest.engine": "Running back-testing engine...",
+    "modeling.sentiment_analysis": "Analyzing sentiment...",
+    "modeling.train_eval": "Training and evaluating model...",
+    "plots": "Generating plot...",
+    "chatbot": "Thinking...",
+}
+
+
+def _run_shell(command: str) -> str:
+    """Execute ``command`` in the system shell and return its output.
+
+    Only ``python -m sentimental_cap_predictor.<module>`` commands where
+    ``<module>`` is in :data:`ALLOWED_MODULES` are permitted. Any other
+    command returns an error message without being executed.
+    """
+
+    parts = shlex.split(command)
+    if len(parts) >= 3 and parts[0] == "python" and parts[1] == "-m":
+        module = parts[2].removeprefix("sentimental_cap_predictor.")
+        if (
+            parts[2].startswith("sentimental_cap_predictor.")
+            and module in ALLOWED_MODULES
+        ):
+            typer.echo(LOADING_MESSAGES.get(module, "Thinking..."))
+            src_dir = Path(__file__).resolve().parents[1]
+            project_root = src_dir.parent
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{src_dir}:{env.get('PYTHONPATH', '')}"
+            result = subprocess.run(
+                parts,
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=project_root,
+                env=env,
+            )
+            return f"{result.stdout}{result.stderr}".strip()
+    return "Command not allowed."
 
 
 @app.command()
@@ -117,6 +167,7 @@ def chat(
             if main_reply.startswith("CMD:"):
                 cmd = main_reply.removeprefix("CMD:").strip()
                 cmd_output = _run_shell(cmd)
+                typer.echo(cmd_output)
                 main_hist.append(f"System: Command output:\n{cmd_output}")
                 main_reply, main_hist = _ask(
                     main_gen,
