@@ -1,4 +1,12 @@
-"""Simple command-line chatbot powered by small Qwen models."""
+"""Simple command-line chatbot powered by small Qwen models.
+
+The assistant can run shell commands when prompted. If a model reply starts
+with ``CMD:`` followed by a command, the command is executed locally and the
+output is appended to the conversation history before asking the model for a
+final explanation.
+"""
+
+import subprocess
 
 import typer
 
@@ -12,12 +20,13 @@ def _get_pipeline(model_id: str):
 
     import os
 
-    # Disable optional backends that can trigger heavy imports or incompatibilities
-    # on systems where TensorFlow or Flax are installed but not fully configured.
-    # ``transformers`` checks the ``USE_TF`` and ``USE_FLAX`` environment
-    # variables when deciding whether to import those frameworks. Setting them
-    # to ``0`` prevents expensive imports that can lead to protobuf runtime
-    # errors on machines that happen to have TensorFlow installed.
+    # Disable optional backends that can trigger heavy imports or
+    # incompatibilities on systems where TensorFlow or Flax are installed
+    # but not fully configured. ``transformers`` checks the ``USE_TF`` and
+    # ``USE_FLAX`` environment variables when deciding whether to import
+    # those frameworks. Setting them to ``0`` prevents expensive imports that
+    # can lead to protobuf runtime errors on machines that happen to have
+    # TensorFlow installed.
     os.environ.setdefault("USE_TF", "0")
     os.environ.setdefault("USE_FLAX", "0")
     from transformers import pipeline
@@ -59,6 +68,29 @@ def _summarize_decision(main_reply: str, exp_reply: str) -> str:
     ).format(main=main_reply, exp=exp_reply)
 
 
+SYSTEM_PROMPT = (
+    "System: You are a command-line assistant for the sentimental CAP "
+    "predictor project. You can execute shell commands for the user. To "
+    "run a command, reply with 'CMD: <command>'. After seeing the command "
+    "output you should provide a helpful explanation."
+)
+
+CLI_USAGE = (
+    "System: Available CLI modules include dataset, plots, "
+    "modeling.sentiment_analysis and chatbot. They can be invoked with "
+    "'python -m sentimental_cap_predictor.<module>'."
+)
+
+
+def _run_shell(command: str) -> str:
+    """Execute ``command`` in the system shell and return its output."""
+
+    result = subprocess.run(
+        command, shell=True, check=False, capture_output=True, text=True
+    )
+    return f"{result.stdout}{result.stderr}".strip()
+
+
 @app.command()
 def chat(
     main_model: str = "Qwen/Qwen2-0.5B-Instruct",
@@ -73,8 +105,8 @@ def chat(
 
     main_gen = _get_pipeline(main_model)
     exp_gen = _get_pipeline(experimental_model)
-    main_hist: list[str] = []
-    exp_hist: list[str] = []
+    main_hist: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
+    exp_hist: list[str] = [SYSTEM_PROMPT, CLI_USAGE]
     typer.echo("Chatbot ready. Type 'exit' to quit.")
     while True:
         user = typer.prompt("You")
@@ -82,6 +114,15 @@ def chat(
             break
         try:
             main_reply, main_hist = _ask(main_gen, main_hist, user)
+            if main_reply.startswith("CMD:"):
+                cmd = main_reply.removeprefix("CMD:").strip()
+                cmd_output = _run_shell(cmd)
+                main_hist.append(f"System: Command output:\n{cmd_output}")
+                main_reply, main_hist = _ask(
+                    main_gen,
+                    main_hist,
+                    "Command executed.",
+                )
             exp_reply, exp_hist = _ask(exp_gen, exp_hist, user)
         except Exception as exc:  # pragma: no cover - model failure
             typer.echo(f"Error: {exc}")
