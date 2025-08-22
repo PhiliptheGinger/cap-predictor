@@ -1,46 +1,109 @@
-import pytest
+import types
 
-from sentimental_cap_predictor.chatbot import (
-    MISSION_STATEMENT,
-    SYSTEM_PROMPT,
-    _run_shell,
-)
+from sentimental_cap_predictor.chatbot import chat_loop
 
 
-@pytest.mark.parametrize(
-    "module,expected",
-    [
-        ("chatbot", "Thinking..."),
-        ("data.ingest", "Ingesting data..."),
-        ("flows.daily_pipeline", "Running daily pipeline..."),
-    ],
-)
-def test_run_shell_executes_command(capsys, module, expected):
-    output = _run_shell(f"python -m sentimental_cap_predictor.{module} --help")
-    captured = capsys.readouterr()
-    assert expected in captured.out
-    assert "usage" in output.lower()
+class DummyParser:
+    """Very small parser used for testing the chatbot loop."""
+
+    def __init__(self, confirm: bool = False):
+        self.confirm = confirm
+        self.registry = {
+            "foo": {"summary": "do foo", "examples": ["foo bar"]},
+        }
+
+    def parse(self, prompt: str) -> dict[str, object]:
+        data: dict[str, object] = {"command": prompt}
+        if self.confirm:
+            data["confirm"] = True
+        return data
 
 
-def test_run_shell_rejects_unlisted_command():
-    output = _run_shell("echo hello")
-    assert "not allowed" in output.lower()
+class DummyDispatcher:
+    def __init__(self) -> None:
+        self.dispatched: list[object] = []
+
+    def dispatch(self, task: object) -> dict[str, object]:
+        self.dispatched.append(task)
+        return {
+            "summary": "ok",
+            "metrics": {"acc": 1},
+            "artifacts": ["a.txt"],
+        }
 
 
-def test_run_shell_blocks_injection():
-    output = _run_shell(
-        "python -m sentimental_cap_predictor.chatbot --help && echo pwned"
+def iter_inputs(*items: str) -> types.FunctionType:
+    it = iter(items)
+
+    def _next(_: str) -> str:
+        return next(it)
+
+    return _next
+
+
+def test_help_lists_registry(capsys):
+    parser = DummyParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("help", "exit"))
+    out = capsys.readouterr().out
+    assert "foo" in out and "do foo" in out and "foo bar" in out
+
+
+def test_dispatch_and_prints(capsys):
+    parser = DummyParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("run", "exit"))
+    out = capsys.readouterr().out
+    assert "SUCCESS: ok" in out
+    assert "acc" in out and "a.txt" in out
+    assert dispatcher.dispatched
+
+
+def test_confirmation(monkeypatch, capsys):
+    parser = DummyParser(confirm=True)
+    dispatcher = DummyDispatcher()
+    prompts = iter_inputs("do it", "exit")
+    confirms = iter(["n"])
+
+    def _confirm(_: str, default: bool | None = None) -> bool:
+        return next(confirms) == "y"
+
+    chat_loop(
+        parser,
+        dispatcher,
+        prompt_fn=prompts,
+        confirm_fn=_confirm,
     )
-    assert "pwned" not in output
+    out = capsys.readouterr().out
+    assert "Cancelled" in out
+    assert not dispatcher.dispatched
 
 
-def test_system_prompt_mentions_cli():
-    assert "command-line assistant" in SYSTEM_PROMPT.lower()
+def test_hide_traceback(capsys):
+    class ErrorParser(DummyParser):
+        def parse(self, prompt: str) -> dict[str, object]:
+            raise ValueError("boom")
+
+    parser = ErrorParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("go", "exit"))
+    captured = capsys.readouterr()
+    assert "boom" in captured.out
+    assert "Traceback" not in captured.err
 
 
-def test_system_prompt_mentions_mission():
-    assert MISSION_STATEMENT in SYSTEM_PROMPT
+def test_debug_shows_traceback(capsys):
+    class ErrorParser(DummyParser):
+        def parse(self, prompt: str) -> dict[str, object]:
+            raise ValueError("boom")
 
-
-def test_system_prompt_warns_about_examples():
-    assert "never claim to have run a command" in SYSTEM_PROMPT.lower()
+    parser = ErrorParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(
+        parser,
+        dispatcher,
+        debug=True,
+        prompt_fn=iter_inputs("go", "exit"),
+    )
+    captured = capsys.readouterr()
+    assert "Traceback" in captured.err
