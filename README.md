@@ -48,6 +48,10 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.plots` – visualize processed data
 - `sentimental_cap_predictor.chatbot` – chat with a local Qwen-powered assistant that consults main and experimental models, explains its decisions, and can execute shell commands when a reply starts with `CMD:`. Only commands for the modules listed here are run, and their output is shown before the assistant's final response.
 
+When the assistant executes a command it prints a short status message (e.g.,
+"Ingesting data..." or "Running back-testing engine...") so you know work is
+in progress.
+
 Run `--help` with any module for detailed options.
 
 ## Documentation

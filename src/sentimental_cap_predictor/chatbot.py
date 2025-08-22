@@ -98,6 +98,17 @@ ALLOWED_MODULES = {
 }
 
 
+LOADING_MESSAGES = {
+    "dataset": "Analyzing dataset...",
+    "data.ingest": "Ingesting data...",
+    "backtest.engine": "Running back-testing engine...",
+    "modeling.sentiment_analysis": "Analyzing sentiment...",
+    "modeling.train_eval": "Training and evaluating model...",
+    "plots": "Generating plot...",
+    "chatbot": "Thinking...",
+}
+
+
 def _run_shell(command: str) -> str:
     """Execute ``command`` in the system shell and return its output.
 
@@ -113,6 +124,7 @@ def _run_shell(command: str) -> str:
             parts[2].startswith("sentimental_cap_predictor.")
             and module in ALLOWED_MODULES
         ):
+            typer.echo(LOADING_MESSAGES.get(module, "Thinking..."))
             src_dir = Path(__file__).resolve().parents[1]
             project_root = src_dir.parent
             env = os.environ.copy()

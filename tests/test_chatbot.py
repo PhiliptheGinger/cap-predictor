@@ -18,11 +18,16 @@ def test_summarize_decision_disagreement():
 
 
 @pytest.mark.parametrize(
-    "module",
-    ["chatbot", "data.ingest"],
+    "module,expected",
+    [
+        ("chatbot", "Thinking..."),
+        ("data.ingest", "Ingesting data..."),
+    ],
 )
-def test_run_shell_executes_command(module):
+def test_run_shell_executes_command(capsys, module, expected):
     output = _run_shell(f"python -m sentimental_cap_predictor.{module} --help")
+    captured = capsys.readouterr()
+    assert expected in captured.out
     assert "usage" in output.lower()
 
 
