@@ -39,6 +39,7 @@ def fetch_prices(ticker: str, period: str = "5y", interval: str = "1d") -> pd.Da
                 interval=interval,
                 progress=False,
                 auto_adjust=False,
+                group_by="column",
             )
             if not df.empty:
                 break
@@ -48,11 +49,29 @@ def fetch_prices(ticker: str, period: str = "5y", interval: str = "1d") -> pd.Da
     else:
         raise ValueError(f"No data returned for ticker {ticker}") from last_error
 
-    df = df.reset_index().rename(columns=str.lower)
+    df = df.reset_index()
+
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [c[0].lower() for c in df.columns]
+    else:
+        df.columns = [str(c).lower() for c in df.columns]
+
     if "adj close" in df.columns:
         df = df.rename(columns={"adj close": "adj_close"})
-    df["date"] = pd.to_datetime(df["date"], utc=True)
+
+    time_col = "date" if "date" in df.columns else (
+        "datetime" if "datetime" in df.columns else None
+    )
+    if time_col is None:
+        raise ValueError(f"No date/datetime column present: {list(df.columns)}")
+
+    df["date"] = pd.to_datetime(df[time_col], utc=True)
     df = df.drop_duplicates(subset="date").sort_values("date")
+
+    for col in EXPECTED_COLUMNS:
+        if col not in df.columns:
+            df[col] = pd.NA
+
     df = df[EXPECTED_COLUMNS]
     df = df.astype(
         {
@@ -116,11 +135,25 @@ def main(
 
     if offline_path is not None:
         df = pd.read_csv(offline_path)
-        df = df.rename(columns=str.lower)
+        df.columns = [str(c).lower() for c in df.columns]
         if "adj close" in df.columns:
             df = df.rename(columns={"adj close": "adj_close"})
-        df["date"] = pd.to_datetime(df["date"], utc=True)
+
+        time_col = "date" if "date" in df.columns else (
+            "datetime" if "datetime" in df.columns else None
+        )
+        if time_col is None:
+            raise ValueError(
+                f"No date/datetime column present in offline file: {list(df.columns)}"
+            )
+
+        df["date"] = pd.to_datetime(df[time_col], utc=True)
         df = df.drop_duplicates(subset="date").sort_values("date")
+
+        for col in EXPECTED_COLUMNS:
+            if col not in df.columns:
+                df[col] = pd.NA
+
         df = df[EXPECTED_COLUMNS]
         df = df.astype(
             {
