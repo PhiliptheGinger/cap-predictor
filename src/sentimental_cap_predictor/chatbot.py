@@ -1,4 +1,4 @@
-"""Simple command-line chatbot powered by local Mistral models."""
+"""Simple command-line chatbot powered by small Qwen models."""
 
 import typer
 
@@ -12,8 +12,14 @@ def _get_pipeline(model_id: str):
 
     import os
 
-    os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
-    os.environ.setdefault("TRANSFORMERS_NO_FLAX", "1")
+    # Disable optional backends that can trigger heavy imports or incompatibilities
+    # on systems where TensorFlow or Flax are installed but not fully configured.
+    # ``transformers`` checks the ``USE_TF`` and ``USE_FLAX`` environment
+    # variables when deciding whether to import those frameworks. Setting them
+    # to ``0`` prevents expensive imports that can lead to protobuf runtime
+    # errors on machines that happen to have TensorFlow installed.
+    os.environ.setdefault("USE_TF", "0")
+    os.environ.setdefault("USE_FLAX", "0")
     from transformers import pipeline
 
     return pipeline("text-generation", model=model_id, tokenizer=model_id)
@@ -55,8 +61,8 @@ def _summarize_decision(main_reply: str, exp_reply: str) -> str:
 
 @app.command()
 def chat(
-    main_model: str = "mistralai/Mistral-7B-v0.1",
-    experimental_model: str = "mistralai/Mistral-7B-Instruct-v0.2",
+    main_model: str = "Qwen/Qwen2-0.5B-Instruct",
+    experimental_model: str = "Qwen/Qwen2-0.5B",
 ) -> None:  # pragma: no cover - CLI wrapper
     """Start an interactive chat session consulting two local models.
 
