@@ -4,7 +4,7 @@ import re
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 
 @dataclass
@@ -30,13 +30,30 @@ class Intent:
     confidence: float = 0.0
 
 
+def parse(
+    text: str, llm: Callable[[str], "Intent"] | None = None
+) -> Intent | List[Intent]:
+    """Parse ``text`` into one or more :class:`Intent` objects.
+
+    The function now supports *chained* commands separated by either
+    semicolons (``;``) or the phrase ``"and then"``. Each segment is parsed
+    independently using the internal ``_parse_single`` routine. For single
+    commands the return type is an :class:`Intent`; for multiple commands a
+    list of intents is returned to maintain backward compatibility.
+    """
+
+    parts = re.split(r"\s*(?:;|\band\s+then\b)\s*", text, flags=re.IGNORECASE)
+    intents = [_parse_single(part, llm) for part in parts if part.strip()]
+    return intents[0] if len(intents) == 1 else intents
+
+
 # ---------------------------------------------------------------------------
-# Core parsing logic
+# Internal single-command parser
 # ---------------------------------------------------------------------------
 
 
-def parse(text: str, llm: Callable[[str], Intent] | None = None) -> Intent:
-    """Parse ``text`` into an :class:`Intent`.
+def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Intent:
+    """Parse a single command ``text`` into an :class:`Intent`.
 
     The parser implements a collection of regular-expression and keyword
     heuristics for the most common commands. If no rule matches, an optional

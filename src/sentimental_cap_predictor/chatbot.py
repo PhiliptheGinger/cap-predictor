@@ -137,20 +137,27 @@ def chat_loop(
             _print_help(nl_parser, echo_fn)
             continue
         try:
-            task = nl_parser.parse(prompt)
+            tasks = nl_parser.parse(prompt)
         except Exception as exc:  # pragma: no cover - parser failure
             _handle_error(exc, debug, echo_fn)
             continue
-        if _needs_confirmation(task):
-            if not confirm_fn("Execute?", default=False):
-                echo_fn("Cancelled")
+
+        task_list = tasks if isinstance(tasks, list) else [tasks]
+        multi = len(task_list) > 1
+
+        for idx, task in enumerate(task_list, 1):
+            if _needs_confirmation(task):
+                if not confirm_fn("Execute?", default=False):
+                    echo_fn("Cancelled")
+                    continue
+            try:
+                result = dispatcher.dispatch(task)
+            except Exception as exc:  # pragma: no cover - dispatcher failure
+                _handle_error(exc, debug, echo_fn)
                 continue
-        try:
-            result = dispatcher.dispatch(task)
-        except Exception as exc:  # pragma: no cover - dispatcher failure
-            _handle_error(exc, debug, echo_fn)
-            continue
-        _print_result(result, echo_fn)
+            if multi:
+                echo_fn(f"Step {idx}:")
+            _print_result(result, echo_fn)
 
 
 # ---------------------------------------------------------------------------
