@@ -41,3 +41,9 @@ def test_dispatch_custom_command(monkeypatch):
     assert res.message == "done"
     assert res.metrics == {"acc": 1}
     assert res.artifacts == ["out.txt"]
+
+
+def test_dispatch_shell_respects_sandbox():
+    res = dispatch({"command": "shell.run", "cmd": "sleep 0"})
+    assert not res.ok
+    assert "not allowed" in res.message

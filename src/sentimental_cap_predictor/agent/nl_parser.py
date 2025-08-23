@@ -47,14 +47,23 @@ def parse(
 ) -> Intent | List[Intent]:
     """Parse ``text`` into one or more :class:`Intent` objects.
 
-    The function now supports *chained* commands separated by either
-    semicolons (``;``) or the phrase ``"and then"``. Each segment is parsed
-    independently using the internal ``_parse_single`` routine. For single
-    commands the return type is an :class:`Intent`; for multiple commands a
-    list of intents is returned to maintain backward compatibility.
+    Besides semicolons and the phrase ``"and then"``, the parser also accepts
+    simple ``"and"`` as a command separator when the subsequent text starts
+    with a known command keyword. This enables prompts such as ``"fetch SPY and
+    train model SPY"`` to be interpreted as two distinct actions.
     """
 
-    parts = re.split(r"\s*(?:;|\band\s+then\b)\s*", text, flags=re.IGNORECASE)
+    # Normalize common "(period/interval)" syntax to "period interval" so the
+    # ingestion regex can parse it.
+    text = re.sub(r"\((\d+[a-z]+)/(\d+[a-z]+)\)", r" \1 \2 ", text, flags=re.IGNORECASE)
+
+    # Split chained commands. The lookahead ensures that plain "and" inside
+    # parameters (e.g. "compare 1 and 2") are not treated as separators.
+    splitter = re.compile(
+        r"\s*(?:;|\band\s+then\b|\band\b(?=\s*(?:ingest|download|fetch|train|retrain|optimize|compare|promote|list|show|run|generate|ideas?|shell|tests|pytest|pipeline|system|status)))\s*",
+        flags=re.IGNORECASE,
+    )
+    parts = splitter.split(text)
     intents = [_parse_single(part, llm) for part in parts if part.strip()]
     return intents[0] if len(intents) == 1 else intents
 
@@ -90,8 +99,8 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
 
     # model.train_eval -------------------------------------------------------
     m = re.match(
-        r"(?:^|\b)(?:train(?:\s+model)?|model\.train_eval)\s+"
-        r"(?P<ticker>[A-Za-z0-9_]+)",
+        r"(?:^|\b)(?:train(?:\s+model)?|retrain(?:\s+the\s+model)?|model\.train_eval)\s+"
+        r"(?:for\s+)?(?P<ticker>[A-Za-z0-9_]+)",
         original,
         flags=re.IGNORECASE,
     )
