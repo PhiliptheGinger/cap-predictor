@@ -153,6 +153,62 @@ class ExperimentTracker:
 
 
 # ----------------------------------------------------------------------
+# Structured helpers
+# ----------------------------------------------------------------------
+
+
+def list_runs() -> Dict[str, Any]:
+    """Return summary of all runs with their metrics and artifacts."""
+
+    tracker = ExperimentTracker()
+    runs = tracker.list_runs()
+    metrics: Dict[str, Any] = {str(r["id"]): r["metrics"] for r in runs}
+    artifacts = [str(p) for r in runs for p in r["artifacts"].values()]
+    return {
+        "summary": f"{len(runs)} runs",
+        "metrics": metrics,
+        "artifacts": artifacts,
+    }
+
+
+def show_run(run_id: int) -> Dict[str, Any]:
+    """Return metrics and artifacts for a single run."""
+
+    tracker = ExperimentTracker()
+    run = tracker.get_run(run_id)
+    return {
+        "summary": f"Run {run_id}",
+        "metrics": run["metrics"],
+        "artifacts": list(run["artifacts"].values()),
+    }
+
+
+def compare_runs(first: int, second: int) -> Dict[str, Any]:
+    """Compare metrics of two runs and surface their artifacts."""
+
+    tracker = ExperimentTracker()
+    run_a = tracker.get_run(first)
+    run_b = tracker.get_run(second)
+    shared = set(run_a["metrics"]).intersection(run_b["metrics"])
+    diff = {
+        key: run_a["metrics"].get(key, 0) - run_b["metrics"].get(key, 0)
+        for key in shared
+    }
+    artifacts = list(run_a["artifacts"].values()) + list(
+        run_b["artifacts"].values()
+    )
+    return {
+        "summary": f"{first} vs {second}",
+        "metrics": {
+            "first": run_a["metrics"],
+            "second": run_b["metrics"],
+            "diff": diff,
+        },
+        "artifacts": artifacts,
+    }
+
+
+# ----------------------------------------------------------------------
 # CLI helpers using Typer
 # ----------------------------------------------------------------------
 app = typer.Typer(help="Minimal CLI for inspecting experiment runs")
