@@ -128,8 +128,20 @@ def dispatch(intent: Mapping[str, Any] | Any) -> DispatchResult:
         return DispatchResult(ok=False, message=str(exc))
 
     message = _get_attr(output, "summary") or _get_attr(output, "message", "")
-    metrics = _get_attr(output, "metrics", {}) or {}
-    artifacts = _get_attr(output, "artifacts", []) or []
+    metrics_obj = _get_attr(output, "metrics", {}) or {}
+    artifacts_obj = _get_attr(output, "artifacts", []) or []
+
+    if isinstance(metrics_obj, Mapping):
+        metrics = dict(metrics_obj)
+    else:
+        metrics = dict(metrics_obj)
+
+    if isinstance(artifacts_obj, Mapping):
+        artifacts = [str(v) for v in artifacts_obj.values()]
+    elif isinstance(artifacts_obj, (str, Path)):
+        artifacts = [str(artifacts_obj)]
+    else:
+        artifacts = [str(a) for a in artifacts_obj]
 
     if not message:
         if isinstance(output, Mapping) and not metrics and not artifacts:
@@ -140,6 +152,6 @@ def dispatch(intent: Mapping[str, Any] | Any) -> DispatchResult:
     return DispatchResult(
         ok=True,
         message=message,
-        artifacts=list(artifacts),
-        metrics=dict(metrics),
+        artifacts=artifacts,
+        metrics=metrics,
     )

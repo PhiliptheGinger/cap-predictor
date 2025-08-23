@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Sequence
 import platform
-import shutil
 import subprocess
 import sys
 
@@ -55,13 +54,36 @@ def run_shell(cmd: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 
-def promote_model(src: str, dst: str) -> str:
-    """Copy a model artifact from ``src`` to ``dst``."""
+def promote_model(src: str, dst: str, dry_run: bool | None = False) -> Dict[str, Any]:
+    """Swap model config and weights between ``src`` and ``dst`` directories."""
 
-    dst_path = Path(dst)
-    dst_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst_path)
-    return str(dst_path)
+    def _find(directory: Path, stem: str) -> Path:
+        matches = list(directory.glob(f"{stem}.*"))
+        if not matches:
+            raise FileNotFoundError(f"missing {stem} in {directory}")
+        if len(matches) > 1:
+            raise ValueError(f"multiple {stem} files in {directory}")
+        return matches[0]
+
+    dry = bool(dry_run)
+    src_dir = Path(src)
+    dst_dir = Path(dst)
+    pairs = [
+        (_find(src_dir, "config"), _find(dst_dir, "config")),
+        (_find(src_dir, "weights"), _find(dst_dir, "weights")),
+    ]
+    artifacts = [str(pairs[0][1]), str(pairs[1][1])]
+    if dry:
+        return {
+            "summary": f"would swap {src} -> {dst}",
+            "artifacts": artifacts,
+        }
+    for a, b in pairs:
+        tmp = b.with_suffix(b.suffix + ".tmp")
+        b.rename(tmp)
+        a.rename(b)
+        tmp.rename(a)
+    return {"summary": f"promoted {src} -> {dst}", "artifacts": artifacts}
 
 
 def get_registry() -> Dict[str, Command]:
@@ -123,19 +145,19 @@ def get_registry() -> Dict[str, Command]:
         ),
         "experiments.list": Command(
             name="experiments.list",
-            handler=experiment.cli_list_runs,
+            handler=experiment.list_runs,
             summary="List recorded experiment runs",
             params_schema={},
         ),
         "experiments.show": Command(
             name="experiments.show",
-            handler=experiment.show,
+            handler=experiment.show_run,
             summary="Show details for a single experiment run",
             params_schema={"run_id": "int"},
         ),
         "experiments.compare": Command(
             name="experiments.compare",
-            handler=experiment.compare,
+            handler=experiment.compare_runs,
             summary="Compare metrics of two experiment runs",
             params_schema={"first": "int", "second": "int"},
         ),
@@ -143,7 +165,7 @@ def get_registry() -> Dict[str, Command]:
             name="model.promote",
             handler=promote_model,
             summary="Promote model artifact to production",
-            params_schema={"src": "str", "dst": "str"},
+            params_schema={"src": "str", "dst": "str", "dry_run": "bool|None"},
             dangerous=True,
         ),
         "tests.run": Command(
