@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Sequence
 import platform
-import subprocess
 import sys
 
 import pytest
@@ -48,10 +47,6 @@ def system_status() -> Dict[str, str]:
     return {"python": sys.version, "platform": platform.platform()}
 
 
-def run_shell(cmd: str) -> subprocess.CompletedProcess[str]:
-    """Execute ``cmd`` in the system shell."""
-
-    return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 
 def promote_model(src: str, dst: str, dry_run: bool | None = False) -> Dict[str, Any]:
@@ -89,6 +84,7 @@ def promote_model(src: str, dst: str, dry_run: bool | None = False) -> Dict[str,
 def get_registry() -> Dict[str, Command]:
     """Return mapping of command names to :class:`Command` entries."""
     from sentimental_cap_predictor.agent import coding_agent
+    from .sandbox import safe_shell
 
     return {
         "data.ingest": Command(
@@ -195,8 +191,8 @@ def get_registry() -> Dict[str, Command]:
         ),
         "shell.run": Command(
             name="shell.run",
-            handler=run_shell,
-            summary="Execute a shell command",
+            handler=safe_shell,
+            summary="Execute a shell command in a restricted sandbox",
             params_schema={"cmd": "str"},
             dangerous=True,
         ),

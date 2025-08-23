@@ -130,6 +130,7 @@ def dispatch(intent: Mapping[str, Any] | Any) -> DispatchResult:
     message = _get_attr(output, "summary") or _get_attr(output, "message", "")
     metrics_obj = _get_attr(output, "metrics", {}) or {}
     artifacts_obj = _get_attr(output, "artifacts", []) or []
+    ok_flag = _get_attr(output, "ok", True)
 
     if isinstance(metrics_obj, Mapping):
         metrics = dict(metrics_obj)
@@ -149,8 +150,13 @@ def dispatch(intent: Mapping[str, Any] | Any) -> DispatchResult:
         elif output is not None:
             message = str(output)
 
+    try:
+        ok = bool(ok_flag)
+    except Exception:  # pragma: no cover - non-boolean ok
+        ok = True
+
     return DispatchResult(
-        ok=True,
+        ok=ok,
         message=message,
         artifacts=artifacts,
         metrics=metrics,

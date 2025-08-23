@@ -30,7 +30,7 @@ The natural language parser supports several shortcuts:
 - `train model AAPL` – fit baseline models for a ticker
 - `compare 1 2` – compare two experiment runs
 - `system status` – report Python and platform versions
-- `shell ls` – run a shell command (requires confirmation)
+- `shell ls` – run a shell command (requires confirmation, only whitelisted binaries are allowed)
 
 ## Extending With New Commands
 
