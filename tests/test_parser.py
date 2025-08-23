@@ -4,7 +4,7 @@ from sentimental_cap_predictor.agent.nl_parser import parse
 
 
 @pytest.mark.parametrize(
-    "text,action,params",
+    "text,command,params",
     [
         (
             "ingest SPY 1y 1d",
@@ -17,16 +17,16 @@ from sentimental_cap_predictor.agent.nl_parser import parse
     ],
 )
 def test_regex_intent_mapping(
-    text: str, action: str, params: dict[str, object]
+    text: str, command: str, params: dict[str, object]
 ) -> None:
     intent = parse(text)
-    assert intent.action == action
+    assert intent.command == command
     assert intent.params == params
 
 
 def test_requires_confirmation() -> None:
     intent = parse("promote foo bar")
-    assert intent.action == "model.promote"
+    assert intent.command == "model.promote"
     assert intent.requires_confirmation
 
 
@@ -40,7 +40,7 @@ def test_requires_confirmation() -> None:
 def test_chained_commands(text: str) -> None:
     intents = parse(text)
     assert isinstance(intents, list)
-    assert [i.action for i in intents] == [
+    assert [i.command for i in intents] == [
         "data.ingest",
         "model.train_eval",
     ]

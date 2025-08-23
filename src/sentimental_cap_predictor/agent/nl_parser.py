@@ -13,7 +13,7 @@ class Intent:
 
     Attributes
     ----------
-    action:
+    command:
         Name of the command to execute. ``None`` if no command could be
         inferred.
     params:
@@ -24,10 +24,22 @@ class Intent:
         Heuristic confidence score between 0 and 1.
     """
 
-    action: str | None
+    command: str | None
     params: Dict[str, Any] = field(default_factory=dict)
     requires_confirmation: bool = False
     confidence: float = 0.0
+
+    # Backwards compatibility -------------------------------------------------
+    # ``action`` was the original field name. Provide a property so existing
+    # code that still accesses ``intent.action`` continues to work without
+    # modification.
+    @property
+    def action(self) -> str | None:  # pragma: no cover - legacy support
+        return self.command
+
+    @action.setter  # pragma: no cover - legacy support
+    def action(self, value: str | None) -> None:
+        self.command = value
 
 
 def parse(
@@ -253,7 +265,7 @@ def _fallback_heuristic(text: str) -> Intent:
     candidate = Path(text)
     if candidate.exists():
         return Intent("file.read", {"path": text}, confidence=0.2)
-    return Intent(action=None, params={"text": text}, confidence=0.0)
+    return Intent(command=None, params={"text": text}, confidence=0.0)
 
 
 __all__ = ["Intent", "parse"]
