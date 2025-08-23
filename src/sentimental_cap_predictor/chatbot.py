@@ -180,8 +180,8 @@ def chat(
     """
 
     try:
-        from . import dispatcher as default_dispatcher  # type: ignore
-        from . import nl_parser as default_parser  # type: ignore
+        from .agent import dispatcher as default_dispatcher
+        from .agent import nl_parser as default_parser
     except Exception as exc:  # pragma: no cover - import failure
         typer.echo(f"Unable to import parser/dispatcher: {exc}")
         return
