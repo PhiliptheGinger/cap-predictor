@@ -1,4 +1,5 @@
 import types
+
 import pytest
 
 from sentimental_cap_predictor.chatbot import chat_loop
@@ -83,7 +84,9 @@ def test_confirmation(monkeypatch, capsys):
 
 def test_chained_dispatch(capsys):
     class ChainParser(DummyParser):
-        def parse(self, prompt: str) -> list[dict[str, object]]:  # type: ignore[override]
+        def parse(  # type: ignore[override]
+            self, prompt: str
+        ) -> list[dict[str, object]]:
             return [{"command": "a"}, {"command": "b"}]
 
     parser = ChainParser()
@@ -123,3 +126,23 @@ def test_debug_shows_traceback(capsys):
     )
     captured = capsys.readouterr()
     assert "Traceback" in captured.err
+
+
+def test_unknown_command_prints_message(capsys):
+    class FailDispatcher(DummyDispatcher):
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
+            return {
+                "ok": False,
+                "message": "Unknown command, type `help` to see options.",
+            }
+
+    parser = DummyParser()
+    dispatcher = FailDispatcher()
+    chat_loop(
+        parser,
+        dispatcher,
+        prompt_fn=iter_inputs("hey, what can you do?", "exit"),
+    )
+    out = capsys.readouterr().out
+    assert "Unknown command, type `help` to see options." in out
+    assert "SUCCESS" not in out
