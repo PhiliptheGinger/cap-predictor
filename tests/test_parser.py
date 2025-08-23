@@ -28,3 +28,19 @@ def test_requires_confirmation() -> None:
     intent = parse("promote foo bar")
     assert intent.action == "model.promote"
     assert intent.requires_confirmation
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "ingest SPY 1y 1d; train model SPY",
+        "ingest SPY 1y 1d and then train model SPY",
+    ],
+)
+def test_chained_commands(text: str) -> None:
+    intents = parse(text)
+    assert isinstance(intents, list)
+    assert [i.action for i in intents] == [
+        "data.ingest",
+        "model.train_eval",
+    ]

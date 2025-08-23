@@ -81,6 +81,20 @@ def test_confirmation(monkeypatch, capsys):
     assert not dispatcher.dispatched
 
 
+def test_chained_dispatch(capsys):
+    class ChainParser(DummyParser):
+        def parse(self, prompt: str) -> list[dict[str, object]]:  # type: ignore[override]
+            return [{"command": "a"}, {"command": "b"}]
+
+    parser = ChainParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("multi", "exit"))
+    out = capsys.readouterr().out
+    assert "Step 1" in out and "Step 2" in out
+    assert out.count("SUCCESS: ok") == 2
+    assert len(dispatcher.dispatched) == 2
+
+
 def test_hide_traceback(capsys):
     class ErrorParser(DummyParser):
         def parse(self, prompt: str) -> dict[str, object]:
