@@ -79,6 +79,17 @@ def _print_result(
             echo_fn(f"  {art}")
 
 
+def _print_failure(
+    result: Any,
+    echo_fn: Callable[[str], None] = typer.echo,
+) -> None:
+    """Print the failure message from ``result``."""
+
+    message = _get_attr(result, "message", "")
+    if message:
+        echo_fn(message)
+
+
 def _print_help(
     nl_parser: Any,
     echo_fn: Callable[[str], None] = typer.echo,
@@ -155,9 +166,13 @@ def chat_loop(
             except Exception as exc:  # pragma: no cover - dispatcher failure
                 _handle_error(exc, debug, echo_fn)
                 continue
+            ok = _get_attr(result, "ok", True)
             if multi:
                 echo_fn(f"Step {idx}:")
-            _print_result(result, echo_fn)
+            if ok:
+                _print_result(result, echo_fn)
+            else:
+                _print_failure(result, echo_fn)
 
 
 # ---------------------------------------------------------------------------
