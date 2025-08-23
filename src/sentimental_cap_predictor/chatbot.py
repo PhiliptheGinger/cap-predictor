@@ -65,6 +65,10 @@ def _print_result(
     summary = _get_attr(result, "summary")
     if summary:
         echo_fn(f"SUCCESS: {summary}")
+    else:
+        message = _get_attr(result, "message")
+        if message:
+            echo_fn(f"SUCCESS: {message}")
 
     metrics = _get_attr(result, "metrics", {}) or {}
     if metrics:

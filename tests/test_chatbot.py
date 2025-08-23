@@ -62,6 +62,20 @@ def test_dispatch_and_prints(capsys):
     assert dispatcher.dispatched
 
 
+def test_dispatch_uses_message_when_no_summary(capsys):
+    class MessageDispatcher(DummyDispatcher):
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+            self.dispatched.append(task)
+            return {"message": "all good"}
+
+    parser = DummyParser()
+    dispatcher = MessageDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("run", "exit"))
+    out = capsys.readouterr().out
+    assert "SUCCESS: all good" in out
+    assert dispatcher.dispatched
+
+
 def test_confirmation(monkeypatch, capsys):
     parser = DummyParser(confirm=True)
     dispatcher = DummyDispatcher()
@@ -145,4 +159,17 @@ def test_unknown_command_prints_message(capsys):
     )
     out = capsys.readouterr().out
     assert "Unknown command, type `help` to see options." in out
+    assert "SUCCESS" not in out
+
+
+def test_failed_dispatch_prints_message(capsys):
+    class FailDispatcher(DummyDispatcher):
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+            return {"ok": False, "message": "bad"}
+
+    parser = DummyParser()
+    dispatcher = FailDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("go", "exit"))
+    out = capsys.readouterr().out
+    assert "bad" in out
     assert "SUCCESS" not in out
