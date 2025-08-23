@@ -1,4 +1,5 @@
 import types
+import pytest
 
 from sentimental_cap_predictor.chatbot import chat_loop
 
@@ -41,12 +42,13 @@ def iter_inputs(*items: str) -> types.FunctionType:
     return _next
 
 
-def test_help_lists_registry(capsys):
+@pytest.mark.parametrize("trigger", ["help", "?"])
+def test_help_lists_registry(trigger, capsys):
     parser = DummyParser()
     dispatcher = DummyDispatcher()
-    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("help", "exit"))
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
     out = capsys.readouterr().out
-    assert "foo" in out and "do foo" in out and "foo bar" in out
+    assert "do foo" in out and "foo bar" in out
 
 
 def test_dispatch_and_prints(capsys):

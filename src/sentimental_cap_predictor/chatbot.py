@@ -94,9 +94,7 @@ def _print_help(
     for name, entry in registry.items():
         summary = _get_attr(entry, "summary", "")
         examples = _get_attr(entry, "examples", []) or []
-        line = f"- {name}"
-        if summary:
-            line += f": {summary}"
+        line = f"- {summary}" if summary else f"- {name}"
         echo_fn(line)
         for ex in examples:
             echo_fn(f"  e.g. {ex}")
@@ -132,9 +130,10 @@ def chat_loop(
 
     while True:
         prompt = prompt_fn("prompt")
-        if prompt.strip().lower() in {"exit", "quit"}:
+        normalized = prompt.strip().lower()
+        if normalized in {"exit", "quit"}:
             break
-        if prompt.strip().lower() == "help":
+        if normalized in {"help", "?"}:
             _print_help(nl_parser, echo_fn)
             continue
         try:

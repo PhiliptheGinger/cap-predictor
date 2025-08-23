@@ -11,8 +11,8 @@ Run the bot using the module path:
 python -m sentimental_cap_predictor.chatbot
 ```
 
-This starts an interactive prompt. Type `help` to see available commands or
-`exit` to leave the session.
+This starts an interactive prompt. Type `help` or `?` to see available
+commands or `exit` to leave the session.
 
 ## Confirmation & Safety
 
