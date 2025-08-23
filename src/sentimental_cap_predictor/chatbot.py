@@ -156,8 +156,15 @@ def chat_loop(
         except Exception as exc:  # pragma: no cover - parser failure
             _handle_error(exc, debug, echo_fn)
             continue
-
-        task_list = tasks if isinstance(tasks, list) else [tasks]
+        task_list = (
+            tasks
+            if isinstance(tasks, list)
+            else ([tasks] if tasks is not None else [])
+        )
+        if not task_list or all(not _get_attr(t, "command") for t in task_list):
+            echo_fn("Unknown command, type `help` to see options.")
+            _print_help(nl_parser, echo_fn)
+            continue
         multi = len(task_list) > 1
 
         for idx, task in enumerate(task_list, 1):

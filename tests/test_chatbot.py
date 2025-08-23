@@ -162,6 +162,20 @@ def test_unknown_command_prints_message(capsys):
     assert "SUCCESS" not in out
 
 
+def test_unknown_text_provides_guidance(capsys):
+    class NoCommandParser(DummyParser):
+        def parse(self, prompt: str) -> dict[str, object]:  # type: ignore[override]
+            return {}
+
+    parser = NoCommandParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("unknown text", "exit"))
+    out = capsys.readouterr().out
+    assert "Unknown command" in out
+    assert "do foo" in out
+    assert not dispatcher.dispatched
+
+
 def test_failed_dispatch_prints_message(capsys):
     class FailDispatcher(DummyDispatcher):
         def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
