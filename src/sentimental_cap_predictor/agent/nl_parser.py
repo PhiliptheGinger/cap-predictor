@@ -124,7 +124,7 @@ def _parse_single(
     lowered = original.lower()
 
     # data.ingest ------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:ingest|download|fetch)\s+(?P<ticker>[A-Za-z0-9_]+)"
         r"(?:\s+(?P<period>\d+[a-z]+))?"
         r"(?:\s+(?P<interval>\d+[a-z]+))?",
@@ -151,7 +151,7 @@ def _parse_single(
         )
 
     # strategy.optimize ------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:optimize|strategy\.optimize)\s+(?P<csv_path>\S+)"
         r"(?:\s+(?P<iterations>\d+))?"
         r"(?:\s+(?P<seed>\d+))?"
@@ -170,7 +170,7 @@ def _parse_single(
         return Intent("strategy.optimize", params, confidence=0.9)
 
     # ideas.generate ---------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:ideas?|ideas\.generate|gen ideas)\s+(?P<topic>\w+)"
         r"(?:\s+(?P<model_id>\w+))?"
         r"(?:\s+(?P<n>\d+))?",
@@ -184,7 +184,7 @@ def _parse_single(
         return Intent("ideas.generate", params, confidence=0.9)
 
     # experiments.compare ----------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:compare|experiments\.compare)\s+"
         r"(?P<first>\d+)\s+(?P<second>\d+)",
         original,
@@ -198,7 +198,7 @@ def _parse_single(
         return Intent("experiments.compare", params, confidence=0.9)
 
     # file.read --------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:file\.read|read|cat)\s+(?P<path>.+)",
         original,
         flags=re.IGNORECASE,
@@ -211,7 +211,7 @@ def _parse_single(
         )
 
     # model.promote ----------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:model\.promote|promote)\s+(?P<src>\S+)\s+(?P<dst>\S+)",
         original,
         flags=re.IGNORECASE,
@@ -226,7 +226,7 @@ def _parse_single(
         )
 
     # tests.run --------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:tests(?:\.run)?|run tests|pytest)\b(?:\s+(?P<args>.*))?",
         original,
         flags=re.IGNORECASE,
@@ -237,7 +237,7 @@ def _parse_single(
         return Intent("tests.run", {"args": args}, confidence=0.9)
 
     # shell.run --------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:shell\.run|!|shell|bash|sh)\s+(?P<cmd>.+)",
         original,
         flags=re.IGNORECASE,
@@ -251,9 +251,9 @@ def _parse_single(
         )
 
     # pipeline.run_daily -----------------------------------------------------
-    m = re.match(
-        r"(?:^|\b)(?:pipeline\.run_daily|run (?:the )?daily pipeline)\s+"
-        r"(?P<ticker>\w+)(?:\s+(?P<period>\S+))?(?:\s+(?P<interval>\S+))?",
+    m = re.search(
+        r"(?:^|\b)(?:pipeline\.run_daily|run\b.*pipeline)\b"
+        r"(?:\s+(?P<ticker>\w+))?(?:\s+(?P<period>\S+))?(?:\s+(?P<interval>\S+))?",
         original,
         flags=re.IGNORECASE,
     )
@@ -267,11 +267,11 @@ def _parse_single(
         )
 
     # experiments.list -------------------------------------------------------
-    if re.match(r"(?:^|\b)(?:experiments\.list|list experiments)$", lowered):
+    if re.search(r"(?:^|\b)(?:experiments\.list|list experiments)$", lowered):
         return Intent("experiments.list", {}, confidence=0.9)
 
     # experiments.show -------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:experiments\.show|show experiment)\s+(?P<run_id>\d+)",
         original,
         flags=re.IGNORECASE,
@@ -284,7 +284,7 @@ def _parse_single(
         )
 
     # sys.status -------------------------------------------------------------
-    if re.match(r"(?:^|\b)(?:sys\.status|system status|status)$", lowered):
+    if re.search(r"(?:^|\b)(?:sys\.status|system status|status)$", lowered):
         return Intent("sys.status", {}, confidence=0.9)
 
     # Fallback ---------------------------------------------------------------
