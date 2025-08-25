@@ -2,6 +2,7 @@ import types
 
 import pytest
 
+from sentimental_cap_predictor.agent import nl_parser
 from sentimental_cap_predictor.chatbot import _print_help, chat_loop
 
 
@@ -41,6 +42,28 @@ def iter_inputs(*items: str) -> types.FunctionType:
         return next(it)
 
     return _next
+
+
+def test_print_help_includes_known_commands(capsys):
+    intent = nl_parser.parse("help")
+    assert intent.command is None
+    _print_help(nl_parser)
+    out = capsys.readouterr().out
+    assert "Download and prepare price data" in out
+    assert "Train baseline models and write evaluation CSVs" in out
+
+
+def _collect_help_output(trigger: str, capsys):
+    dispatcher = DummyDispatcher()
+    chat_loop(nl_parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
+    return capsys.readouterr().out
+
+
+def test_conversational_help_matches_help(capsys):
+    out_help = _collect_help_output("help", capsys)
+    out_question = _collect_help_output("what can you do?", capsys)
+    assert out_help == out_question
+    assert "Download and prepare price data" in out_help
 
 
 @pytest.mark.parametrize("trigger", ["help", "?"])
