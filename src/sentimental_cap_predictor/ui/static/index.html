@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Command Runner</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    .command { margin-bottom: 1.5rem; }
+    .params input { margin-right: 0.5rem; }
+    #result { margin-top: 2rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Available Commands</h1>
+  <div id="commands"></div>
+  <div id="result"></div>
+  <script>
+    async function loadCommands() {
+      const res = await fetch('/commands');
+      const commands = await res.json();
+      const container = document.getElementById('commands');
+      for (const [name, info] of Object.entries(commands)) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'command';
+
+        const title = document.createElement('h3');
+        title.textContent = `${name}: ${info.summary}`;
+        wrapper.appendChild(title);
+
+        const paramsDiv = document.createElement('div');
+        paramsDiv.className = 'params';
+        const inputs = {};
+        for (const [param, placeholder] of Object.entries(info.example.params)) {
+          const input = document.createElement('input');
+          input.placeholder = `${param}`;
+          input.dataset.param = param;
+          paramsDiv.appendChild(input);
+          inputs[param] = input;
+        }
+        wrapper.appendChild(paramsDiv);
+
+        const button = document.createElement('button');
+        button.textContent = 'Run';
+        button.onclick = async () => {
+          const params = {};
+          for (const [param, input] of Object.entries(inputs)) {
+            if (input.value) params[param] = input.value;
+          }
+          const resp = await fetch('/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: name, params })
+          });
+          const data = await resp.json();
+          renderResult(name, data);
+        };
+        wrapper.appendChild(button);
+
+        container.appendChild(wrapper);
+      }
+    }
+
+    function renderResult(name, data) {
+      const result = document.getElementById('result');
+      result.innerHTML = '';
+
+      const heading = document.createElement('h2');
+      heading.textContent = `Result for ${name}`;
+      result.appendChild(heading);
+
+      if (data.message) {
+        const p = document.createElement('p');
+        p.textContent = data.message;
+        result.appendChild(p);
+      }
+
+      if (data.reasoning) {
+        const rTitle = document.createElement('h3');
+        rTitle.textContent = 'Reasoning';
+        result.appendChild(rTitle);
+        const p = document.createElement('p');
+        p.textContent = data.reasoning;
+        result.appendChild(p);
+      }
+
+      if (data.metrics) {
+        const mTitle = document.createElement('h3');
+        mTitle.textContent = 'Metrics';
+        result.appendChild(mTitle);
+        const ul = document.createElement('ul');
+        for (const [k, v] of Object.entries(data.metrics)) {
+          const li = document.createElement('li');
+          li.textContent = `${k}: ${v}`;
+          ul.appendChild(li);
+        }
+        result.appendChild(ul);
+      }
+
+      if (data.artifacts) {
+        const aTitle = document.createElement('h3');
+        aTitle.textContent = 'Artifacts';
+        result.appendChild(aTitle);
+        const ul = document.createElement('ul');
+        for (const [k, v] of Object.entries(data.artifacts)) {
+          const li = document.createElement('li');
+          const link = document.createElement('a');
+          link.href = v;
+          link.textContent = k;
+          li.appendChild(link);
+          ul.appendChild(li);
+        }
+        result.appendChild(ul);
+      }
+    }
+
+    loadCommands();
+  </script>
+</body>
+</html>

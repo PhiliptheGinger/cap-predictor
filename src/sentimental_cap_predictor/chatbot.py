@@ -173,7 +173,39 @@ def chat_loop(
         multi = len(task_list) > 1
 
         for idx, task in enumerate(task_list, 1):
+            # show command information and gather any missing parameters
+            command_name = _get_attr(task, "command")
+            params = _get_attr(task, "params", {}) or {}
+            registry = getattr(nl_parser, "registry", {}) or {}
+            entry = registry.get(command_name) if command_name else None
+            if entry:
+                summary = _get_attr(entry, "summary", "")
+                schema = _get_attr(entry, "params_schema", {}) or {}
+                if summary:
+                    echo_fn(f"{command_name}: {summary}")
+                required = [
+                    name
+                    for name, type_str in schema.items()
+                    if "None" not in str(type_str)
+                ]
+                if required:
+                    echo_fn("Required params: " + ", ".join(required))
+                missing = [n for n in required if n not in params]
+                for name in missing:
+                    params[name] = prompt_fn(name)
+                if isinstance(task, dict):
+                    task["params"] = params
+                else:
+                    setattr(task, "params", params)
+
             if _needs_confirmation(task):
+                if entry:
+                    param_line = ", ".join(f"{k}={v}" for k, v in params.items())
+                    if summary:
+                        echo_fn(
+                            f"About to execute {command_name}: {summary}"
+                            + (f" with params: {param_line}" if param_line else "")
+                        )
                 if not confirm_fn("Execute?", default=False):
                     echo_fn("Cancelled")
                     continue

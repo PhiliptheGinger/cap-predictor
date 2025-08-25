@@ -38,7 +38,7 @@ SAFE_BUILTINS = {
 MAX_LOOP_ITERATIONS = 10_000
 
 
-def _exec(code: str, queue: mp.Queue, cpu_time: int, mem_limit: int) -> None:
+def _exec(code: str, conn: mp.connection.Connection, cpu_time: int, mem_limit: int) -> None:
     proc = psutil.Process()
     try:
         if hasattr(psutil, "RLIMIT_CPU"):
@@ -50,9 +50,10 @@ def _exec(code: str, queue: mp.Queue, cpu_time: int, mem_limit: int) -> None:
     env: Dict[str, object] = {"__builtins__": SAFE_BUILTINS}
     try:
         exec(code, env)
-        queue.put(env)
+        env.pop("__builtins__", None)
+        conn.send(env)
     except Exception as exc:  # pragma: no cover - relay exception to parent
-        queue.put(exc)
+        conn.send(exc)
 
 
 def _validate(code: str) -> None:
@@ -104,10 +105,11 @@ def run_code(
 
     _validate(code)
     ctx = mp.get_context("spawn")
-    queue: mp.Queue = ctx.Queue()
+    parent_conn, child_conn = ctx.Pipe(duplex=False)
     cpu = cpu_time or timeout
-    proc = ctx.Process(target=_exec, args=(code, queue, cpu, mem_limit))
+    proc = ctx.Process(target=_exec, args=(code, child_conn, cpu, mem_limit))
     proc.start()
+    child_conn.close()
     proc_ps = psutil.Process(proc.pid)
     start = time.time()
     while proc.is_alive() and time.time() - start < timeout:
@@ -118,11 +120,11 @@ def run_code(
     if proc.is_alive():
         proc.terminate()
         raise TimeoutError("Strategy execution timed out")
-    if queue.empty():
+    if not parent_conn.poll():
         if proc.exitcode and proc.exitcode != 0:
             raise RuntimeError("Sandbox terminated unexpectedly")
         return {}
-    result = queue.get()
+    result = parent_conn.recv()
     if isinstance(result, Exception):
         raise result
     return result

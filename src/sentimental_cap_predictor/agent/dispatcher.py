@@ -33,6 +33,7 @@ class DispatchResult:
     message: str = ""
     artifacts: list[str] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
+    reasoning: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +131,7 @@ def dispatch(intent: Mapping[str, Any] | Any) -> DispatchResult:
     message = _get_attr(output, "summary") or _get_attr(output, "message", "")
     metrics_obj = _get_attr(output, "metrics", {}) or {}
     artifacts_obj = _get_attr(output, "artifacts", []) or []
+    reasoning = _get_attr(output, "reasoning", "")
     ok_flag = _get_attr(output, "ok", True)
 
     if isinstance(metrics_obj, Mapping):
@@ -160,4 +162,5 @@ def dispatch(intent: Mapping[str, Any] | Any) -> DispatchResult:
         message=message,
         artifacts=artifacts,
         metrics=metrics,
+        reasoning=reasoning,
     )
