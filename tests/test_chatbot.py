@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from sentimental_cap_predictor.chatbot import chat_loop
+from sentimental_cap_predictor.chatbot import _print_help, chat_loop
 
 
 class DummyParser:
