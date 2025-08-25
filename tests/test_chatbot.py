@@ -187,3 +187,44 @@ def test_failed_dispatch_prints_message(capsys):
     out = capsys.readouterr().out
     assert "bad" in out
     assert "SUCCESS" not in out
+
+
+def test_prompts_for_missing_params(monkeypatch, capsys):
+    class ParamParser:
+        def __init__(self) -> None:
+            self.registry = {
+                "foo": {
+                    "summary": "do foo",
+                    "params_schema": {"a": "str", "b": "int"},
+                }
+            }
+
+        def parse(self, prompt: str) -> dict[str, object]:
+            return {"command": "foo", "confirm": True}
+
+    class RecordingDispatcher(DummyDispatcher):
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+            self.dispatched.append(task)
+            return {"summary": "ok"}
+
+    parser = ParamParser()
+    dispatcher = RecordingDispatcher()
+
+    prompts = iter_inputs("go", "AAA", "123", "exit")
+    confirms = iter(["y"])
+
+    def _confirm(_: str, default: bool | None = None) -> bool:
+        return next(confirms) == "y"
+
+    chat_loop(parser, dispatcher, prompt_fn=prompts, confirm_fn=_confirm)
+
+    out = capsys.readouterr().out
+    assert "do foo" in out
+    assert "Required params" in out
+    assert dispatcher.dispatched
+    dispatched = dispatcher.dispatched[0]
+    if isinstance(dispatched, dict):
+        params = dispatched["params"]
+    else:
+        params = dispatched.params
+    assert params["a"] == "AAA" and params["b"] == "123"
