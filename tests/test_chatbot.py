@@ -77,7 +77,11 @@ def test_help_lists_registry(trigger, capsys):
 
 @pytest.mark.parametrize(
     "trigger",
-    ["what can you do?", "what actions can you take?", "hey, what can you do?"],
+    [
+        "what can you do?",
+        "what actions can you take?",
+        "hey, what can you do?",
+    ],
 )
 def test_question_triggers_help(trigger, capsys):
     parser = DummyParser()
@@ -100,7 +104,7 @@ def test_dispatch_and_prints(capsys):
 
 def test_dispatch_uses_message_when_no_summary(capsys):
     class MessageDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
             self.dispatched.append(task)
             return {"message": "all good"}
 
@@ -200,12 +204,16 @@ def test_unknown_command_prints_message(capsys):
 
 def test_unknown_text_provides_guidance(capsys):
     class NoCommandParser(DummyParser):
-        def parse(self, prompt: str) -> dict[str, object]:  # type: ignore[override]
+        def parse(self, prompt: str) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
             return {}
 
     parser = NoCommandParser()
     dispatcher = DummyDispatcher()
-    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("unknown text", "exit"))
+    chat_loop(
+        parser,
+        dispatcher,
+        prompt_fn=iter_inputs("unknown text", "exit"),
+    )
     out = capsys.readouterr().out
     assert "Unknown command" in out
     assert "do foo" in out
@@ -214,7 +222,7 @@ def test_unknown_text_provides_guidance(capsys):
 
 def test_failed_dispatch_prints_message(capsys):
     class FailDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
             return {"ok": False, "message": "bad"}
 
     parser = DummyParser()
@@ -223,3 +231,22 @@ def test_failed_dispatch_prints_message(capsys):
     out = capsys.readouterr().out
     assert "bad" in out
     assert "SUCCESS" not in out
+
+
+def test_pipeline_prompt_dispatches_without_help(capsys):
+    dispatcher = DummyDispatcher()
+    prompts = iter_inputs(
+        "Hey, can you run the full pipeline for NVDA?",
+        "exit",
+    )
+
+    def _confirm(_: str, default: bool | None = None) -> bool:
+        return True
+
+    chat_loop(nl_parser, dispatcher, prompt_fn=prompts, confirm_fn=_confirm)
+    out = capsys.readouterr().out
+
+    assert dispatcher.dispatched
+    task = dispatcher.dispatched[0]
+    assert getattr(task, "command", None) == "pipeline.run_daily"
+    assert "Available commands" not in out
