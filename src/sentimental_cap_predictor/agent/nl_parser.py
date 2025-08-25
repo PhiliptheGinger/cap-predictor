@@ -252,8 +252,7 @@ def _parse_single(
 
     # pipeline.run_daily -----------------------------------------------------
     m = re.match(
-        r"(?:^|\b)(?:pipeline\.run_daily|run (?:the )?(?:daily|full|entire|"
-        r"whole) pipeline)\s+"
+        r"(?:^|\b)(?:pipeline\.run_daily|run (?:the )?daily pipeline)\s+"
         r"(?P<ticker>\w+)(?:\s+(?P<period>\S+))?(?:\s+(?P<interval>\S+))?",
         original,
         flags=re.IGNORECASE,
