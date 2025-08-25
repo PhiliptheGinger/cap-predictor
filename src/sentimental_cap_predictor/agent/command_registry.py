@@ -5,6 +5,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Sequence
+import platform
+import sys
 
 import pytest
 
@@ -46,13 +48,10 @@ def system_status() -> Dict[str, str]:
     return {"python": sys.version, "platform": platform.platform()}
 
 
-def promote_model(
-    src: str,
-    dst: str,
-    dry_run: bool | None = False,
-) -> Dict[str, Any]:
-    """Swap model config and weights between ``src`` and ``dst``
-    directories."""
+
+
+def promote_model(src: str, dst: str, dry_run: bool | None = False) -> Dict[str, Any]:
+    """Swap model config and weights between ``src`` and ``dst`` directories."""
 
     def _find(directory: Path, stem: str) -> Path:
         matches = list(directory.glob(f"{stem}.*"))
@@ -86,6 +85,7 @@ def promote_model(
 def get_registry() -> Dict[str, Command]:
     """Return mapping of command names to :class:`Command` entries."""
     from sentimental_cap_predictor.agent import coding_agent
+    from .sandbox import safe_shell
 
     from .sandbox import safe_shell
 

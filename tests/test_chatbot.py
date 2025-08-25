@@ -233,20 +233,42 @@ def test_failed_dispatch_prints_message(capsys):
     assert "SUCCESS" not in out
 
 
-def test_pipeline_prompt_dispatches_without_help(capsys):
-    dispatcher = DummyDispatcher()
-    prompts = iter_inputs(
-        "Hey, can you run the full pipeline for NVDA?",
-        "exit",
-    )
+def test_prompts_for_missing_params(monkeypatch, capsys):
+    class ParamParser:
+        def __init__(self) -> None:
+            self.registry = {
+                "foo": {
+                    "summary": "do foo",
+                    "params_schema": {"a": "str", "b": "int"},
+                }
+            }
+
+        def parse(self, prompt: str) -> dict[str, object]:
+            return {"command": "foo", "confirm": True}
+
+    class RecordingDispatcher(DummyDispatcher):
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+            self.dispatched.append(task)
+            return {"summary": "ok"}
+
+    parser = ParamParser()
+    dispatcher = RecordingDispatcher()
+
+    prompts = iter_inputs("go", "AAA", "123", "exit")
+    confirms = iter(["y"])
 
     def _confirm(_: str, default: bool | None = None) -> bool:
-        return True
+        return next(confirms) == "y"
 
-    chat_loop(nl_parser, dispatcher, prompt_fn=prompts, confirm_fn=_confirm)
+    chat_loop(parser, dispatcher, prompt_fn=prompts, confirm_fn=_confirm)
+
     out = capsys.readouterr().out
-
+    assert "do foo" in out
+    assert "Required params" in out
     assert dispatcher.dispatched
-    task = dispatcher.dispatched[0]
-    assert getattr(task, "command", None) == "pipeline.run_daily"
-    assert "Available commands" not in out
+    dispatched = dispatcher.dispatched[0]
+    if isinstance(dispatched, dict):
+        params = dispatched["params"]
+    else:
+        params = dispatched.params
+    assert params["a"] == "AAA" and params["b"] == "123"

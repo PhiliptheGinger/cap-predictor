@@ -70,20 +70,12 @@ def parse(
 
     # Normalize common "(period/interval)" syntax to "period interval" so the
     # ingestion regex can parse it.
-    text = re.sub(
-        r"\((\d+[a-z]+)/(\d+[a-z]+)\)",
-        r" \1 \2 ",
-        text,
-        flags=re.IGNORECASE,
-    )
+    text = re.sub(r"\((\d+[a-z]+)/(\d+[a-z]+)\)", r" \1 \2 ", text, flags=re.IGNORECASE)
 
     # Split chained commands. The lookahead ensures that plain "and" inside
     # parameters (e.g. "compare 1 and 2") are not treated as separators.
     splitter = re.compile(
-        r"\s*(?:;|\band\s+then\b|"
-        r"\band\b(?=\s*(?:ingest|download|fetch|train|retrain|optimize|"
-        r"compare|promote|list|show|run|generate|ideas?|shell|tests|pytest|"
-        r"pipeline|system|status)))\s*",
+        r"\s*(?:;|\band\s+then\b|\band\b(?=\s*(?:ingest|download|fetch|train|retrain|optimize|compare|promote|list|show|run|generate|ideas?|shell|tests|pytest|pipeline|system|status)))\s*",
         flags=re.IGNORECASE,
     )
     parts = splitter.split(text)
@@ -137,8 +129,7 @@ def _parse_single(
 
     # model.train_eval -------------------------------------------------------
     m = re.match(
-        r"(?:^|\b)(?:train(?:\s+model)?|retrain(?:\s+the\s+model)?|"
-        r"model\.train_eval)\s+"
+        r"(?:^|\b)(?:train(?:\s+model)?|retrain(?:\s+the\s+model)?|model\.train_eval)\s+"
         r"(?:for\s+)?(?P<ticker>[A-Za-z0-9_]+)",
         original,
         flags=re.IGNORECASE,
