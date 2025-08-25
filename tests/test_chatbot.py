@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from sentimental_cap_predictor.chatbot import chat_loop
+from sentimental_cap_predictor.chatbot import _print_help, chat_loop
 
 
 class DummyParser:
@@ -50,6 +50,15 @@ def test_help_lists_registry(trigger, capsys):
     chat_loop(parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
     out = capsys.readouterr().out
     assert "do foo" in out and "foo bar" in out
+
+
+def test_print_help_lists_real_commands(capsys):
+    from sentimental_cap_predictor.agent import nl_parser as real_parser
+
+    _print_help(real_parser)
+    out = capsys.readouterr().out
+    assert "Available commands:" in out
+    assert "Download and prepare price data" in out
 
 
 def test_dispatch_and_prints(capsys):

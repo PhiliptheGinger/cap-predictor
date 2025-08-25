@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
+from .command_registry import get_registry
+
+# Registry ------------------------------------------------------------------
+registry = get_registry()
+
 
 @dataclass
 class Intent:
@@ -277,4 +282,4 @@ def _fallback_heuristic(text: str) -> Intent:
     return Intent(command=None, params={"text": text}, confidence=0.0)
 
 
-__all__ = ["Intent", "parse"]
+__all__ = ["Intent", "parse", "registry"]
