@@ -35,6 +35,7 @@ def test_requires_confirmation() -> None:
     [
         "ingest SPY 1y 1d; train model SPY",
         "ingest SPY 1y 1d and then train model SPY",
+        "ingest SPY 1y 1d and train model SPY",
     ],
 )
 def test_chained_commands(text: str) -> None:
