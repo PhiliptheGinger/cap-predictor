@@ -14,6 +14,11 @@ from sentimental_cap_predictor.agent.nl_parser import parse
         ("train model AAPL", "model.train_eval", {"ticker": "AAPL"}),
         ("compare 1 2", "experiments.compare", {"first": 1, "second": 2}),
         ("system status", "sys.status", {}),
+        (
+            "Hey, can you run the full pipeline?",
+            "pipeline.run_daily",
+            {},
+        ),
     ],
 )
 def test_regex_intent_mapping(
@@ -45,3 +50,20 @@ def test_chained_commands(text: str) -> None:
         "data.ingest",
         "model.train_eval",
     ]
+
+
+def test_pipeline_synonyms() -> None:
+    """Variants like "full" or "entire" pipeline map to the same command."""
+    base = parse("run the daily pipeline SPY")
+    assert base.command == "pipeline.run_daily"
+    assert base.params["ticker"] == "SPY"
+
+    variants = [
+        "run the full pipeline SPY",
+        "run the entire pipeline SPY",
+        "run the whole pipeline SPY",
+    ]
+    for text in variants:
+        intent = parse(text)
+        assert intent.command == base.command
+        assert intent.params == base.params

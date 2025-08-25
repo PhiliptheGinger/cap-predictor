@@ -2,7 +2,8 @@ import types
 
 import pytest
 
-from sentimental_cap_predictor.chatbot import chat_loop
+from sentimental_cap_predictor.agent import nl_parser
+from sentimental_cap_predictor.chatbot import _print_help, chat_loop
 
 
 class DummyParser:
@@ -43,6 +44,28 @@ def iter_inputs(*items: str) -> types.FunctionType:
     return _next
 
 
+def test_print_help_includes_known_commands(capsys):
+    intent = nl_parser.parse("help")
+    assert intent.command is None
+    _print_help(nl_parser)
+    out = capsys.readouterr().out
+    assert "Download and prepare price data" in out
+    assert "Train baseline models and write evaluation CSVs" in out
+
+
+def _collect_help_output(trigger: str, capsys):
+    dispatcher = DummyDispatcher()
+    chat_loop(nl_parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
+    return capsys.readouterr().out
+
+
+def test_conversational_help_matches_help(capsys):
+    out_help = _collect_help_output("help", capsys)
+    out_question = _collect_help_output("what can you do?", capsys)
+    assert out_help == out_question
+    assert "Download and prepare price data" in out_help
+
+
 @pytest.mark.parametrize("trigger", ["help", "?"])
 def test_help_lists_registry(trigger, capsys):
     parser = DummyParser()
@@ -50,6 +73,23 @@ def test_help_lists_registry(trigger, capsys):
     chat_loop(parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
     out = capsys.readouterr().out
     assert "do foo" in out and "foo bar" in out
+
+
+@pytest.mark.parametrize(
+    "trigger",
+    [
+        "what can you do?",
+        "what actions can you take?",
+        "hey, what can you do?",
+    ],
+)
+def test_question_triggers_help(trigger, capsys):
+    parser = DummyParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
+    out = capsys.readouterr().out
+    assert "do foo" in out and "foo bar" in out
+    assert "Unknown command" not in out
 
 
 def test_dispatch_and_prints(capsys):
@@ -64,7 +104,7 @@ def test_dispatch_and_prints(capsys):
 
 def test_dispatch_uses_message_when_no_summary(capsys):
     class MessageDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
             self.dispatched.append(task)
             return {"message": "all good"}
 
@@ -155,7 +195,7 @@ def test_unknown_command_prints_message(capsys):
     chat_loop(
         parser,
         dispatcher,
-        prompt_fn=iter_inputs("hey, what can you do?", "exit"),
+        prompt_fn=iter_inputs("run", "exit"),
     )
     out = capsys.readouterr().out
     assert "Unknown command, type `help` to see options." in out
@@ -164,12 +204,16 @@ def test_unknown_command_prints_message(capsys):
 
 def test_unknown_text_provides_guidance(capsys):
     class NoCommandParser(DummyParser):
-        def parse(self, prompt: str) -> dict[str, object]:  # type: ignore[override]
+        def parse(self, prompt: str) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
             return {}
 
     parser = NoCommandParser()
     dispatcher = DummyDispatcher()
-    chat_loop(parser, dispatcher, prompt_fn=iter_inputs("unknown text", "exit"))
+    chat_loop(
+        parser,
+        dispatcher,
+        prompt_fn=iter_inputs("unknown text", "exit"),
+    )
     out = capsys.readouterr().out
     assert "Unknown command" in out
     assert "do foo" in out
@@ -178,7 +222,7 @@ def test_unknown_text_provides_guidance(capsys):
 
 def test_failed_dispatch_prints_message(capsys):
     class FailDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
+        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
             return {"ok": False, "message": "bad"}
 
     parser = DummyParser()

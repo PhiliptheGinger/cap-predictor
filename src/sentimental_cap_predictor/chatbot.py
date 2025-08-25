@@ -148,7 +148,12 @@ def chat_loop(
         normalized = prompt.strip().lower()
         if normalized in {"exit", "quit"}:
             break
-        if normalized in {"help", "?"}:
+        normalized_no_q = normalized.rstrip("?")
+        help_phrases = {"what can you do", "what actions can you take"}
+        if (
+            normalized in {"help", "?"}
+            or any(phrase in normalized_no_q for phrase in help_phrases)
+        ):
             _print_help(nl_parser, echo_fn)
             continue
         try:

@@ -6,6 +6,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
+from .command_registry import get_registry
+
+# Registry ------------------------------------------------------------------
+registry = get_registry()
+
+# Canonicalization -----------------------------------------------------------
+# Map conversational synonyms to a canonical phrase so downstream regular
+# expressions only need to account for the standardized form. This keeps the
+# regexes manageable while still allowing flexible user phrasing.
+SYNONYM_MAP = {
+    "full pipeline": "daily pipeline",
+    "entire pipeline": "daily pipeline",
+    "whole pipeline": "daily pipeline",
+}
+
 
 @dataclass
 class Intent:
@@ -73,7 +88,10 @@ def parse(
 # ---------------------------------------------------------------------------
 
 
-def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Intent:
+def _parse_single(
+    text: str,
+    llm: Callable[[str], Intent] | None = None,
+) -> Intent:
     """Parse a single command ``text`` into an :class:`Intent`.
 
     The parser implements a collection of regular-expression and keyword
@@ -83,10 +101,22 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
     """
 
     original = text.strip()
+
+    # Replace known synonyms with their canonical equivalents prior to
+    # matching so that the subsequent regexes only need to consider a single
+    # phrase for each concept.
+    for phrase, canonical in SYNONYM_MAP.items():
+        original = re.sub(
+            rf"\b{re.escape(phrase)}\b",
+            canonical,
+            original,
+            flags=re.IGNORECASE,
+        )
+
     lowered = original.lower()
 
     # data.ingest ------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:ingest|download|fetch)\s+(?P<ticker>[A-Za-z0-9_]+)"
         r"(?:\s+(?P<period>\d+[a-z]+))?"
         r"(?:\s+(?P<interval>\d+[a-z]+))?",
@@ -112,7 +142,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         )
 
     # strategy.optimize ------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:optimize|strategy\.optimize)\s+(?P<csv_path>\S+)"
         r"(?:\s+(?P<iterations>\d+))?"
         r"(?:\s+(?P<seed>\d+))?"
@@ -131,7 +161,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         return Intent("strategy.optimize", params, confidence=0.9)
 
     # ideas.generate ---------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:ideas?|ideas\.generate|gen ideas)\s+(?P<topic>\w+)"
         r"(?:\s+(?P<model_id>\w+))?"
         r"(?:\s+(?P<n>\d+))?",
@@ -145,7 +175,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         return Intent("ideas.generate", params, confidence=0.9)
 
     # experiments.compare ----------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:compare|experiments\.compare)\s+"
         r"(?P<first>\d+)\s+(?P<second>\d+)",
         original,
@@ -159,7 +189,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         return Intent("experiments.compare", params, confidence=0.9)
 
     # file.read --------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:file\.read|read|cat)\s+(?P<path>.+)",
         original,
         flags=re.IGNORECASE,
@@ -172,7 +202,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         )
 
     # model.promote ----------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:model\.promote|promote)\s+(?P<src>\S+)\s+(?P<dst>\S+)",
         original,
         flags=re.IGNORECASE,
@@ -187,7 +217,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         )
 
     # tests.run --------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:tests(?:\.run)?|run tests|pytest)\b(?:\s+(?P<args>.*))?",
         original,
         flags=re.IGNORECASE,
@@ -198,7 +228,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         return Intent("tests.run", {"args": args}, confidence=0.9)
 
     # shell.run --------------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:shell\.run|!|shell|bash|sh)\s+(?P<cmd>.+)",
         original,
         flags=re.IGNORECASE,
@@ -212,9 +242,9 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         )
 
     # pipeline.run_daily -----------------------------------------------------
-    m = re.match(
-        r"(?:^|\b)(?:pipeline\.run_daily|run (?:the )?daily pipeline)\s+"
-        r"(?P<ticker>\w+)(?:\s+(?P<period>\S+))?(?:\s+(?P<interval>\S+))?",
+    m = re.search(
+        r"(?:^|\b)(?:pipeline\.run_daily|run\b.*pipeline)\b"
+        r"(?:\s+(?P<ticker>\w+))?(?:\s+(?P<period>\S+))?(?:\s+(?P<interval>\S+))?",
         original,
         flags=re.IGNORECASE,
     )
@@ -228,11 +258,11 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         )
 
     # experiments.list -------------------------------------------------------
-    if re.match(r"(?:^|\b)(?:experiments\.list|list experiments)$", lowered):
+    if re.search(r"(?:^|\b)(?:experiments\.list|list experiments)$", lowered):
         return Intent("experiments.list", {}, confidence=0.9)
 
     # experiments.show -------------------------------------------------------
-    m = re.match(
+    m = re.search(
         r"(?:^|\b)(?:experiments\.show|show experiment)\s+(?P<run_id>\d+)",
         original,
         flags=re.IGNORECASE,
@@ -245,7 +275,7 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
         )
 
     # sys.status -------------------------------------------------------------
-    if re.match(r"(?:^|\b)(?:sys\.status|system status|status)$", lowered):
+    if re.search(r"(?:^|\b)(?:sys\.status|system status|status)$", lowered):
         return Intent("sys.status", {}, confidence=0.9)
 
     # Fallback ---------------------------------------------------------------
@@ -277,4 +307,4 @@ def _fallback_heuristic(text: str) -> Intent:
     return Intent(command=None, params={"text": text}, confidence=0.0)
 
 
-__all__ = ["Intent", "parse"]
+__all__ = ["Intent", "parse", "registry"]
