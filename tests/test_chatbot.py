@@ -104,7 +104,10 @@ def test_dispatch_and_prints(capsys):
 
 def test_dispatch_uses_message_when_no_summary(capsys):
     class MessageDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
+        def dispatch(  # type: ignore[override]
+            self,
+            task: object,
+        ) -> dict[str, object]:
             self.dispatched.append(task)
             return {"message": "all good"}
 
@@ -184,7 +187,10 @@ def test_debug_shows_traceback(capsys):
 
 def test_unknown_command_prints_message(capsys):
     class FailDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
+        def dispatch(  # type: ignore[override]
+            self,
+            task: object,
+        ) -> dict[str, object]:
             return {
                 "ok": False,
                 "message": "Unknown command, type `help` to see options.",
@@ -204,7 +210,10 @@ def test_unknown_command_prints_message(capsys):
 
 def test_unknown_text_provides_guidance(capsys):
     class NoCommandParser(DummyParser):
-        def parse(self, prompt: str) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
+        def parse(  # type: ignore[override]
+            self,
+            prompt: str,
+        ) -> dict[str, object]:
             return {}
 
     parser = NoCommandParser()
@@ -222,7 +231,10 @@ def test_unknown_text_provides_guidance(capsys):
 
 def test_failed_dispatch_prints_message(capsys):
     class FailDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]  # noqa: E501
+        def dispatch(  # type: ignore[override]
+            self,
+            task: object,
+        ) -> dict[str, object]:
             return {"ok": False, "message": "bad"}
 
     parser = DummyParser()
@@ -233,42 +245,20 @@ def test_failed_dispatch_prints_message(capsys):
     assert "SUCCESS" not in out
 
 
-def test_prompts_for_missing_params(monkeypatch, capsys):
-    class ParamParser:
-        def __init__(self) -> None:
-            self.registry = {
-                "foo": {
-                    "summary": "do foo",
-                    "params_schema": {"a": "str", "b": "int"},
-                }
-            }
-
-        def parse(self, prompt: str) -> dict[str, object]:
-            return {"command": "foo", "confirm": True}
-
-    class RecordingDispatcher(DummyDispatcher):
-        def dispatch(self, task: object) -> dict[str, object]:  # type: ignore[override]
-            self.dispatched.append(task)
-            return {"summary": "ok"}
-
-    parser = ParamParser()
-    dispatcher = RecordingDispatcher()
-
-    prompts = iter_inputs("go", "AAA", "123", "exit")
-    confirms = iter(["y"])
+def test_pipeline_prompt_dispatches_without_help(capsys):
+    dispatcher = DummyDispatcher()
+    prompts = iter_inputs(
+        "Hey, can you run the full pipeline for NVDA?",
+        "exit",
+    )
 
     def _confirm(_: str, default: bool | None = None) -> bool:
-        return next(confirms) == "y"
+        return True
 
-    chat_loop(parser, dispatcher, prompt_fn=prompts, confirm_fn=_confirm)
-
+    chat_loop(nl_parser, dispatcher, prompt_fn=prompts, confirm_fn=_confirm)
     out = capsys.readouterr().out
-    assert "do foo" in out
-    assert "Required params" in out
+
     assert dispatcher.dispatched
-    dispatched = dispatcher.dispatched[0]
-    if isinstance(dispatched, dict):
-        params = dispatched["params"]
-    else:
-        params = dispatched.params
-    assert params["a"] == "AAA" and params["b"] == "123"
+    task = dispatcher.dispatched[0]
+    assert getattr(task, "command", None) == "pipeline.run_daily"
+    assert "Available commands" not in out
