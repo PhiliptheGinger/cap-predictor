@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import platform
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Sequence
 import platform
 import sys
+import json
 
 import pytest
 
@@ -46,6 +47,17 @@ def system_status() -> Dict[str, str]:
     """Return basic information about the Python runtime and platform."""
 
     return {"python": sys.version, "platform": platform.platform()}
+
+
+def ideas_generate_with_reasoning(topic: str, model_id: str, n: int) -> Dict[str, Any]:
+    """Wrapper around :func:`idea_generator.generate_ideas` including context."""
+
+    ideas = idea_generator.generate_ideas(topic, model_id=model_id, n=n)
+    return {
+        "message": json.dumps([asdict(i) for i in ideas], indent=2),
+        "metrics": {"num_ideas": len(ideas)},
+        "reasoning": f"Generated {len(ideas)} ideas about {topic} using model {model_id}",
+    }
 
 
 
@@ -148,7 +160,7 @@ def get_registry() -> Dict[str, Command]:
         ),
         "ideas.generate": Command(
             name="ideas.generate",
-            handler=idea_generator.generate_ideas,
+            handler=ideas_generate_with_reasoning,
             summary="Generate trading ideas using a local model",
             params_schema={"topic": "str", "model_id": "str", "n": "int"},
         ),

@@ -47,6 +47,7 @@ def run_command(request: RunRequest) -> Dict[str, Any]:
         "message": result.message,
         "artifacts": result.artifacts,
         "metrics": result.metrics,
+        "reasoning": result.reasoning,
     }
 
 
