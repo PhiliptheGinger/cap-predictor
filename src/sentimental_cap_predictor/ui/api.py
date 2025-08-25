@@ -3,8 +3,10 @@ from __future__ import annotations
 """FastAPI application exposing command dispatch endpoints."""
 
 from typing import Any, Dict
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from sentimental_cap_predictor.agent import command_registry, dispatcher
@@ -46,3 +48,8 @@ def run_command(request: RunRequest) -> Dict[str, Any]:
         "artifacts": result.artifacts,
         "metrics": result.metrics,
     }
+
+
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
