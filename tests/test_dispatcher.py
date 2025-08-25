@@ -29,7 +29,11 @@ def test_dispatch_uses_handler_and_structures_result(monkeypatch):
     res = dispatcher_module.dispatch({"command": "dummy", "x": 5})
     assert calls == [5]
     assert res == DispatchResult(
-        ok=True, message="done", metrics={"x": 5}, artifacts=["out.txt"]
+        ok=True,
+        message="done",
+        metrics={"x": 5},
+        artifacts=["out.txt"],
+        reasoning="",
     )
 
 

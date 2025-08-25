@@ -96,6 +96,17 @@ def run(
     logger.info("Summary report written to %s", path)
     typer.echo(f"Summary report saved to {path}")
 
+    reasoning = (
+        f"RMSE {rmse}, backtest return {backtest_return} with windows "
+        f"{opt.short_window}/{opt.long_window}"
+    )
+    return {
+        "summary": f"Pipeline run complete for {ticker}",
+        "artifacts": [str(path)],
+        "metrics": {"rmse": rmse, "backtest_return": backtest_return},
+        "reasoning": reasoning,
+    }
+
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry
     app()

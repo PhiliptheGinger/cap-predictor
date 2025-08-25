@@ -74,6 +74,15 @@
         result.appendChild(p);
       }
 
+      if (data.reasoning) {
+        const rTitle = document.createElement('h3');
+        rTitle.textContent = 'Reasoning';
+        result.appendChild(rTitle);
+        const p = document.createElement('p');
+        p.textContent = data.reasoning;
+        result.appendChild(p);
+      }
+
       if (data.metrics) {
         const mTitle = document.createElement('h3');
         mTitle.textContent = 'Metrics';
