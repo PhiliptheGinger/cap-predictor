@@ -52,13 +52,17 @@ def test_help_lists_registry(trigger, capsys):
     assert "do foo" in out and "foo bar" in out
 
 
-def test_print_help_lists_real_commands(capsys):
-    from sentimental_cap_predictor.agent import nl_parser as real_parser
-
-    _print_help(real_parser)
+@pytest.mark.parametrize(
+    "trigger",
+    ["what can you do?", "what actions can you take?", "hey, what can you do?"],
+)
+def test_question_triggers_help(trigger, capsys):
+    parser = DummyParser()
+    dispatcher = DummyDispatcher()
+    chat_loop(parser, dispatcher, prompt_fn=iter_inputs(trigger, "exit"))
     out = capsys.readouterr().out
-    assert "Available commands:" in out
-    assert "Download and prepare price data" in out
+    assert "do foo" in out and "foo bar" in out
+    assert "Unknown command" not in out
 
 
 def test_dispatch_and_prints(capsys):
@@ -164,7 +168,7 @@ def test_unknown_command_prints_message(capsys):
     chat_loop(
         parser,
         dispatcher,
-        prompt_fn=iter_inputs("hey, what can you do?", "exit"),
+        prompt_fn=iter_inputs("run", "exit"),
     )
     out = capsys.readouterr().out
     assert "Unknown command, type `help` to see options." in out
