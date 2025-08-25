@@ -45,3 +45,20 @@ def test_chained_commands(text: str) -> None:
         "data.ingest",
         "model.train_eval",
     ]
+
+
+def test_pipeline_synonyms() -> None:
+    """Variants like "full" or "entire" pipeline map to the same command."""
+    base = parse("run the daily pipeline SPY")
+    assert base.command == "pipeline.run_daily"
+    assert base.params["ticker"] == "SPY"
+
+    variants = [
+        "run the full pipeline SPY",
+        "run the entire pipeline SPY",
+        "run the whole pipeline SPY",
+    ]
+    for text in variants:
+        intent = parse(text)
+        assert intent.command == base.command
+        assert intent.params == base.params

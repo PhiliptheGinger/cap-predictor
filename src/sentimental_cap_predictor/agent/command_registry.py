@@ -1,20 +1,19 @@
 from __future__ import annotations
 
+import platform
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Sequence
-import platform
-import sys
 
 import pytest
 
+from sentimental_cap_predictor import experiment, plots
 from sentimental_cap_predictor.data import ingest as data_ingest
-from sentimental_cap_predictor.modeling import train_eval as model_train_eval
-from sentimental_cap_predictor import plots
 from sentimental_cap_predictor.flows import daily_pipeline
-from sentimental_cap_predictor.trader_utils import strategy_optimizer
+from sentimental_cap_predictor.modeling import train_eval as model_train_eval
 from sentimental_cap_predictor.research import idea_generator
-from sentimental_cap_predictor import experiment
+from sentimental_cap_predictor.trader_utils import strategy_optimizer
 
 
 @dataclass
@@ -47,10 +46,13 @@ def system_status() -> Dict[str, str]:
     return {"python": sys.version, "platform": platform.platform()}
 
 
-
-
-def promote_model(src: str, dst: str, dry_run: bool | None = False) -> Dict[str, Any]:
-    """Swap model config and weights between ``src`` and ``dst`` directories."""
+def promote_model(
+    src: str,
+    dst: str,
+    dry_run: bool | None = False,
+) -> Dict[str, Any]:
+    """Swap model config and weights between ``src`` and ``dst``
+    directories."""
 
     def _find(directory: Path, stem: str) -> Path:
         matches = list(directory.glob(f"{stem}.*"))
@@ -84,6 +86,7 @@ def promote_model(src: str, dst: str, dry_run: bool | None = False) -> Dict[str,
 def get_registry() -> Dict[str, Command]:
     """Return mapping of command names to :class:`Command` entries."""
     from sentimental_cap_predictor.agent import coding_agent
+
     from .sandbox import safe_shell
 
     return {
@@ -119,8 +122,18 @@ def get_registry() -> Dict[str, Command]:
             name="pipeline.run_daily",
             handler=daily_pipeline.run,
             summary="Run full daily pipeline",
-            params_schema={"ticker": "str", "period": "str", "interval": "str"},
+            params_schema={
+                "ticker": "str",
+                "period": "str",
+                "interval": "str",
+            },
             dangerous=True,
+            aliases=(
+                "run the daily pipeline",
+                "run the full pipeline",
+                "run the entire pipeline",
+                "run the whole pipeline",
+            ),
         ),
         "strategy.optimize": Command(
             name="strategy.optimize",

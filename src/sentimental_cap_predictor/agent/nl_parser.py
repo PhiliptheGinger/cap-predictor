@@ -11,6 +11,16 @@ from .command_registry import get_registry
 # Registry ------------------------------------------------------------------
 registry = get_registry()
 
+# Canonicalization -----------------------------------------------------------
+# Map conversational synonyms to a canonical phrase so downstream regular
+# expressions only need to account for the standardized form. This keeps the
+# regexes manageable while still allowing flexible user phrasing.
+SYNONYM_MAP = {
+    "full pipeline": "daily pipeline",
+    "entire pipeline": "daily pipeline",
+    "whole pipeline": "daily pipeline",
+}
+
 
 @dataclass
 class Intent:
@@ -60,12 +70,20 @@ def parse(
 
     # Normalize common "(period/interval)" syntax to "period interval" so the
     # ingestion regex can parse it.
-    text = re.sub(r"\((\d+[a-z]+)/(\d+[a-z]+)\)", r" \1 \2 ", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"\((\d+[a-z]+)/(\d+[a-z]+)\)",
+        r" \1 \2 ",
+        text,
+        flags=re.IGNORECASE,
+    )
 
     # Split chained commands. The lookahead ensures that plain "and" inside
     # parameters (e.g. "compare 1 and 2") are not treated as separators.
     splitter = re.compile(
-        r"\s*(?:;|\band\s+then\b|\band\b(?=\s*(?:ingest|download|fetch|train|retrain|optimize|compare|promote|list|show|run|generate|ideas?|shell|tests|pytest|pipeline|system|status)))\s*",
+        r"\s*(?:;|\band\s+then\b|"
+        r"\band\b(?=\s*(?:ingest|download|fetch|train|retrain|optimize|"
+        r"compare|promote|list|show|run|generate|ideas?|shell|tests|pytest|"
+        r"pipeline|system|status)))\s*",
         flags=re.IGNORECASE,
     )
     parts = splitter.split(text)
@@ -78,7 +96,10 @@ def parse(
 # ---------------------------------------------------------------------------
 
 
-def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Intent:
+def _parse_single(
+    text: str,
+    llm: Callable[[str], Intent] | None = None,
+) -> Intent:
     """Parse a single command ``text`` into an :class:`Intent`.
 
     The parser implements a collection of regular-expression and keyword
@@ -88,6 +109,18 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
     """
 
     original = text.strip()
+
+    # Replace known synonyms with their canonical equivalents prior to
+    # matching so that the subsequent regexes only need to consider a single
+    # phrase for each concept.
+    for phrase, canonical in SYNONYM_MAP.items():
+        original = re.sub(
+            rf"\b{re.escape(phrase)}\b",
+            canonical,
+            original,
+            flags=re.IGNORECASE,
+        )
+
     lowered = original.lower()
 
     # data.ingest ------------------------------------------------------------
@@ -104,7 +137,8 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
 
     # model.train_eval -------------------------------------------------------
     m = re.match(
-        r"(?:^|\b)(?:train(?:\s+model)?|retrain(?:\s+the\s+model)?|model\.train_eval)\s+"
+        r"(?:^|\b)(?:train(?:\s+model)?|retrain(?:\s+the\s+model)?|"
+        r"model\.train_eval)\s+"
         r"(?:for\s+)?(?P<ticker>[A-Za-z0-9_]+)",
         original,
         flags=re.IGNORECASE,
@@ -218,7 +252,8 @@ def _parse_single(text: str, llm: Callable[[str], Intent] | None = None) -> Inte
 
     # pipeline.run_daily -----------------------------------------------------
     m = re.match(
-        r"(?:^|\b)(?:pipeline\.run_daily|run (?:the )?daily pipeline)\s+"
+        r"(?:^|\b)(?:pipeline\.run_daily|run (?:the )?(?:daily|full|entire|"
+        r"whole) pipeline)\s+"
         r"(?P<ticker>\w+)(?:\s+(?P<period>\S+))?(?:\s+(?P<interval>\S+))?",
         original,
         flags=re.IGNORECASE,
