@@ -66,25 +66,6 @@ ABOUT_TEXT = (
     'If you\'re unsure what to say, just ask "what can you do?"'
 )
 
-
-def _summarize_decision(main_reply: str, exp_reply: str) -> str:
-    """Explain how the final response was selected.
-
-    Compares outputs from the main and experimental models and returns a
-    human-readable explanation describing any differences and which response
-    was chosen.
-    """
-    if main_reply.strip() == exp_reply.strip():
-        return f"Both models agree: {main_reply}"
-    return (
-        "Main model replied: {main}.\n"
-        "Experimental model replied: {exp}.\n"
-        "Decision: opting for the main model's answer because it is the "
-        "production model while the experimental model is still under "
-        "evaluation."
-    ).format(main=main_reply, exp=exp_reply)
-
-
 def _run(cmd_list: list[str]) -> str:
     try:
         proc = subprocess.run(
