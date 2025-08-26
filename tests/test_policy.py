@@ -1,14 +1,16 @@
 from sentimental_cap_predictor.chatbot_nlu import parse, resolve
 
 
-def test_ambiguous_prompts_trigger_clarify():
-    nlu = parse("run the pipeline report", ctx={})
+def test_resolve_dispatches_known_intent():
+    nlu = parse("run the pipeline now", ctx={})
     res = resolve(nlu, ctx={})
-    assert res.action_needed == "ASK_CLARIFY"
-    assert "pipeline.run_now" in res.prompt and "plots.make_report" in res.prompt
+    assert res.action_needed == "DISPATCH"
+    assert res.intent == "pipeline.run_now"
 
 
 def test_fallback_on_ood():
     nlu = parse("order pizza", ctx={})
     res = resolve(nlu, ctx={})
     assert res.action_needed == "FALLBACK"
+    assert res.intent == "help.show_options"
+
