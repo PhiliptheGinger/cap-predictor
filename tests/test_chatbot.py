@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from sentimental_cap_predictor import chatbot
 from sentimental_cap_predictor.chatbot import _summarize_decision
 
@@ -30,8 +32,9 @@ def test_repl_no_debug_output(monkeypatch, capsys):
     assert "[debug]" not in captured.out
 
 
-def test_repl_debug_output_env(monkeypatch, capsys):
-    monkeypatch.setenv("CHATBOT_DEBUG", "1")
+@pytest.mark.parametrize("value", ["1", "true", "yes", "on"])
+def test_repl_debug_output_env(monkeypatch, capsys, value):
+    monkeypatch.setenv("CHATBOT_DEBUG", value)
     _run_repl_once()
     captured = capsys.readouterr()
     assert "[debug] intent=smalltalk.greeting" in captured.out
