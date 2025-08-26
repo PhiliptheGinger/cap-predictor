@@ -29,6 +29,9 @@ class NLUEngine:
         labels: List[str] = []
         with examples_path.open() as fh:
             for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
                 obj = json.loads(line)
                 intent = obj["intent"]
                 if intent == "AMBIGUOUS":

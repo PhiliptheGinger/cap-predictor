@@ -24,6 +24,7 @@ Use ``--debug`` to show full tracebacks when diagnosing failures.
 
 from __future__ import annotations
 
+import re
 import traceback
 from collections.abc import Callable
 from typing import Any
@@ -325,15 +326,30 @@ def main(*, debug: bool = False) -> None:
     print(WELCOME_BANNER)
     while True:
         prompt = typer.prompt("prompt")
-        if prompt.strip().lower() in {"exit", "quit"}:
+        normalized = prompt.strip().lower()
+        if normalized in {"exit", "quit"}:
             break
+
+        # Fast path for simple greetings and help requests
+        if re.search(r"\b(hi|hello|hey)\b", normalized):
+            typer.echo(dispatch("smalltalk.greeting", {}))
+            continue
+        help_triggers = {"help", "?", "what can you do", "what actions can you take"}
+        if normalized in help_triggers or any(t in normalized for t in help_triggers):
+            typer.echo(dispatch("help.show_options", {}))
+            continue
+
         try:
+            thinking_msg = "Thinking..."
+            print(thinking_msg, end="", flush=True)
             data = qwen_intent.predict(prompt)
+            print("\r" + " " * len(thinking_msg) + "\r", end="", flush=True)
             intent = data.get("intent", "help.show_options")
             slots = data.get("slots", {}) or {}
             reply = dispatch(intent, slots)
             typer.echo(reply)
         except Exception as exc:  # pragma: no cover
+            print("\r" + " " * len(thinking_msg) + "\r", end="", flush=True)
             typer.echo(f"Error: {exc}")
             if debug:
                 traceback.print_exc()
