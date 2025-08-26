@@ -58,6 +58,9 @@ DATA_PATH = os.getenv("DATA_PATH", "./data/your_data.csv")
 # Logging level
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# Toggle per‑ticker logging of pipeline runs
+ENABLE_TICKER_LOGS = os.getenv("ENABLE_TICKER_LOGS", "0") == "1"
+
 # Remove existing log handlers without accessing private attributes
 try:
     logger.remove()
@@ -102,5 +105,5 @@ TICKER_LIST = (
 # Clean up any extra spaces or empty strings
 TICKER_LIST = [ticker.strip() for ticker in TICKER_LIST if ticker.strip()]
 
-if os.getenv("CAP_LOG_TICKERS") == "1":
+if ENABLE_TICKER_LOGS:
     logger.info(f"Final ticker list: {TICKER_LIST}")
