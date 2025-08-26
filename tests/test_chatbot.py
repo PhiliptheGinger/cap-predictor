@@ -35,3 +35,16 @@ def test_repl_debug_output_env(monkeypatch, capsys):
     _run_repl_once()
     captured = capsys.readouterr()
     assert "[debug] intent=smalltalk.greeting" in captured.out
+
+
+def test_repl_debug_output_env_false(monkeypatch, capsys):
+    monkeypatch.setenv("CHATBOT_DEBUG", "0")
+    _run_repl_once()
+    captured = capsys.readouterr()
+    assert "[debug]" not in captured.out
+
+
+def test_repl_debug_output_flag(capsys):
+    _run_repl_once(debug=True)
+    captured = capsys.readouterr()
+    assert "[debug] intent=smalltalk.greeting" in captured.out

@@ -222,7 +222,8 @@ def repl(debug: bool | None = None) -> None:
     """
 
     if debug is None:
-        debug = bool(os.getenv("CHATBOT_DEBUG"))
+        debug_env = os.getenv("CHATBOT_DEBUG", "")
+        debug = debug_env.lower() in {"1", "true", "yes", "on"}
 
     print(WELCOME_BANNER)
     while True:
