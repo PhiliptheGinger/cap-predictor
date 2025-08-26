@@ -194,12 +194,15 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
 
 
 def _predict_intent(text: str) -> Dict[str, Any]:
-    # Try Qwen NLU; if not wired yet, use fallback so commands still work
+    """Predict intent using the Qwen model with a regex fallback."""
+
+    out = None
     try:
         out = qwen_intent.predict(text)
-        if not out or not out.get("intent"):
-            out = qwen_intent.predict_fallback(text)
     except Exception:
+        # Propagate to fallback below
+        out = None
+    if not out or not out.get("intent"):
         out = qwen_intent.predict_fallback(text)
     return out
 

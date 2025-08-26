@@ -27,6 +27,7 @@ FEWSHOT = """Few-shot:
 - "hey! how's it going?" -> smalltalk.greeting
 """
 
+
 def _build_user_prompt(utterance: str) -> str:
     return (
         f'Utterance: "{utterance}"\n'
@@ -36,6 +37,7 @@ def _build_user_prompt(utterance: str) -> str:
         '{"intent":"...", "slots":{}, "alt_intent":"..."}\n'
         "</json>"
     )
+
 
 def call_qwen(utterance: str) -> str:
     """REPLACE this call with your existing Qwen client call.
@@ -51,15 +53,20 @@ def call_qwen(utterance: str) -> str:
 _JSON_RE = re.compile(r"<json>\s*(\{.*\})\s*</json>", re.S)
 
 
-def predict(utterance: str) -> Dict[str, Any]:
-    try:
-        text = call_qwen(utterance)
-        m = _JSON_RE.search(text or "")
-        if not m:
-            return {"intent": "help.show_options", "slots": {}}
-        return json.loads(m.group(1))
-    except Exception:
-        return {"intent": "help.show_options", "slots": {}}
+def predict(utterance: str) -> Dict[str, Any] | None:
+    """Call Qwen to classify an utterance.
+
+    Returns the parsed intent dictionary on success. If the model response
+    doesn't contain a JSON block, ``None`` is returned. Any exception from the
+    underlying model call is allowed to propagate so the caller can decide how
+    to handle it (e.g., by invoking a keyword fallback).
+    """
+
+    text = call_qwen(utterance)
+    m = _JSON_RE.search(text or "")
+    if not m:
+        return None
+    return json.loads(m.group(1))
 
 
 # --- Minimal keyword fallback (used if Qwen not yet wired) ---
