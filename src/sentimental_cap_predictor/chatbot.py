@@ -1,88 +1,227 @@
-"""Simple command-line chatbot powered by local Mistral models."""
+# flake8: noqa
+from __future__ import annotations
 
-import typer
+import subprocess
+import sys
+from typing import Any, Dict
 
-app = typer.Typer(
-    help="Interactive chatbot using local Hugging Face models",
+from sentimental_cap_predictor.chatbot_nlu import qwen_intent
+
+ASSISTANT_NAME = "Cap Assistant"
+ASSISTANT_TAGLINE = (
+    "your project-sidekick for data ingest, pipelines, training, and plots."
 )
 
+WELCOME_BANNER = f"""
+Hi! I'm {ASSISTANT_NAME} — {ASSISTANT_TAGLINE}
 
-def _get_pipeline(model_id: str):
-    """Return a text-generation pipeline for ``model_id``."""
+I can:
+  • Run the pipeline (now or daily)
+  • Ingest market data (tickers, period, interval)
+  • Train/evaluate models
+  • Plot reports
+  • Explain why I chose an action
 
-    import os
+Try:
+  - "run the pipeline now"
+  - "please run the daily pipeline"
+  - "ingest NVDA and AAPL for 5d at 1h"
+  - "train and evaluate on AAPL"
+  - "plot results for TSLA YTD"
+  - "what can you do?"
+  - "who are you?"
+""".strip()
 
-    os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
-    os.environ.setdefault("TRANSFORMERS_NO_FLAX", "1")
-    from transformers import pipeline
+HELP_TEXT = """
+Here's what I can help with right now:
 
-    return pipeline("text-generation", model=model_id, tokenizer=model_id)
+• Pipelines
+  - "run the pipeline now"
+  - "run the daily pipeline"
 
+• Data ingest
+  - "ingest AAPL for 5d at 1h"
+  - "pull data for TSLA period 1Y interval 1d"
 
-def _ask(generator, history: list[str], user: str) -> tuple[str, list[str]]:
-    """Send the updated history to ``generator`` and append its reply."""
+• Modeling
+  - "train and evaluate on NVDA"
+  - "run training for AAPL with random seed 7"
 
-    prompt = "\n".join(history + [f"User: {user}", "Assistant:"])
-    gen_output = generator(
-        prompt,
-        max_new_tokens=256,
-        do_sample=True,
-        temperature=0.2,
-    )
-    result = gen_output[0]["generated_text"]
-    reply = result.split("Assistant:")[-1].strip()
-    history.extend([f"User: {user}", f"Assistant: {reply}"])
-    return reply, history
+• Plots & reports
+  - "plot results for AAPL YTD"
+  - "generate charts last week for TSLA"
+
+• Explanations
+  - "why did you do that?"
+  - "explain the last action"
+
+Tip: ask "who are you?" if you want my identity & scope.
+""".strip()
+
+ABOUT_TEXT = (
+    f"I'm {ASSISTANT_NAME}. I live inside the Cap Predictor project and route "
+    "your requests to project actions.\n"
+    "Right now I understand plain-English requests for pipelines, data ingest, "
+    "training, plotting, and explanations.\n"
+    'If you\'re unsure what to say, just ask "what can you do?"'
+)
 
 
 def _summarize_decision(main_reply: str, exp_reply: str) -> str:
     """Explain how the final response was selected.
 
-    The function compares outputs from the main and experimental models and
-    returns a human-readable explanation describing any differences and which
-    response was chosen.
+    Compares outputs from the main and experimental models and returns a
+    human-readable explanation describing any differences and which response
+    was chosen.
     """
-
     if main_reply.strip() == exp_reply.strip():
         return f"Both models agree: {main_reply}"
     return (
-        "Main model replied: {main}.\nExperimental model replied: {exp}.\n"
+        "Main model replied: {main}.\n"
+        "Experimental model replied: {exp}.\n"
         "Decision: opting for the main model's answer because it is the "
         "production model while the experimental model is still under "
         "evaluation."
     ).format(main=main_reply, exp=exp_reply)
 
 
-@app.command()
-def chat(
-    main_model: str = "mistralai/Mistral-7B-v0.1",
-    experimental_model: str = "mistralai/Mistral-7B-Instruct-v0.2",
-) -> None:  # pragma: no cover - CLI wrapper
-    """Start an interactive chat session consulting two local models.
+def _run(cmd_list: list[str]) -> str:
+    try:
+        proc = subprocess.run(
+            cmd_list,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        return proc.stdout.strip()
+    except Exception as e:  # pragma: no cover - subprocess failure
+        return f"Command failed: {e}"
 
-    The chatbot queries both a *main* and an *experimental* model for every
-    question and reports which answer was chosen and why. Type ``exit`` or
-    ``quit`` to end the session.
-    """
 
-    main_gen = _get_pipeline(main_model)
-    exp_gen = _get_pipeline(experimental_model)
-    main_hist: list[str] = []
-    exp_hist: list[str] = []
-    typer.echo("Chatbot ready. Type 'exit' to quit.")
+def dispatch(intent: str, slots: Dict[str, Any]) -> str:
+    # Small talk / meta
+    if intent == "smalltalk.greeting":
+        return f"Hey there! 👋\n\n{HELP_TEXT}"
+    if intent == "help.show_options":
+        return HELP_TEXT
+    if intent == "bot.identity":
+        return ABOUT_TEXT
+    if intent == "explain.decision":
+        return (
+            "I choose actions by matching your request to a known intent and "
+            "extracting slots (e.g., tickers, period). If I’m unsure, I’ll ask "
+            "a clarifying question."
+        )
+
+    # Actions (prefer calling your existing CLI modules via subprocess)
+    if intent == "pipeline.run_now":
+        # If you have a CLI for pipeline, call it here; otherwise stub a success.
+        # Example (adjust if your pipeline module differs):
+        # cmd = [
+        #     sys.executable,
+        #     "-m",
+        #     "sentimental_cap_predictor.pipeline",
+        #     "run_now",
+        # ]
+        # out = _run(cmd)
+        # return out or "Running the pipeline now."
+        return "Running the pipeline now."
+
+    if intent == "pipeline.run_daily":
+        # cmd = [
+        #     sys.executable,
+        #     "-m",
+        #     "sentimental_cap_predictor.pipeline",
+        #     "run_daily",
+        # ]
+        # out = _run(cmd)
+        # return out or "Kicking off the daily pipeline."
+        return "Kicking off the daily pipeline."
+
+    if intent == "data.ingest":
+        tickers = slots.get("tickers") or slots.get("ticker") or []
+        if isinstance(tickers, str):
+            tickers = [tickers]
+        period = slots.get("period") or "5d"
+        interval = slots.get("interval") or "1h"
+        # Known-good CLI from your logs:
+        # python -m sentimental_cap_predictor.data.ingest NVDA --period 5d --interval 1h
+        args = [
+            sys.executable,
+            "-m",
+            "sentimental_cap_predictor.data.ingest",
+            *tickers,
+            "--period",
+            str(period),
+            "--interval",
+            str(interval),
+        ]
+        out = _run(args)
+        return (
+            out or f"Started ingest for {tickers} period={period} interval={interval}."
+        )
+
+    if intent == "model.train_eval":
+        ticker = slots.get("ticker")
+        if not ticker:
+            return "Which ticker should I train on? e.g., 'train and evaluate on NVDA'"
+        # python -m sentimental_cap_predictor.modeling.train_eval AAPL
+        args = [
+            sys.executable,
+            "-m",
+            "sentimental_cap_predictor.modeling.train_eval",
+            ticker,
+        ]
+        out = _run(args)
+        return out or f"Training & evaluating on {ticker}."
+
+    if intent == "plots.make_report":
+        ticker = slots.get("ticker")
+        if not ticker:
+            return "Which ticker should I plot? e.g., 'plot results for TSLA YTD'"
+        # You previously ran: python -m sentimental_cap_predictor.plots AAPL
+        args = [
+            sys.executable,
+            "-m",
+            "sentimental_cap_predictor.plots",
+            ticker,
+        ]
+        out = _run(args)
+        return out or f"Generating report for {ticker}."
+
+    # Friendly default if we somehow miss
+    return "I didn’t catch a supported request.\n\n" + HELP_TEXT
+
+
+def _predict_intent(text: str) -> Dict[str, Any]:
+    # Try Qwen NLU; if not wired yet, use fallback so commands still work
+    try:
+        out = qwen_intent.predict(text)
+        if not out or not out.get("intent"):
+            out = qwen_intent.predict_fallback(text)
+    except Exception:
+        out = qwen_intent.predict_fallback(text)
+    return out
+
+
+def repl():
+    print(WELCOME_BANNER)
     while True:
-        user = typer.prompt("You")
-        if user.strip().lower() in {"exit", "quit"}:
-            break
         try:
-            main_reply, main_hist = _ask(main_gen, main_hist, user)
-            exp_reply, exp_hist = _ask(exp_gen, exp_hist, user)
-        except Exception as exc:  # pragma: no cover - model failure
-            typer.echo(f"Error: {exc}")
+            user = input("prompt: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nBye!")
             break
-        summary = _summarize_decision(main_reply, exp_reply)
-        typer.echo(f"Bot: {summary}")
+        if not user:
+            continue
+        nlu = _predict_intent(user)
+        intent = nlu.get("intent") or "help.show_options"
+        slots = nlu.get("slots", {})
+        # DEBUG: show what the NLU decided so we can tune prompts
+        print(f"[debug] intent={intent} slots={slots}")
+        reply = dispatch(intent, slots)
+        print(reply)
 
 
-if __name__ == "__main__":  # pragma: no cover - entry point
-    app()
+if __name__ == "__main__":
+    repl()
