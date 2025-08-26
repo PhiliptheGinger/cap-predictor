@@ -1,0 +1,61 @@
+version: 1
+intents:
+  - name: pipeline.run_daily
+    examples:
+      - "run the daily pipeline"
+      - "schedule the routine daily job"
+      - "kick off the daily flow"
+      - "start my daily update"
+    signals: ["daily", "every day", "routine", "schedule"]
+    required_slots: []
+  - name: pipeline.run_now
+    examples:
+      - "run the pipeline now"
+      - "kick off the pipeline immediately"
+      - "start the job right now"
+      - "execute the full pipeline"
+    signals: ["run", "execute", "now", "immediately"]
+    required_slots: []
+  - name: data.ingest
+    examples:
+      - "ingest NVDA for 5d at 1h"
+      - "pull data for AAPL period 1Y interval 1d"
+      - "fetch prices for TSLA and PLTR last week hourly"
+    signals: ["ingest", "pull", "fetch", "download", "data"]
+    required_slots: ["tickers", "period", "interval"]
+    slot_patterns:
+      tickers: "(?:[A-Z\\.]{1,5})(?:\\s*(?:,|and)\\s*[A-Z\\.]{1,5})*"
+      period: "(?:\\d+[DWMY]|1D|5D|1M|6M|1Y|5Y|max|last\\s+week|ytd)"
+      interval: "(?:\\d+h|\\d+d|1d|1h|1m)"
+  - name: model.train_eval
+    examples:
+      - "train and evaluate on NVDA"
+      - "run training for AAPL with random seed 7"
+      - "fit the model then eval using 80/20 split for TSLA"
+    signals: ["train", "evaluate", "fit", "train_eval"]
+    required_slots: ["ticker"]
+  - name: plots.make_report
+    examples:
+      - "make a performance report for NVDA"
+      - "plot results for AAPL YTD"
+      - "generate charts last week for TSLA"
+    signals: ["plot", "report", "charts", "graph", "visualize"]
+    required_slots: ["ticker"]
+  - name: explain.decision
+    examples:
+      - "why did you do that?"
+      - "explain the last action"
+      - "justify your decision"
+    signals: ["why", "explain", "justify", "because"]
+    required_slots: []
+  - name: help.show_options
+    examples:
+      - "help"
+      - "what can you do?"
+      - "I’m lost"
+    signals: ["help", "options", "what can you do", "how to"]
+    required_slots: []
+entities:
+  ticker: "[A-Z\\.]{1,5}"
+  period: "(\\d+[DWMY]|1D|5D|1M|6M|1Y|5Y|max|last\\s+week|ytd)"
+  interval: "(\\d+h|\\d+d|1d|1h|1m)"
