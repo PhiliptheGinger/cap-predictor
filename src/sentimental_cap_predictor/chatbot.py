@@ -98,6 +98,21 @@ def _run(cmd_list: list[str]) -> str:
         return f"Command failed: {e}"
 
 
+def _run_daily_pipeline(ticker: str, period: str, interval: str) -> str:
+    """Run the project's daily pipeline for ``ticker`` via subprocess."""
+    args = [
+        sys.executable,
+        "-m",
+        "sentimental_cap_predictor.flows.daily_pipeline",
+        ticker,
+        "--period",
+        str(period),
+        "--interval",
+        str(interval),
+    ]
+    return _run(args)
+
+
 def dispatch(intent: str, slots: Dict[str, Any]) -> str:
     # Small talk / meta
     if intent == "smalltalk.greeting":
@@ -118,36 +133,14 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
         ticker = slots.get("ticker") or "NVDA"
         period = slots.get("period") or "5y"
         interval = slots.get("interval") or "1d"
-        args = [
-            sys.executable,
-            "-m",
-            "sentimental_cap_predictor.flows.daily_pipeline",
-            "run",
-            ticker,
-            "--period",
-            str(period),
-            "--interval",
-            str(interval),
-        ]
-        out = _run(args)
+        out = _run_daily_pipeline(ticker, period, interval)
         return out or f"Running the pipeline now for {ticker}."
 
     if intent == "pipeline.run_daily":
         ticker = slots.get("ticker") or "NVDA"
         period = slots.get("period") or "5y"
         interval = slots.get("interval") or "1d"
-        args = [
-            sys.executable,
-            "-m",
-            "sentimental_cap_predictor.flows.daily_pipeline",
-            "run",
-            ticker,
-            "--period",
-            str(period),
-            "--interval",
-            str(interval),
-        ]
-        out = _run(args)
+        out = _run_daily_pipeline(ticker, period, interval)
         return out or f"Kicking off the daily pipeline for {ticker}."
 
     if intent == "data.ingest":
