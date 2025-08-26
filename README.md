@@ -45,7 +45,7 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.dataset` – download price and news data
 - `sentimental_cap_predictor.plots` – visualize processed data
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
-- `sentimental_cap_predictor.chatbot` – chat with a local Mistral-powered assistant that consults main and experimental models and explains its decisions
+- `sentimental_cap_predictor.chatbot` – chat with a local Mistral-powered assistant that consults main and experimental models and explains its decisions. Set `CHATBOT_DEBUG=1` or pass `--debug` to show predicted intents.
 
 Run `--help` with any module for detailed options.
 

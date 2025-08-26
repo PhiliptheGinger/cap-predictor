@@ -1,6 +1,8 @@
 # flake8: noqa
 from __future__ import annotations
 
+import argparse
+import os
 import subprocess
 import sys
 from typing import Any, Dict
@@ -211,7 +213,17 @@ def _predict_intent(text: str) -> Dict[str, Any]:
     return out
 
 
-def repl():
+def repl(debug: bool | None = None) -> None:
+    """Run an interactive REPL for the Cap Assistant.
+
+    If ``debug`` is ``None`` its value is derived from the ``CHATBOT_DEBUG``
+    environment variable. When enabled, the assistant prints the predicted
+    intent and slots before responding.
+    """
+
+    if debug is None:
+        debug = bool(os.getenv("CHATBOT_DEBUG"))
+
     print(WELCOME_BANNER)
     while True:
         try:
@@ -224,11 +236,17 @@ def repl():
         nlu = _predict_intent(user)
         intent = nlu.get("intent") or "help.show_options"
         slots = nlu.get("slots", {})
-        # DEBUG: show what the NLU decided so we can tune prompts
-        print(f"[debug] intent={intent} slots={slots}")
+        if debug:
+            # Show what the NLU decided so we can tune prompts
+            print(f"[debug] intent={intent} slots={slots}")
         reply = dispatch(intent, slots)
         print(reply)
 
 
 if __name__ == "__main__":
-    repl()
+    parser = argparse.ArgumentParser(description="Cap Assistant chatbot")
+    parser.add_argument(
+        "--debug", action="store_true", help="Show intent and slot information"
+    )
+    args = parser.parse_args()
+    repl(debug=args.debug)
