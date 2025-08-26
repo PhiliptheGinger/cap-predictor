@@ -1,0 +1,12 @@
+{"text":"please run the daily pipeline","intent":"pipeline.run_daily"}
+{"text":"kick off the routine daily job","intent":"pipeline.run_daily"}
+{"text":"run the pipeline now","intent":"pipeline.run_now"}
+{"text":"execute the full pipeline immediately","intent":"pipeline.run_now"}
+{"text":"ingest NVDA and AAPL for 5d at 1h","intent":"data.ingest","slots":{"tickers":["NVDA","AAPL"],"period":"5d","interval":"1h"}}
+{"text":"pull data for TSLA period 1Y interval 1d","intent":"data.ingest","slots":{"tickers":["TSLA"],"period":"1Y","interval":"1d"}}
+{"text":"train and evaluate on NVDA","intent":"model.train_eval","slots":{"ticker":"NVDA"}}
+{"text":"generate charts last week for TSLA","intent":"plots.make_report","slots":{"ticker":"TSLA","range":"last week"}}
+{"text":"why did you do that?","intent":"explain.decision"}
+{"text":"help","intent":"help.show_options"}
+{"text":"order a pizza","intent":"help.show_options"}
+{"text":"run the pipeline report","intent":"AMBIGUOUS"}
