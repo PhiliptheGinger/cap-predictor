@@ -3,7 +3,7 @@ from __future__ import annotations
 # flake8: noqa
 import json
 import os
-import re
+import re as _re
 from typing import Any, Dict
 
 SYSTEM = """You are an intent classifier and slot extractor for the Cap Predictor CLI.
@@ -77,7 +77,7 @@ def call_qwen(utterance: str) -> str:
     raise RuntimeError(f"Qwen request failed: {msg}")
 
 
-_JSON_RE = re.compile(r"<json>\s*(\{.*\})\s*</json>", re.S)
+_JSON_RE = _re.compile(r"<json>\s*(\{.*\})\s*</json>", _re.S)
 
 
 def predict(utterance: str) -> Dict[str, Any] | None:
@@ -105,7 +105,6 @@ def predict(utterance: str) -> Dict[str, Any] | None:
 
 
 # --- Minimal keyword fallback (used if Qwen not yet wired) ---
-import re as _re  # noqa: E402
 
 _PIPELINE_NOW = _re.compile(
     r"\b(run|start|kick off|execute).*(pipeline|flow).*(now|right away|immediately)?",
