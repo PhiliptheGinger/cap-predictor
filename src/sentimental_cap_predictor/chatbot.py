@@ -104,6 +104,7 @@ def _run_daily_pipeline(ticker: str, period: str, interval: str) -> str:
         sys.executable,
         "-m",
         "sentimental_cap_predictor.flows.daily_pipeline",
+        "run",
         ticker,
         "--period",
         str(period),
@@ -133,15 +134,13 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
         ticker = slots.get("ticker") or "NVDA"
         period = slots.get("period") or "5y"
         interval = slots.get("interval") or "1d"
-        out = _run_daily_pipeline(ticker, period, interval)
-        return out or f"Running the pipeline now for {ticker}."
+        return _run_daily_pipeline(ticker, period, interval)
 
     if intent == "pipeline.run_daily":
         ticker = slots.get("ticker") or "NVDA"
         period = slots.get("period") or "5y"
         interval = slots.get("interval") or "1d"
-        out = _run_daily_pipeline(ticker, period, interval)
-        return out or f"Kicking off the daily pipeline for {ticker}."
+        return _run_daily_pipeline(ticker, period, interval)
 
     if intent == "data.ingest":
         tickers = slots.get("tickers") or slots.get("ticker") or []
