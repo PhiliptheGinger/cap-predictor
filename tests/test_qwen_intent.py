@@ -9,6 +9,8 @@ def _fake_create(model, temperature, messages):
         "please run the daily pipeline": "<json>{\"intent\":\"pipeline.run_daily\",\"slots\":{}}</json>",
         "run pipeline": "<json>{\"intent\":\"pipeline.run_now\",\"slots\":{}}</json>",
         "order a pizza": "<json>{\"intent\":\"help.show_options\",\"slots\":{}}</json>",
+        "who are you?": "<json>{\"intent\":\"bot.identity\",\"slots\":{}}</json>",
+        "hey!": "<json>{\"intent\":\"smalltalk.greeting\",\"slots\":{}}</json>",
     }
     content = mapping.get(utterance, "<json>{\"intent\":\"help.show_options\",\"slots\":{}}</json>")
     return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
@@ -20,3 +22,5 @@ def test_smoke_intents(monkeypatch):
     assert qwen_intent.predict("please run the daily pipeline")["intent"] == "pipeline.run_daily"
     assert qwen_intent.predict("run pipeline")["intent"] == "pipeline.run_now"
     assert qwen_intent.predict("order a pizza")["intent"] == "help.show_options"
+    assert qwen_intent.predict("who are you?")["intent"] == "bot.identity"
+    assert qwen_intent.predict("hey!")["intent"] == "smalltalk.greeting"

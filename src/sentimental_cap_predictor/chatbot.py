@@ -33,6 +33,66 @@ import typer
 from .chatbot_nlu import qwen_intent
 from .flows.daily_pipeline import run as _run_pipeline
 
+
+# --- Friendly identity & help text ---
+ASSISTANT_NAME = "Cap Assistant"
+ASSISTANT_TAGLINE = (
+    "your project-sidekick for data ingest, pipelines, training, and plots."
+)
+
+WELCOME_BANNER = f"""
+Hi! I'm {ASSISTANT_NAME} — {ASSISTANT_TAGLINE}
+
+I can:
+  • Run the pipeline (now or on schedule)
+  • Ingest market data (tickers, period, interval)
+  • Train/evaluate models
+  • Plot reports
+  • Explain why I chose an action
+
+Try one of these:
+  - "run the pipeline now"
+  - "please run the daily pipeline"
+  - "ingest NVDA and AAPL for 5d at 1h"
+  - "train and evaluate on AAPL"
+  - "plot results for TSLA YTD"
+  - "what can you do?"
+  - "who are you?"
+""".strip()
+
+HELP_TEXT = f"""
+Here's what I can help with right now:
+
+• Pipelines
+  - "run the pipeline now"
+  - "run the daily pipeline"
+
+• Data ingest
+  - "ingest AAPL for 5d at 1h"
+  - "pull data for TSLA period 1Y interval 1d"
+
+• Modeling
+  - "train and evaluate on NVDA"
+  - "run training for AAPL with random seed 7"
+
+• Plots & reports
+  - "plot results for AAPL YTD"
+  - "generate charts last week for TSLA"
+
+• Explanations
+  - "why did you do that?"
+  - "explain the last action"
+
+Tip: ask "who are you?" if you want my identity & scope.
+""".strip()
+
+ABOUT_TEXT = f"""
+I'm {ASSISTANT_NAME}. I live inside the Cap Predictor project and route your requests to project actions.
+Right now I understand plain-English requests for pipelines, data ingest, training, plotting, and explanations.
+If you're unsure what to say, just ask "what can you do?"
+""".strip()
+
+
 app = typer.Typer(help="Interactive helper for project utilities")
 
 
@@ -230,8 +290,53 @@ def chat_loop(
 
 
 # ---------------------------------------------------------------------------
-# Typer entry point
+# Intent dispatcher & Typer entry point
 # ---------------------------------------------------------------------------
+
+
+def dispatch(intent: str, slots: dict) -> str:
+    if intent == "pipeline.run_daily":
+        _run_pipeline("AAPL")
+        return "Kicking off the daily pipeline. I’ll let you know when it completes."
+    if intent == "pipeline.run_now":
+        _run_pipeline("AAPL")
+        return "Running the pipeline now."
+    if intent == "data.ingest":
+        return (
+            f"Starting ingest for {slots.get('tickers')} period={slots.get('period')} interval={slots.get('interval')}."
+        )
+    if intent == "model.train_eval":
+        return f"Training & evaluating on {slots.get('ticker')}."
+    if intent == "plots.make_report":
+        return f"Generating report for {slots.get('ticker')} range={slots.get('range')}."
+    if intent == "explain.decision":
+        return "I explain my choices by pointing to the intent I matched, the slots I extracted, and recent context."
+    if intent in ("help.show_options", "help", "unknown"):
+        return HELP_TEXT
+    if intent in ("bot.identity", "who_are_you"):
+        return ABOUT_TEXT
+    if intent == "smalltalk.greeting":
+        return f"Hey there! 👋\n\n{HELP_TEXT}"
+
+    return "I didn’t catch a supported request.\n\n" + HELP_TEXT
+
+
+def main(*, debug: bool = False) -> None:
+    print(WELCOME_BANNER)
+    while True:
+        prompt = typer.prompt("prompt")
+        if prompt.strip().lower() in {"exit", "quit"}:
+            break
+        try:
+            data = qwen_intent.predict(prompt)
+            intent = data.get("intent", "help.show_options")
+            slots = data.get("slots", {}) or {}
+            reply = dispatch(intent, slots)
+            typer.echo(reply)
+        except Exception as exc:  # pragma: no cover
+            typer.echo(f"Error: {exc}")
+            if debug:
+                traceback.print_exc()
 
 
 @app.command()
@@ -244,32 +349,7 @@ def chat(
 ) -> None:  # pragma: no cover - CLI wrapper
     """Simple chatbot that routes intents to project functions."""
 
-    actions: dict[str, Callable[[], Any]] = {
-        "pipeline.run_daily": lambda: _run_pipeline("AAPL"),
-        "pipeline.run_now": lambda: _run_pipeline("AAPL"),
-    }
-
-    while True:
-        prompt = typer.prompt("prompt")
-        if prompt.strip().lower() in {"exit", "quit"}:
-            break
-        try:
-            data = qwen_intent.predict(prompt)
-            intent = data.get("intent")
-            fn = actions.get(intent)
-            if fn:
-                result = fn()
-                summary = result.get("summary") if isinstance(result, dict) else None
-                if summary:
-                    typer.echo(f"SUCCESS: {summary}")
-                else:
-                    typer.echo("SUCCESS")
-            else:
-                typer.echo("Sorry, I can't help with that.")
-        except Exception as exc:  # pragma: no cover
-            typer.echo(f"Error: {exc}")
-            if debug:
-                traceback.print_exc()
+    main(debug=debug)
 
 
 if __name__ == "__main__":  # pragma: no cover - entry point

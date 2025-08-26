@@ -26,7 +26,7 @@ SYSTEM = (
     "You are an intent classifier and slot extractor for the Cap Predictor CLI.\n"
     "Return ONLY JSON between <json>...</json> tags. No prose.\n"
     "Choose the intent from this FIXED list:\n"
-    "[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options]\n\n"
+    "[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options, bot.identity, smalltalk.greeting]\n\n"
     "Rules:\n"
     "- If the text is clearly outside these intents, use help.show_options.\n"
     "- Extract slots when relevant:\n"
@@ -49,7 +49,12 @@ FEWSHOT = (
     "- \"train and evaluate on NVDA\" -> model.train_eval\n"
     "- \"plot results for AAPL YTD\" -> plots.make_report\n"
     "- \"why did you do that?\" -> explain.decision\n"
-    "- \"help me out\" -> help.show_options"
+    "- \"help me out\" -> help.show_options\n"
+    "- \"what can you do?\" -> help.show_options\n"
+    "- \"who are you?\" -> bot.identity\n"
+    "- \"what are you?\" -> bot.identity\n"
+    "- \"hey!\" -> smalltalk.greeting\n"
+    "- \"hello, how's it going?\" -> smalltalk.greeting"
 )
 
 
