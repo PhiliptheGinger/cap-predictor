@@ -30,6 +30,9 @@ from typing import Any
 
 import typer
 
+from .chatbot_nlu import qwen_intent
+from .flows.daily_pipeline import run as _run_pipeline
+
 app = typer.Typer(help="Interactive helper for project utilities")
 
 
@@ -239,41 +242,30 @@ def chat(
         help="Show tracebacks on errors",
     ),
 ) -> None:  # pragma: no cover - CLI wrapper
-    """Launch interactive chatbot using the intent/slot engine."""
+    """Simple chatbot that routes intents to project functions."""
 
-    try:  # pragma: no cover - import failure
-        from . import chatbot_nlu as bot
-    except Exception as exc:  # pragma: no cover
-        typer.echo(f"Unable to import NLU components: {exc}")
-        return
+    actions: dict[str, Callable[[], Any]] = {
+        "pipeline.run_daily": lambda: _run_pipeline("AAPL"),
+        "pipeline.run_now": lambda: _run_pipeline("AAPL"),
+    }
 
-    ctx: dict = {}
     while True:
         prompt = typer.prompt("prompt")
         if prompt.strip().lower() in {"exit", "quit"}:
             break
         try:
-            nlu = bot.parse(prompt, ctx)
-            res = bot.resolve(nlu, ctx)
-            if res.action_needed == "ASK_CLARIFY" and res.prompt:
-                typer.echo(res.prompt)
-                choice = typer.prompt("choice")
-                nlu = bot.parse(choice, ctx)
-                res = bot.resolve(nlu, ctx)
-            if res.action_needed == "ASK_SLOT" and res.prompt:
-                for slot in nlu.missing_slots:
-                    val = typer.prompt(slot)
-                    res.slots[slot] = val
-                res.action_needed = "DISPATCH"
-            if res.action_needed == "FALLBACK":
-                typer.echo(res.prompt or "Sorry, I can't help with that.")
-                continue
-            decision = bot.dispatch(res, ctx)
-            argument = bot.explain(decision, nlu, ctx)
-            summary = decision.result.get("summary") if isinstance(decision.result, dict) else None
-            if summary:
-                typer.echo(f"SUCCESS: {summary}")
-            typer.echo(argument.text)
+            data = qwen_intent.predict(prompt)
+            intent = data.get("intent")
+            fn = actions.get(intent)
+            if fn:
+                result = fn()
+                summary = result.get("summary") if isinstance(result, dict) else None
+                if summary:
+                    typer.echo(f"SUCCESS: {summary}")
+                else:
+                    typer.echo("SUCCESS")
+            else:
+                typer.echo("Sorry, I can't help with that.")
         except Exception as exc:  # pragma: no cover
             typer.echo(f"Error: {exc}")
             if debug:

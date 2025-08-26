@@ -1,12 +1,35 @@
 {"text":"please run the daily pipeline","intent":"pipeline.run_daily"}
 {"text":"kick off the routine daily job","intent":"pipeline.run_daily"}
+{"text":"start my daily update","intent":"pipeline.run_daily"}
+{"text":"schedule the pipeline to run every day","intent":"pipeline.run_daily"}
+
 {"text":"run the pipeline now","intent":"pipeline.run_now"}
 {"text":"execute the full pipeline immediately","intent":"pipeline.run_now"}
+{"text":"kick off the pipeline right this second","intent":"pipeline.run_now"}
+{"text":"start the job now","intent":"pipeline.run_now"}
+
 {"text":"ingest NVDA and AAPL for 5d at 1h","intent":"data.ingest","slots":{"tickers":["NVDA","AAPL"],"period":"5d","interval":"1h"}}
 {"text":"pull data for TSLA period 1Y interval 1d","intent":"data.ingest","slots":{"tickers":["TSLA"],"period":"1Y","interval":"1d"}}
+{"text":"fetch prices for PLTR, SQ, and ROKU last week hourly","intent":"data.ingest","slots":{"tickers":["PLTR","SQ","ROKU"],"period":"last week","interval":"1h"}}
+{"text":"download SHOP for 6M with 1d bars","intent":"data.ingest","slots":{"tickers":["SHOP"],"period":"6M","interval":"1d"}}
+{"text":"grab AAPL + MSFT max at 1m","intent":"data.ingest","slots":{"tickers":["AAPL","MSFT"],"period":"max","interval":"1m"}}
+
 {"text":"train and evaluate on NVDA","intent":"model.train_eval","slots":{"ticker":"NVDA"}}
+{"text":"run training for AAPL with random seed 7","intent":"model.train_eval","slots":{"ticker":"AAPL","seed":7}}
+{"text":"fit the model then eval using 80/20 split for TSLA","intent":"model.train_eval","slots":{"ticker":"TSLA","split":"80/20"}}
+
+{"text":"make a performance report for NVDA","intent":"plots.make_report","slots":{"ticker":"NVDA"}}
+{"text":"plot results for AAPL YTD","intent":"plots.make_report","slots":{"ticker":"AAPL","range":"YTD"}}
 {"text":"generate charts last week for TSLA","intent":"plots.make_report","slots":{"ticker":"TSLA","range":"last week"}}
+
 {"text":"why did you do that?","intent":"explain.decision"}
+{"text":"explain the last action","intent":"explain.decision"}
+{"text":"justify your decision","intent":"explain.decision"}
+
 {"text":"help","intent":"help.show_options"}
-{"text":"order a pizza","intent":"help.show_options"}
+{"text":"what can you do?","intent":"help.show_options"}
+{"text":"i’m lost","intent":"help.show_options"}
+
 {"text":"run the pipeline report","intent":"AMBIGUOUS"}
+{"text":"order a pizza","intent":"help.show_options"}
+
