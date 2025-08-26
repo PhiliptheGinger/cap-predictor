@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # flake8: noqa
 import json
+import os
 import re
 from typing import Any, Dict
 
@@ -40,14 +41,40 @@ def _build_user_prompt(utterance: str) -> str:
 
 
 def call_qwen(utterance: str) -> str:
-    """REPLACE this call with your existing Qwen client call.
-    Requirements:
-      - pass SYSTEM as the system prompt
-      - pass _build_user_prompt(utterance) as the user prompt
-      - temperature=0.0, top_p=1.0, max_tokens ~ 200
-    Return the raw text from Qwen.
+    """Call the Qwen API to classify ``utterance``.
+
+    The Qwen SDK is expected to look for an API key in the ``DASHSCOPE_API_KEY``
+    environment variable.  The ``dashscope`` package provides a ``Generation``
+    endpoint compatible with OpenAI-style chat messages.  We pass the
+    :data:`SYSTEM` prompt as ``system`` and the constructed user prompt from
+    :func:`_build_user_prompt` as ``user``.  The model is queried with
+    deterministic settings (``temperature=0.0`` and ``top_p=1.0``) and the raw
+    text output is returned.
     """
-    raise NotImplementedError("Wire this to your Qwen client (temperature=0.0).")
+
+    from dashscope import Generation
+
+    messages = [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": _build_user_prompt(utterance)},
+    ]
+
+    response = Generation.call(
+        model=os.getenv("QWEN_INTENT_MODEL", "qwen-turbo"),
+        messages=messages,
+        temperature=0.0,
+        top_p=1.0,
+        max_tokens=200,
+        result_format="text",
+    )
+
+    if response.status_code == 200:
+        output = response.output or {}
+        if isinstance(output, dict):
+            return output.get("text", str(output))
+        return str(output)
+    msg = getattr(response, "message", "Qwen API error")
+    raise RuntimeError(f"Qwen request failed: {msg}")
 
 
 _JSON_RE = re.compile(r"<json>\s*(\{.*\})\s*</json>", re.S)
