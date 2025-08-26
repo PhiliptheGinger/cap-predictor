@@ -15,7 +15,7 @@ from loguru import logger
 from newspaper import Article, Config
 from typing_extensions import Annotated
 
-from .config import RAW_DATA_DIR
+from .config import RAW_DATA_DIR, ENABLE_TICKER_LOGS
 from .data_bundle import DataBundle
 from .preprocessing import merge_data
 
@@ -42,9 +42,10 @@ def check_for_nan(df: pd.DataFrame, context: str = "") -> None:
         )
         logger.warning(df[df.isna().any(axis=1)].to_string())
     else:
-        logger.info(
-            f"{Fore.GREEN}No NaN values found after {context}.{Style.RESET_ALL}"
-        )
+        if ENABLE_TICKER_LOGS:
+            logger.info(
+                f"{Fore.GREEN}No NaN values found after {context}.{Style.RESET_ALL}"
+            )
 
 
 def query_gdelt_for_news(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -101,9 +102,10 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
 
 def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
     """Download the price data for a specific period for a ticker from yfinance."""
-    logger.info(
-        f"{Fore.YELLOW}Starting price data download for {ticker} for period: {period}.{Style.RESET_ALL}"
-    )
+    if ENABLE_TICKER_LOGS:
+        logger.info(
+            f"{Fore.YELLOW}Starting price data download for {ticker} for period: {period}.{Style.RESET_ALL}"
+        )
     try:
         stock = yf.Ticker(ticker)
         df = stock.history(period=period)
@@ -124,7 +126,8 @@ def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
 
 def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     """Handle missing data without introducing NaNs in already complete columns."""
-    logger.info(f"{Fore.YELLOW}Handling missing data.{Style.RESET_ALL}")
+    if ENABLE_TICKER_LOGS:
+        logger.info(f"{Fore.YELLOW}Handling missing data.{Style.RESET_ALL}")
 
     initial_missing = df.isnull().sum().sum()
     cols_with_missing = df.columns[df.isnull().any()]
@@ -137,9 +140,10 @@ def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     final_missing = df.isnull().sum().sum()
-    logger.info(
-        f"{Fore.GREEN}Missing data handled. Initial NaNs: {initial_missing}, Remaining NaNs after processing: {final_missing}.{Style.RESET_ALL}"
-    )
+    if ENABLE_TICKER_LOGS:
+        logger.info(
+            f"{Fore.GREEN}Missing data handled. Initial NaNs: {initial_missing}, Remaining NaNs after processing: {final_missing}.{Style.RESET_ALL}"
+        )
 
     check_for_nan(df, "handling missing data")
     return df
@@ -210,9 +214,10 @@ def main(
 ) -> None:
     if period_arg is not None:
         period = period_arg
-    logger.info(
-        f"{Fore.YELLOW}Starting data collection for ticker: {ticker}.{Style.RESET_ALL}"
-    )
+    if ENABLE_TICKER_LOGS:
+        logger.info(
+            f"{Fore.YELLOW}Starting data collection for ticker: {ticker}.{Style.RESET_ALL}"
+        )
 
     if not output_path:
         output_path = RAW_DATA_DIR / f"{ticker}.feather"
@@ -223,13 +228,15 @@ def main(
     # Load existing price data if file exists
     if output_path.exists():
         existing_price_df = pd.read_feather(output_path)
-        logger.info(
-            f"{Fore.GREEN}Loaded existing price data from {output_path}.{Style.RESET_ALL}"
-        )
+        if ENABLE_TICKER_LOGS:
+            logger.info(
+                f"{Fore.GREEN}Loaded existing price data from {output_path}.{Style.RESET_ALL}"
+            )
     else:
-        logger.info(
-            f"{Fore.YELLOW}No existing price data found for {ticker}. Creating a new file.{Style.RESET_ALL}"
-        )
+        if ENABLE_TICKER_LOGS:
+            logger.info(
+                f"{Fore.YELLOW}No existing price data found for {ticker}. Creating a new file.{Style.RESET_ALL}"
+            )
         existing_price_df = pd.DataFrame()
 
     # Download new price data
@@ -247,19 +254,22 @@ def main(
 
     # Save merged data back to feather file
     merged_price_df.to_feather(output_path)
-    logger.info(f"Price data saved to {output_path}.")
+    if ENABLE_TICKER_LOGS:
+        logger.info(f"Price data saved to {output_path}.")
 
     # Load existing news data if file exists
     if news_output_path.exists():
         existing_news_df = pd.read_feather(news_output_path)
-        logger.info(
-            f"{Fore.GREEN}Loaded existing news data from {news_output_path}.{Style.RESET_ALL}"
-        )
+        if ENABLE_TICKER_LOGS:
+            logger.info(
+                f"{Fore.GREEN}Loaded existing news data from {news_output_path}.{Style.RESET_ALL}"
+            )
     else:
-        logger.info(
-            f"{Fore.YELLOW}No existing news data found for {ticker}. "
-            f"Creating a new file.{Style.RESET_ALL}"
-        )
+        if ENABLE_TICKER_LOGS:
+            logger.info(
+                f"{Fore.YELLOW}No existing news data found for {ticker}. "
+                f"Creating a new file.{Style.RESET_ALL}"
+            )
         existing_news_df = pd.DataFrame()
 
     # Query for new news data
@@ -284,17 +294,19 @@ def main(
 
         new_news_df["content"] = contents
 
-        logger.info(
-            f"{Fore.GREEN}Successfully extracted content from {successful_extractions} "
-            f"out of {len(new_news_df)} articles.{Style.RESET_ALL}"
-        )
+        if ENABLE_TICKER_LOGS:
+            logger.info(
+                f"{Fore.GREEN}Successfully extracted content from {successful_extractions} "
+                f"out of {len(new_news_df)} articles.{Style.RESET_ALL}"
+            )
 
         # Merge new news data with existing data
         merged_news_df = merge_data(existing_news_df, new_news_df, merge_on="url")
 
         # Save merged news data back to feather file
         merged_news_df.to_feather(news_output_path)
-        logger.info(f"News data saved to {news_output_path}.")
+        if ENABLE_TICKER_LOGS:
+            logger.info(f"News data saved to {news_output_path}.")
     else:
         logger.warning(
             f"{Fore.RED}No news data available for the given date range."

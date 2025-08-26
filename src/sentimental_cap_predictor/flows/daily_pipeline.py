@@ -15,6 +15,7 @@ import pandas as pd
 import typer
 from loguru import logger
 
+from ..config import ENABLE_TICKER_LOGS
 from ..data import ingest as data_ingest
 from ..model_training import train_and_predict
 from ..preprocessing import preprocess_price_data
@@ -93,8 +94,9 @@ def run(
     path = _summary_path(ticker)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(summary, indent=2))
-    logger.info("Summary report written to %s", path)
-    typer.echo(f"Summary report saved to {path}")
+    if ENABLE_TICKER_LOGS:
+        logger.info("Summary report written to %s", path)
+        typer.echo(f"Summary report saved to {path}")
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry
