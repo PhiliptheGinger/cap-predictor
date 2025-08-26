@@ -27,7 +27,6 @@ FEWSHOT = """Few-shot:
 - "hey! how's it going?" -> smalltalk.greeting
 """
 
-
 def _build_user_prompt(utterance: str) -> str:
     return (
         f'Utterance: "{utterance}"\n'
@@ -37,7 +36,6 @@ def _build_user_prompt(utterance: str) -> str:
         '{"intent":"...", "slots":{}, "alt_intent":"..."}\n'
         "</json>"
     )
-
 
 def call_qwen(utterance: str) -> str:
     """REPLACE this call with your existing Qwen client call.
