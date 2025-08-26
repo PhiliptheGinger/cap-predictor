@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import Dict
 
 from .io_types import Argument, DispatchDecision, NLUResult, Resolution
-from .nlu import NLUEngine
 from .ontology import Ontology
 from .policy import Policy
 from .dispatcher import Dispatcher
 from .reasoner import Reasoner
+from .qwen_intent import QwenNLU
 
 # ---------------------------------------------------------------------------
 # Initialize components
@@ -16,9 +16,7 @@ from .reasoner import Reasoner
 
 _pkg_path = Path(__file__).resolve().parent
 _ontology = Ontology(_pkg_path / "intents.yaml")
-_engine = NLUEngine.from_files(
-    _pkg_path / "intents.yaml", _pkg_path / "examples" / "seed_utterances.jsonl"
-)
+_engine = QwenNLU()
 _policy = Policy(_ontology)
 _dispatcher = Dispatcher()
 _reasoner = Reasoner(_ontology)
@@ -30,7 +28,11 @@ _reasoner = Reasoner(_ontology)
 
 def parse(utterance: str, ctx: Dict) -> NLUResult:
     ctx["utterance"] = utterance
-    return _engine.parse(utterance)
+    nlu = _engine.predict(utterance)
+    if nlu.intent:
+        required = _ontology.required_slots(nlu.intent)
+        nlu.missing_slots = [s for s in required if s not in nlu.slots]
+    return nlu
 
 
 def resolve(nlu: NLUResult, ctx: Dict) -> Resolution:
