@@ -102,4 +102,5 @@ TICKER_LIST = (
 # Clean up any extra spaces or empty strings
 TICKER_LIST = [ticker.strip() for ticker in TICKER_LIST if ticker.strip()]
 
-logger.info(f"Final ticker list: {TICKER_LIST}")
+if os.getenv("CAP_LOG_TICKERS") == "1":
+    logger.info(f"Final ticker list: {TICKER_LIST}")
