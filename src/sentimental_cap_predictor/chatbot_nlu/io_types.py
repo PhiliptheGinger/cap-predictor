@@ -9,7 +9,7 @@ class NLUResult:
     """Output of the NLU engine."""
 
     intent: Optional[str]
-    scores: Dict[str, float] = field(default_factory=dict)
+    scores: Optional[Dict[str, float]] = None
     slots: Dict[str, Any] = field(default_factory=dict)
     missing_slots: List[str] = field(default_factory=list)
 
