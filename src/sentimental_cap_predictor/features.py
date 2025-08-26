@@ -4,7 +4,7 @@ import time
 import pandas as pd
 import numpy as np
 from loguru import logger
-from .config import RAW_DATA_DIR, PROCESSED_DATA_DIR, MODELING_DIR
+from .config import RAW_DATA_DIR, PROCESSED_DATA_DIR, MODELING_DIR, ENABLE_TICKER_LOGS
 from pathlib import Path
 import warnings
 import traceback
@@ -38,6 +38,8 @@ DEFAULT_PREDICTION_DAYS = int(os.getenv("PREDICTION_DAYS", 14))  # Default to 14
 
 # Function to print NaN information at different steps
 def print_nan_info(df, step_name):
+    if not ENABLE_TICKER_LOGS:
+        return
     nan_info = df.isna().sum().sum()
     logger.info(f"After {step_name}: {nan_info} NaN values.")
     logger.info(df.head())
@@ -45,7 +47,8 @@ def print_nan_info(df, step_name):
 
 # Core function for generating predictions
 def generate_predictions(bundle: DataBundle, ticker, mode='train_test', prediction_days=None, processed_dir=Path(PROCESSED_DATA_DIR)):
-    logger.info(f"Starting prediction process for ticker: {ticker} in {mode} mode")
+    if ENABLE_TICKER_LOGS:
+        logger.info(f"Starting prediction process for ticker: {ticker} in {mode} mode")
 
     price_df = bundle.prices.copy()
     news_df = bundle.sentiment.copy() if bundle.sentiment is not None else pd.DataFrame(index=price_df.index)
@@ -57,7 +60,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
         logger.error("Price DataFrame is empty. Exiting.")
         return None
 
-    logger.info("Price DataFrame before preprocessing:")
+    if ENABLE_TICKER_LOGS:
+        logger.info("Price DataFrame before preprocessing:")
     print_nan_info(price_df, "loading data")
 
     price_df, scaler = preprocess_price_data(price_df)
@@ -78,7 +82,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
     if price_df.index.freq is None:
         logger.debug("Setting frequency to 'D' for datetime index.")
         price_df = price_df.asfreq('D')
-        logger.info(f"Frequency set to 'D'.")
+        if ENABLE_TICKER_LOGS:
+            logger.info(f"Frequency set to 'D'.")
         print_nan_info(price_df, "frequency_set")
 
         price_df = price_df.interpolate(method='time')
@@ -87,13 +92,15 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
         print_nan_info(price_df, "interpolate_after_frequency_set")
 
     # Perform sentiment analysis on the news DataFrame
-    logger.info("Performing sentiment analysis on the news articles.")
+    if ENABLE_TICKER_LOGS:
+        logger.info("Performing sentiment analysis on the news articles.")
     sentiment_df = perform_sentiment_analysis(news_df)
 
     # Handle train_test and production mode separately
     if mode == 'train_test':
         # Split data into train and test sets
-        logger.info("Splitting data into train and test sets.")
+        if ENABLE_TICKER_LOGS:
+            logger.info("Splitting data into train and test sets.")
         train_size = int(len(price_df) * TRAIN_RATIO)
         train_data = price_df[:train_size]
         test_data = price_df[train_size:]
@@ -103,7 +110,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
     elif mode == 'production':
         train_data = price_df
         test_data = pd.DataFrame(index=pd.date_range(start=price_df.index[-1] + pd.Timedelta(days=1), periods=prediction_days, freq='D'))
-        logger.info(f"Production mode: preparing to forecast the next {prediction_days} days.")
+        if ENABLE_TICKER_LOGS:
+            logger.info(f"Production mode: preparing to forecast the next {prediction_days} days.")
 
     if len(train_data) == 0:
         logger.error("Training data is empty. Exiting.")
@@ -120,7 +128,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
     # Load existing processed data if exists
     csv_output_path = processed_dir / f"{ticker}_{mode}_predictions.csv"
     if csv_output_path.exists():
-        logger.info(f"Loading existing processed data from {csv_output_path}.")
+        if ENABLE_TICKER_LOGS:
+            logger.info(f"Loading existing processed data from {csv_output_path}.")
         existing_df = pd.read_csv(csv_output_path)
     else:
         existing_df = pd.DataFrame()
@@ -135,14 +144,16 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
     # Merge new predictions with the existing data
     df_final = merge_data(existing_df, df_final, merge_on='Date')
 
-    logger.info(f"Final DataFrame prepared with shape: {df_final.shape}")
+    if ENABLE_TICKER_LOGS:
+        logger.info(f"Final DataFrame prepared with shape: {df_final.shape}")
 
     # Compute evaluation metrics
     try:
         valid_df = df_final.dropna(subset=['actual', 'predicted'])
         rmse = np.sqrt(((valid_df['actual'] - valid_df['predicted']) ** 2).mean())
         mape = (np.abs((valid_df['actual'] - valid_df['predicted']) / valid_df['actual']).replace([np.inf, -np.inf], np.nan).dropna()).mean() * 100
-        logger.info(f"RMSE: {rmse:.4f}, MAPE: {mape:.2f}%")
+        if ENABLE_TICKER_LOGS:
+            logger.info(f"RMSE: {rmse:.4f}, MAPE: {mape:.2f}%")
     except Exception as e:
         logger.error(f"Error computing metrics: {e}")
         rmse, mape = None, None
@@ -150,7 +161,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
     # Saving the final DataFrame to CSV
     try:
         df_final.to_csv(csv_output_path, index=False)  # Save the DataFrame with the 'Date' column
-        logger.info(f"Final predictions saved to {csv_output_path}")
+        if ENABLE_TICKER_LOGS:
+            logger.info(f"Final predictions saved to {csv_output_path}")
     except Exception as e:
         logger.error(f"Error saving predictions to CSV file: {e}")
         logger.error(traceback.format_exc())
@@ -168,7 +180,8 @@ def generate_predictions(bundle: DataBundle, ticker, mode='train_test', predicti
         ])
         try:
             metrics_df.to_csv(metrics_path, mode='a', header=not metrics_path.exists(), index=False)
-            logger.info(f"Metrics saved to {metrics_path}")
+            if ENABLE_TICKER_LOGS:
+                logger.info(f"Metrics saved to {metrics_path}")
         except Exception as e:
             logger.error(f"Error saving metrics to file: {e}")
 
@@ -196,8 +209,9 @@ if __name__ == "__main__":
         # Generate predictions using the main function
         result = generate_predictions(bundle, ticker, mode, prediction_days)
         if result is not None:
-            logger.info("Result DataFrame:")
-            print(result.head())
+            if ENABLE_TICKER_LOGS:
+                logger.info("Result DataFrame:")
+                print(result.head())
         else:
             logger.error("No result was generated.")
     except Exception as e:
@@ -207,4 +221,5 @@ if __name__ == "__main__":
     # Calculate total time taken
     end_time = time.time()
     total_time = end_time - start_time
-    logger.info(f"Total runtime: {total_time:.2f} seconds")
+    if ENABLE_TICKER_LOGS:
+        logger.info(f"Total runtime: {total_time:.2f} seconds")
