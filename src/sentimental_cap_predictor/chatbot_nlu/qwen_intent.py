@@ -62,21 +62,52 @@ class QwenNLU:
         """Return ``NLUResult`` predicted by Qwen for ``utterance``."""
 
         system_prompt = (
-            "You are an intent classifier for the Cap Predictor chatbot. "
-            'Your job is to output JSON only, with "intent" and "slots". '
-            "Choose the closest intent from this fixed list: "
-            "[pipeline.run_daily, pipeline.run_now, data.ingest, "
-            "model.train_eval, plots.make_report, explain.decision, "
-            "help.show_options]."
+            "You are an intent classifier and slot extractor for the Cap Predictor CLI.\n"
+            "Return ONLY JSON between <json>...</json> tags. No prose.\n"
+            "Choose the intent from this FIXED list:\n"
+            "[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options]\n\n"
+            "Rules:\n"
+            "- If the text is clearly outside these intents, use help.show_options.\n"
+            "- Extract slots when relevant:\n"
+            "  tickers: array of uppercase symbols like AAPL, NVDA (regex [A-Z\\.]{1,5})\n"
+            "  period: one of 1D,5D,1M,6M,1Y,5Y,max, or phrases like \"last week\",\"ytd\"\n"
+            "  interval: one of 1m,1h,1d or patterns like \\d+m/\\d+h/\\d+d\n"
+            "  range: free phrases like \"YTD\",\"last week\"\n"
+            "  split: strings like \"80/20\"\n"
+            "  seed: integer\n"
+            "- Normalize tickers to uppercase. Omit unknown slots.\n"
+            "- If unsure between two intents, pick the best AND include \"alt_intent\" with the runner-up.\n"
+            "- Absolutely no text outside the <json> block."
         )
+
+        user_prompt = (
+            f'Utterance: "{utterance}"\n\n'
+            "Few-shot hints (examples):\n"
+            "- \"please run the daily pipeline\" -> pipeline.run_daily\n"
+            "- \"run the pipeline now\" -> pipeline.run_now\n"
+            "- \"ingest NVDA and AAPL for 5d at 1h\" -> data.ingest with slots\n"
+            "- \"train and evaluate on NVDA\" -> model.train_eval\n"
+            "- \"plot results for AAPL YTD\" -> plots.make_report\n"
+            "- \"why did you do that?\" -> explain.decision\n"
+            "- \"help me out\" -> help.show_options\n\n"
+            "Return exactly:\n<json>\n"
+            "{\"intent\": \"...\", \"slots\": {...}, \"alt_intent\": \"...\" }\n"
+            "</json>"
+        )
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": utterance},
+            {"role": "user", "content": user_prompt},
         ]
 
         try:
             raw = self._chat(messages)
-            data = json.loads(raw.strip())
+            import re
+
+            m = re.search(r"<json>\s*(\{.*?\})\s*</json>", raw, re.S)
+            if not m:
+                raise ValueError("no json block")
+            data = json.loads(m.group(1))
             intent = data.get("intent")
             slots = data.get("slots") or {}
             # Normalise ticker like entities to upper case.
