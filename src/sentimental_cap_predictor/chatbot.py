@@ -115,28 +115,40 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
 
     # Actions (prefer calling your existing CLI modules via subprocess)
     if intent == "pipeline.run_now":
-        # If you have a CLI for pipeline, call it here; otherwise stub a success.
-        # Example (adjust if your pipeline module differs):
-        # cmd = [
-        #     sys.executable,
-        #     "-m",
-        #     "sentimental_cap_predictor.pipeline",
-        #     "run_now",
-        # ]
-        # out = _run(cmd)
-        # return out or "Running the pipeline now."
-        return "Running the pipeline now."
+        ticker = slots.get("ticker") or "NVDA"
+        period = slots.get("period") or "5y"
+        interval = slots.get("interval") or "1d"
+        args = [
+            sys.executable,
+            "-m",
+            "sentimental_cap_predictor.flows.daily_pipeline",
+            "run",
+            ticker,
+            "--period",
+            str(period),
+            "--interval",
+            str(interval),
+        ]
+        out = _run(args)
+        return out or f"Running the pipeline now for {ticker}."
 
     if intent == "pipeline.run_daily":
-        # cmd = [
-        #     sys.executable,
-        #     "-m",
-        #     "sentimental_cap_predictor.pipeline",
-        #     "run_daily",
-        # ]
-        # out = _run(cmd)
-        # return out or "Kicking off the daily pipeline."
-        return "Kicking off the daily pipeline."
+        ticker = slots.get("ticker") or "NVDA"
+        period = slots.get("period") or "5y"
+        interval = slots.get("interval") or "1d"
+        args = [
+            sys.executable,
+            "-m",
+            "sentimental_cap_predictor.flows.daily_pipeline",
+            "run",
+            ticker,
+            "--period",
+            str(period),
+            "--interval",
+            str(interval),
+        ]
+        out = _run(args)
+        return out or f"Kicking off the daily pipeline for {ticker}."
 
     if intent == "data.ingest":
         tickers = slots.get("tickers") or slots.get("ticker") or []
