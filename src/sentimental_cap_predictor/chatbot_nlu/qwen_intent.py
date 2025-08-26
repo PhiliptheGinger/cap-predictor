@@ -57,16 +57,24 @@ def predict(utterance: str) -> Dict[str, Any] | None:
     """Call Qwen to classify an utterance.
 
     Returns the parsed intent dictionary on success. If the model response
-    doesn't contain a JSON block, ``None`` is returned. Any exception from the
-    underlying model call is allowed to propagate so the caller can decide how
-    to handle it (e.g., by invoking a keyword fallback).
+    doesn't contain a JSON block, ``None`` is returned. When the Qwen call
+    itself fails, ``None`` is returned so the caller can decide how to handle
+    the failure (e.g., by invoking a keyword fallback).  No default intent is
+    forced here.
     """
 
-    text = call_qwen(utterance)
+    try:
+        text = call_qwen(utterance)
+    except Exception:  # pragma: no cover - network/client failure
+        return None
+
     m = _JSON_RE.search(text or "")
     if not m:
         return None
-    return json.loads(m.group(1))
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
 
 
 # --- Minimal keyword fallback (used if Qwen not yet wired) ---
