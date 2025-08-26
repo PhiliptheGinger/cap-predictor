@@ -39,3 +39,30 @@ def test_generate_ideas_uses_env_default(monkeypatch):
     monkeypatch.setattr(idea_generator, "_get_pipeline", _stub)
     idea_generator.generate_ideas("topic", n=1)
     assert called["model"] == "env-model"
+
+
+def test_get_pipeline_enforces_pytorch(monkeypatch):
+    """_get_pipeline should disable TF/Flax and use the PyTorch backend."""
+
+    import importlib
+    import os
+    import sys
+    import types
+
+    called = {}
+
+    def fake_pipeline(task, *, model=None, tokenizer=None, framework=None):
+        called["framework"] = framework
+        return _StubPipeline()
+
+    fake_transformers = types.SimpleNamespace(pipeline=fake_pipeline)
+    monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
+
+    import sentimental_cap_predictor.research.idea_generator as ig
+    importlib.reload(ig)
+    ig._get_pipeline.cache_clear()
+
+    ig._get_pipeline("dummy-model")
+    assert called["framework"] == "pt"
+    assert os.environ.get("TRANSFORMERS_NO_TF") == "1"
+    assert os.environ.get("USE_TF") == "0"

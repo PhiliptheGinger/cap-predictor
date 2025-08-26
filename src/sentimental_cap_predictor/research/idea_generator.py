@@ -38,19 +38,29 @@ def _get_pipeline(model_id: str):
     frameworks (e.g. TensorFlow) that ``transformers`` tries to load by
     default.  This keeps test environments lightweight and avoids import-time
     errors when those libraries are unavailable.
+
+    The pipeline is explicitly configured to use **PyTorch** as the backend and
+    to disable TensorFlow and Flax.  This prevents ``transformers`` from
+    attempting to import those libraries which can trigger DLL errors on
+    Windows systems where TensorFlow is not installed or not supported.
     """
 
-    # ``TRANSFORMERS_NO_TF`` prevents ``transformers`` from attempting to load
-    # TensorFlow, which is not a dependency of this project.  The environment
-    # variable must be set before importing the library.
     import os
 
+    # Explicitly disable TensorFlow and Flax before importing ``transformers``.
+    # ``USE_TF``/``USE_FLAX`` force ``is_tf_available`` and ``is_flax_available``
+    # to return ``False`` even if the packages are present in the environment.
     os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
     os.environ.setdefault("TRANSFORMERS_NO_FLAX", "1")
+    os.environ.setdefault("USE_TF", "0")
+    os.environ.setdefault("USE_FLAX", "0")
 
     from transformers import pipeline
 
-    return pipeline("text-generation", model=model_id, tokenizer=model_id)
+    # ``framework="pt"`` guarantees the pipeline uses PyTorch only.
+    return pipeline(
+        "text-generation", model=model_id, tokenizer=model_id, framework="pt"
+    )
 
 
 def generate_ideas(
