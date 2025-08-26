@@ -15,7 +15,9 @@ class Policy:
     ontology: Ontology
 
     def resolve(self, nlu: NLUResult, ctx: Dict) -> Resolution:
-        scores = nlu.scores
+        scores = nlu.scores or {}
+        if not scores and nlu.intent:
+            scores = {nlu.intent: 1.0}
         if not scores:
             return Resolution(intent=None, slots={}, action_needed="FALLBACK", prompt="I didn't catch that.")
         intents_sorted = sorted(scores.items(), key=lambda x: x[1], reverse=True)
