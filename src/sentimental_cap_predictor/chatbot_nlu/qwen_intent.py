@@ -115,7 +115,31 @@ _PIPELINE_DAILY = _re.compile(r"\b(daily)\b|\bevery\s*day\b", _re.I)
 _HELP = _re.compile(r"\b(help|what can you do|how do i|commands?)\b", _re.I)
 _WHO = _re.compile(r"\b(who are you|what are you|what is this)\b", _re.I)
 _HELLO = _re.compile(r"\b(hi|hello|hey|how'?s it going|what'?s up)\b", _re.I)
-_INGEST = _re.compile(r"\b(ingest|pull|fetch|download).*(\b[A-Z\.]{1,5}\b)", _re.I)
+_TICKER_TOKEN = r"[A-Z\.]{1,5}"
+_TICKERS = _re.compile(_TICKER_TOKEN)
+
+# Capture one or more ticker symbols appearing anywhere after the trigger word.
+_INGEST = _re.compile(
+    rf"\b(ingest|pull|fetch|download)\b.*?({_TICKER_TOKEN}(?:[\s,]+{_TICKER_TOKEN})*)",
+    _re.I,
+)
+_TRAIN = _re.compile(
+    rf"\b(train|fit|learn|evaluate)\b.*?({_TICKER_TOKEN}(?:[\s,]+{_TICKER_TOKEN})*)",
+    _re.I,
+)
+_PLOT = _re.compile(
+    rf"\b(plot|graph|chart)\b.*?({_TICKER_TOKEN}(?:[\s,]+{_TICKER_TOKEN})*)",
+    _re.I,
+)
+
+
+def _slots_from_match(m: _re.Match[str]) -> Dict[str, Any]:
+    tickers = [t.upper() for t in _TICKERS.findall(m.group(2))]
+    if not tickers:
+        return {}
+    if len(tickers) == 1:
+        return {"ticker": tickers[0]}
+    return {"tickers": tickers}
 
 
 def predict_fallback(utterance: str) -> Dict[str, Any]:
@@ -130,6 +154,13 @@ def predict_fallback(utterance: str) -> Dict[str, Any]:
         return {"intent": "pipeline.run_daily", "slots": {}}
     if _PIPELINE_NOW.search(text):
         return {"intent": "pipeline.run_now", "slots": {}}
-    if _INGEST.search(text):
-        return {"intent": "data.ingest", "slots": {}}
+    m = _INGEST.search(text)
+    if m:
+        return {"intent": "data.ingest", "slots": _slots_from_match(m)}
+    m = _TRAIN.search(text)
+    if m:
+        return {"intent": "model.train_eval", "slots": _slots_from_match(m)}
+    m = _PLOT.search(text)
+    if m:
+        return {"intent": "plots.make_report", "slots": _slots_from_match(m)}
     return {"intent": "help.show_options", "slots": {}}
