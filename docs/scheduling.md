@@ -8,6 +8,7 @@ Automate the nightly pipeline on Windows using **Task Scheduler**.
    ```powershell
    python -m venv venv
    .\venv\Scripts\activate
+   pip install openai
    pip install -e .
    ```
 2. Configure any required environment variables, for example:
