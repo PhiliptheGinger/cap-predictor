@@ -66,3 +66,5 @@ def test_get_pipeline_enforces_pytorch(monkeypatch):
     assert called["framework"] == "pt"
     assert os.environ.get("TRANSFORMERS_NO_TF") == "1"
     assert os.environ.get("USE_TF") == "0"
+    assert os.environ.get("TRANSFORMERS_NO_FLAX") == "1"
+    assert os.environ.get("USE_FLAX") == "0"
