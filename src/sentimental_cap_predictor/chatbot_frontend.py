@@ -15,7 +15,9 @@ SYSTEM_PROMPT = (
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     config = get_llm_config()
-    provider = QwenLocalProvider(**config)
+    provider = QwenLocalProvider(
+        model_path=config.model_path, temperature=config.temperature
+    )
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
