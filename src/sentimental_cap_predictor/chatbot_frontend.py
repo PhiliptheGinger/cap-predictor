@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sentimental_cap_predictor.config_llm import get_llm_config
-from sentimental_cap_predictor.llm_providers.qwen import QwenProvider
+from sentimental_cap_predictor.llm_providers.qwen_local import QwenLocalProvider
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant."
@@ -13,9 +13,9 @@ SYSTEM_PROMPT = (
 
 
 def main() -> None:
-    """Run a REPL-style chat session with the Qwen model."""
+    """Run a REPL-style chat session with the local Qwen model."""
     config = get_llm_config()
-    provider = QwenProvider(**config)
+    provider = QwenLocalProvider(**config)
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
     ]

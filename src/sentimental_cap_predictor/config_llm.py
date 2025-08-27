@@ -11,17 +11,11 @@ load_dotenv()
 
 
 def get_llm_config() -> dict[str, Any]:
-    """Return configuration for Qwen LLM from environment variables."""
+    """Return configuration for a local Qwen LLM."""
 
-    base_url = os.getenv(
-        "QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    )
-    api_key = os.getenv("QWEN_API_KEY", "")
-    model = os.getenv("QWEN_MODEL", "qwen-max")
+    model_path = os.getenv("QWEN_MODEL_PATH", "Qwen/Qwen2-1.5B-Instruct")
     temperature = float(os.getenv("LLM_TEMPERATURE", 0.7))
     return {
-        "base_url": base_url,
-        "api_key": api_key,
-        "model": model,
+        "model_path": model_path,
         "temperature": temperature,
     }
