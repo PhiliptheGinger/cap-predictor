@@ -6,6 +6,9 @@ import os
 import re as _re
 from typing import Any, Dict
 
+from sentimental_cap_predictor.config_llm import get_llm_config
+from sentimental_cap_predictor.llm_providers.qwen_local import QwenLocalProvider
+
 SYSTEM = """You are an intent classifier and slot extractor for the Cap Predictor CLI.
 Return ONLY JSON between <json>...</json>. Choose the intent from this FIXED list:
 [pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options, bot.identity, smalltalk.greeting]
@@ -40,41 +43,25 @@ def _build_user_prompt(utterance: str) -> str:
     )
 
 
+_LOCAL_PROVIDER: QwenLocalProvider | None = None
+
+
 def call_qwen(utterance: str) -> str:
-    """Call the Qwen API to classify ``utterance``.
+    """Classify ``utterance`` using a local Qwen model."""
 
-    The Qwen SDK is expected to look for an API key in the ``DASHSCOPE_API_KEY``
-    environment variable.  The ``dashscope`` package provides a ``Generation``
-    endpoint compatible with OpenAI-style chat messages.  We pass the
-    :data:`SYSTEM` prompt as ``system`` and the constructed user prompt from
-    :func:`_build_user_prompt` as ``user``.  The model is queried with
-    deterministic settings (``temperature=0.0`` and ``top_p=1.0``) and the raw
-    text output is returned.
-    """
-
-    from dashscope import Generation
+    global _LOCAL_PROVIDER
+    if _LOCAL_PROVIDER is None:
+        cfg = get_llm_config()
+        # Use deterministic settings for intent classification
+        _LOCAL_PROVIDER = QwenLocalProvider(
+            model_path=cfg.model_path, temperature=0.0
+        )
 
     messages = [
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": _build_user_prompt(utterance)},
     ]
-
-    response = Generation.call(
-        model=os.getenv("QWEN_INTENT_MODEL", "qwen-turbo"),
-        messages=messages,
-        temperature=0.0,
-        top_p=1.0,
-        max_tokens=200,
-        result_format="text",
-    )
-
-    if response.status_code == 200:
-        output = response.output or {}
-        if isinstance(output, dict):
-            return output.get("text", str(output))
-        return str(output)
-    msg = getattr(response, "message", "Qwen API error")
-    raise RuntimeError(f"Qwen request failed: {msg}")
+    return _LOCAL_PROVIDER.chat(messages, max_new_tokens=200, top_p=1.0)
 
 
 _JSON_RE = _re.compile(r"<json>\s*(\{.*\})\s*</json>", _re.S)
@@ -92,7 +79,7 @@ def predict(utterance: str) -> Dict[str, Any] | None:
 
     try:
         text = call_qwen(utterance)
-    except Exception:  # pragma: no cover - network/client failure
+    except Exception:  # pragma: no cover - model inference failure
         return None
 
     m = _JSON_RE.search(text or "")
