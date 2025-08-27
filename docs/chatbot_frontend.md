@@ -1,8 +1,8 @@
 # Chatbot Frontend
 
-This module provides a minimal REPL interface to a Qwen chat model. It
-reads configuration from environment variables (loaded with `python-dotenv`) and
-communicates with an external runner through a simple `CMD:` protocol.
+This module provides a minimal REPL interface to a **local** Qwen chat model.
+It reads configuration from environment variables (loaded with `python-dotenv`)
+and communicates with an external runner through a simple `CMD:` protocol.
 
 ## Environment variables
 
@@ -11,12 +11,26 @@ defaults when they are unset:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `QWEN_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | Base URL for the Qwen endpoint |
-| `QWEN_API_KEY` | *(empty string)* | API key used to authenticate requests |
-| `QWEN_MODEL` | `qwen-max` | Model name passed to the API |
+| `QWEN_MODEL_PATH` | `Qwen/Qwen2-1.5B-Instruct` | Local path or HF repository for the weights |
 | `LLM_TEMPERATURE` | `0.7` | Sampling temperature |
 
 Variables can be placed in a `.env` file which is loaded automatically.
+
+## Dependencies and weights
+
+Install the required libraries:
+
+```bash
+pip install transformers torch
+```
+
+Download the Qwen weights (for example using the Hugging Face CLI):
+
+```bash
+huggingface-cli download Qwen/Qwen2-1.5B-Instruct --local-dir /path/to/qwen
+```
+
+Set `QWEN_MODEL_PATH` to the directory containing the weights.
 
 ## Run
 
