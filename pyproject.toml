@@ -27,7 +27,8 @@ dependencies = [
     "optuna>=3,<4",
     "lxml-html-clean>=0.4,<1",
     "openai>=1,<2",
-    "tensorflow>=2.15,<3",
+    "protobuf<5",
+    "tensorflow==2.15.0",
 ]
 
 [project.optional-dependencies]
