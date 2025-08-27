@@ -18,10 +18,19 @@ Variables can be placed in a `.env` file which is loaded automatically.
 
 ## Dependencies and weights
 
-Install the required libraries:
+Install the required libraries.  The local provider relies on
+`transformers`, `accelerate`, and `safetensors` in addition to `torch`:
 
 ```bash
-pip install transformers torch
+pip install transformers accelerate safetensors torch
+```
+
+If you need an offline setup, download the wheels ahead of time and
+install from the local directory:
+
+```bash
+pip download transformers accelerate safetensors torch -d ./wheels
+pip install --no-index --find-links=./wheels transformers accelerate safetensors torch
 ```
 
 Download the Qwen weights (for example using the Hugging Face CLI):
@@ -30,7 +39,8 @@ Download the Qwen weights (for example using the Hugging Face CLI):
 huggingface-cli download Qwen/Qwen2-1.5B-Instruct --local-dir /path/to/qwen
 ```
 
-Set `QWEN_MODEL_PATH` to the directory containing the weights.
+Set `QWEN_MODEL_PATH` to the directory containing the weights so the model
+can be loaded entirely offline.
 
 ## Run
 
