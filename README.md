@@ -50,6 +50,21 @@ Each module exposes a Typer application:
 
 Run `--help` with any module for detailed options.
 
+## Qwen Frontend and `CMD:` Protocol
+
+The project includes a lightweight frontend that talks to a Qwen chat model and
+supports a simple command protocol. For convenience, alias the module and then
+run the chatbot:
+
+```bash
+alias capbot="python -m sentimental_cap_predictor.chatbot"
+python -m sentimental_cap_predictor.chatbot
+```
+
+Responses that begin with `CMD:` request that your environment execute the
+following shell command. Use an external runner that detects this prefix,
+runs the command, and feeds its output back to the chat session.
+
 ## Documentation
 
 See the [User Manual](docs/user_manual.md) for environment setup, workflow
