@@ -28,7 +28,6 @@ dependencies = [
     "psutil>=5.9,<6",
     "optuna>=3,<4",
     "lxml-html-clean>=0.4,<1",
-    "openai>=1,<2",
     "protobuf<5",
     "tensorflow==2.15.0",
 ]
