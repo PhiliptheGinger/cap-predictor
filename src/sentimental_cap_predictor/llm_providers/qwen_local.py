@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any, List
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from .base import ChatMessage, LLMProvider
 
@@ -16,8 +17,11 @@ class QwenLocalProvider(LLMProvider):
     def __init__(self, model_path: str, temperature: float) -> None:
         self.temperature = temperature
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_path, device_map="auto"
+        config = AutoConfig.from_pretrained(model_path)
+        with init_empty_weights():
+            model = AutoModelForCausalLM.from_config(config)
+        self.model = load_checkpoint_and_dispatch(
+            model, model_path, device_map="auto"
         )
         self.model.eval()
 
@@ -34,3 +38,4 @@ class QwenLocalProvider(LLMProvider):
             )
         generated = outputs[0, inputs["input_ids"].shape[-1] :]
         return self.tokenizer.decode(generated, skip_special_tokens=True)
+
