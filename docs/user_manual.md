@@ -7,6 +7,7 @@
   ```
 - Install dependencies in editable mode with development extras:
   ```bash
+  pip install openai
   pip install -e .[dev]
   ```
 
