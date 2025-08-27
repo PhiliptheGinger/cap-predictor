@@ -23,7 +23,6 @@ flowchart TD
    Fill in API keys and adjust paths or hyperparameters as needed.
 2. **Install dependencies**
    ```bash
-   pip install openai
    pip install -e .[dev]
    ```
 3. **Collect data**
@@ -52,9 +51,11 @@ Run `--help` with any module for detailed options.
 
 ## Qwen Frontend and `CMD:` Protocol
 
-The project includes a lightweight frontend that talks to a Qwen chat model and
-supports a simple command protocol. For convenience, alias the module and then
-run the chatbot:
+The project includes a lightweight frontend that chats with a **local** Qwen
+model and supports a simple command protocol. Download a Qwen checkpoint from
+Hugging Face and set `QWEN_MODEL_PATH` to its directory (defaults to
+`Qwen/Qwen2-1.5B-Instruct`). For convenience, alias the module and then run the
+chatbot:
 
 ```bash
 alias capbot="python -m sentimental_cap_predictor.chatbot"
