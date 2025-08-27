@@ -23,6 +23,7 @@ flowchart TD
    Fill in API keys and adjust paths or hyperparameters as needed.
 2. **Install dependencies**
    ```bash
+   pip install openai
    pip install -e .[dev]
    ```
 3. **Collect data**

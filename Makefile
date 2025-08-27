@@ -1,7 +1,8 @@
 .PHONY: install lint format test
 
 install:
-	pip install -e .[dev]
+        pip install openai
+        pip install -e .[dev]
 
 lint:
 	pre-commit run --all-files
