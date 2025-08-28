@@ -97,14 +97,45 @@ def objective(
     -------
     float
         The evaluated objective value.
+    Raises
+    ------
+    ValueError
+        If ``expression`` contains anything other than arithmetic operations on
+        provided metric names.
     """
 
     if expression:
-        local = {k: float(v) for k, v in metrics.items()}
+        import ast
+
+        allowed_ops = {
+            ast.Add: lambda a, b: a + b,
+            ast.Sub: lambda a, b: a - b,
+            ast.Mult: lambda a, b: a * b,
+            ast.Div: lambda a, b: a / b,
+            ast.Pow: lambda a, b: a ** b,
+        }
+
+        def _eval(node: ast.AST) -> float:
+            if isinstance(node, ast.Expression):
+                return _eval(node.body)
+            if isinstance(node, ast.BinOp) and type(node.op) in allowed_ops:
+                return allowed_ops[type(node.op)](_eval(node.left), _eval(node.right))
+            if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+                operand = _eval(node.operand)
+                return operand if isinstance(node.op, ast.UAdd) else -operand
+            if isinstance(node, ast.Name):
+                if node.id not in metrics:
+                    raise ValueError(f"Unknown metric '{node.id}'")
+                return float(metrics[node.id])
+            if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                return float(node.value)
+            raise ValueError("Expression must contain only arithmetic operations")
+
         try:
-            return float(eval(expression, {"__builtins__": {}}, local))
-        except Exception:
-            return float("nan")
+            parsed = ast.parse(expression, mode="eval")
+            return float(_eval(parsed))
+        except Exception as exc:  # noqa: BLE001 - provide clear error to caller
+            raise ValueError(f"Invalid expression: {expression}") from exc
     if weights:
         return float(sum(metrics.get(k, 0.0) * w for k, w in weights.items()))
     return metrics.get("sharpe_ratio", 0.0)

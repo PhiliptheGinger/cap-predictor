@@ -27,6 +27,19 @@ def test_objective_supports_expression():
     assert value == pytest.approx(0.9)
 
 
+def test_objective_rejects_malicious_expression():
+    metrics = {"sharpe_ratio": 1.0}
+    with pytest.raises(ValueError):
+        objective(metrics, expression="__import__('os').system('echo hacked')")
+
+
+def test_objective_supports_weights():
+    metrics = {"sharpe_ratio": 1.0, "max_drawdown": -0.2}
+    weights = {"sharpe_ratio": 1.0, "max_drawdown": 0.5}
+    value = objective(metrics, weights=weights)
+    assert value == pytest.approx(0.9)
+
+
 def test_passes_constraints_configurable():
     metrics = {"trade_count": 40, "max_drawdown": -0.1, "volatility": 0.15}
     constraints = Constraints(max_drawdown=0.05)
