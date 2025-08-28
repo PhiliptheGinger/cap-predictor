@@ -30,10 +30,25 @@ def _load_model(
 def embed_texts(
     texts: Sequence[str],
     model_name: str = MODEL_NAME,
+    tokenizer: AutoTokenizer | None = None,
+    model: AutoModel | None = None,
 ) -> "np.ndarray":
-    """Return ``float32`` sentence embeddings for *texts*."""
+    """Return ``float32`` sentence embeddings for *texts*.
 
-    tokenizer, model = _load_model(model_name)
+    Parameters
+    ----------
+    texts:
+        The input strings to embed.
+    model_name:
+        Name of the model to load if ``tokenizer`` or ``model`` are not
+        supplied.
+    tokenizer, model:
+        Optionally supply a pre-loaded tokenizer and model.  When provided,
+        these will be used instead of loading a new pair via :func:`_load_model`.
+    """
+
+    if tokenizer is None or model is None:
+        tokenizer, model = _load_model(model_name)
     inputs = tokenizer(
         list(texts),
         padding=True,
@@ -42,7 +57,9 @@ def embed_texts(
     )
     with torch.no_grad():
         outputs = model(**inputs)
-    embeddings = outputs.last_hidden_state.mean(dim=1).cpu().numpy().astype("float32")  # noqa: E501
+    embeddings = (
+        outputs.last_hidden_state.mean(dim=1).cpu().numpy().astype("float32")
+    )
     return embeddings
 
 
@@ -50,12 +67,31 @@ def build_index(
     papers: Sequence[dict],
     index_path: Path,
     model_name: str = MODEL_NAME,
+    tokenizer: AutoTokenizer | None = None,
+    model: AutoModel | None = None,
 ) -> Path:
     """Build a FAISS index for *papers* and persist it to *index_path*.
 
     The papers are expected to contain ``title`` and ``abstract`` fields.  The
     embeddings are constructed from the concatenation of these fields.
-    Returns the path to the written index.
+
+    Parameters
+    ----------
+    papers:
+        Iterable of paper metadata dictionaries.
+    index_path:
+        Destination for the written FAISS index.
+    model_name:
+        Name of the model to load if ``tokenizer`` or ``model`` are not
+        supplied.
+    tokenizer, model:
+        Optionally supply a pre-loaded tokenizer and model to reuse across
+        multiple invocations.
+
+    Returns
+    -------
+    Path
+        The path to the written index.
     """
 
     texts: List[str] = []
@@ -64,7 +100,9 @@ def build_index(
         texts.append(text)
     if not texts:
         raise ValueError("No papers supplied")
-    embeddings = embed_texts(texts, model_name=model_name)
+    embeddings = embed_texts(
+        texts, model_name=model_name, tokenizer=tokenizer, model=model
+    )
     dim = embeddings.shape[1]
     index = faiss.IndexFlatL2(dim)
     index.add(embeddings)
