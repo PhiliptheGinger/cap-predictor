@@ -64,13 +64,20 @@ def query_gdelt_for_news(ticker: str, start_date: str, end_date: str) -> pd.Data
     }
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         articles = data.get("articles", [])
         return pd.DataFrame(articles)
-    except requests.exceptions.RequestException as err:
-        logger.error(f"{Fore.RED}Error querying GDELT API: {err}{Style.RESET_ALL}")
+    except requests.Timeout:
+        logger.error(
+            f"{Fore.RED}GDELT API request timed out for {ticker}{Style.RESET_ALL}"
+        )
+        return pd.DataFrame()
+    except requests.RequestException as err:
+        logger.error(
+            f"{Fore.RED}Error querying GDELT API for {ticker}: {err}{Style.RESET_ALL}"
+        )
         return pd.DataFrame()
 
 
