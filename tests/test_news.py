@@ -95,3 +95,38 @@ def test_extract_article_content_user_agent(
     assert text == "body"
     assert expected in captured["ua"]
     assert captured["timeout"] == 10
+
+
+def test_query_gdelt_for_news_uses_timeout(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        def json(self):
+            return {"articles": []}
+
+        def raise_for_status(self):  # pragma: no cover - no-op
+            pass
+
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        captured["timeout"] = timeout
+        return DummyResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    df = dataset.query_gdelt_for_news(
+        "NVDA", "20240101000000", "20240102000000"
+    )
+    assert captured["timeout"] == 30
+    assert isinstance(df, pd.DataFrame)
+
+
+def test_query_gdelt_for_news_handles_timeout(monkeypatch):
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        raise requests.Timeout()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    df = dataset.query_gdelt_for_news(
+        "NVDA", "20240101000000", "20240102000000"
+    )
+    assert df.empty
