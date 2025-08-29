@@ -9,10 +9,8 @@ src/sentimental_cap_predictor/__init__.py
 src/sentimental_cap_predictor/config.py
 src/sentimental_cap_predictor/dataset.py
 src/sentimental_cap_predictor/features.py
-src/sentimental_cap_predictor/features_backup.py
 src/sentimental_cap_predictor/model_training.py
 src/sentimental_cap_predictor/plots.py
-src/sentimental_cap_predictor/plots_backup.py
 src/sentimental_cap_predictor/preprocessing.py
 src/sentimental_cap_predictor/modeling/__init__.py
 src/sentimental_cap_predictor/modeling/bias_predictions.py
