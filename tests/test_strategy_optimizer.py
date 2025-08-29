@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from sentimental_cap_predictor.trader_utils.strategy_optimizer import (
     moving_average_crossover,
@@ -27,6 +28,34 @@ def test_random_search_returns_parameters():
     assert isinstance(res.score, float)
     assert isinstance(res.mean_return, float)
     assert isinstance(res.mean_drawdown, float)
+
+
+def test_random_search_invalid_iterations():
+    prices = pd.Series(range(10), dtype=float)
+    with pytest.raises(ValueError):
+        random_search(prices, iterations=0)
+
+
+def test_random_search_invalid_short_range():
+    prices = pd.Series(range(10), dtype=float)
+    with pytest.raises(ValueError):
+        random_search(
+            prices,
+            iterations=1,
+            short_range=(5, 2),
+            long_range=(3, 10),
+        )
+
+
+def test_random_search_invalid_long_range():
+    prices = pd.Series(range(10), dtype=float)
+    with pytest.raises(ValueError):
+        random_search(
+            prices,
+            iterations=1,
+            short_range=(1, 2),
+            long_range=(5, 4),
+        )
 
 
 def test_walk_forward_eval_outputs_floats():

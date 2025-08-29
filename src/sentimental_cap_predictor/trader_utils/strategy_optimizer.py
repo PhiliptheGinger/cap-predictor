@@ -7,16 +7,16 @@ self‑improving trading component that can be extended in the future.
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import Tuple
-import random
 
 import numpy as np
 import pandas as pd
 import typer
 from loguru import logger
 from sklearn.model_selection import TimeSeriesSplit
-
+from tqdm import tqdm
 
 app = typer.Typer(help="Utilities for strategy optimization")
 
@@ -38,7 +38,9 @@ class OptimizationResult:
     mean_drawdown: float
 
 
-def moving_average_crossover(prices: pd.Series, short_window: int, long_window: int) -> float:
+def moving_average_crossover(
+    prices: pd.Series, short_window: int, long_window: int
+) -> float:
     """Evaluate a simple moving-average crossover strategy.
 
     Parameters
@@ -46,8 +48,8 @@ def moving_average_crossover(prices: pd.Series, short_window: int, long_window: 
     prices:
         Series of closing prices indexed by date.
     short_window, long_window:
-        Window sizes for the short and long moving averages. ``short_window`` must
-        be strictly less than ``long_window``.
+        Window sizes for the short and long moving averages.
+        ``short_window`` must be strictly less than ``long_window``.
 
     Returns
     -------
@@ -126,8 +128,14 @@ def walk_forward_eval(
         max_drawdown = float(drawdown.min())
         drawdowns.append(abs(max_drawdown))
 
-    mean_return = float(np.mean(returns_list)) if returns_list else float("nan")
-    mean_drawdown = float(np.mean(drawdowns)) if drawdowns else float("nan")
+    if returns_list:
+        mean_return = float(np.mean(returns_list))
+    else:
+        mean_return = float("nan")
+    if drawdowns:
+        mean_drawdown = float(np.mean(drawdowns))
+    else:
+        mean_drawdown = float("nan")
     return mean_return, mean_drawdown
 
 
@@ -159,21 +167,40 @@ def random_search(
         Dataclass containing the best parameters and associated WFA metrics.
     """
 
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
+    if short_range[0] >= short_range[1]:
+        raise ValueError("short_range must be an increasing tuple")
+    if long_range[0] >= long_range[1]:
+        raise ValueError("long_range must be an increasing tuple")
+
     rng = random.Random(seed)
     best_result: OptimizationResult | None = None
 
-    for _ in range(iterations):
+    for _ in tqdm(range(iterations)):
         short = rng.randint(*short_range)
         long = rng.randint(*long_range)
         if short >= long:
             continue
 
-        mean_ret, mean_dd = walk_forward_eval(prices, short, long, n_splits=n_splits)
+        mean_ret, mean_dd = walk_forward_eval(
+            prices,
+            short,
+            long,
+            n_splits=n_splits,
+        )
         score = mean_ret - lambda_drawdown * mean_dd
         if not best_result or score > best_result.score:
-            best_result = OptimizationResult(short, long, score, mean_ret, mean_dd)
+            best_result = OptimizationResult(
+                short,
+                long,
+                score,
+                mean_ret,
+                mean_dd,
+            )
             logger.debug(
-                "New best result: short=%d long=%d score=%.6f return=%.6f drawdown=%.6f",
+                "New best result: short=%d long=%d score=%.6f return=%.6f "
+                "drawdown=%.6f",
                 short,
                 long,
                 score,
@@ -189,19 +216,34 @@ def random_search(
 
 @app.command()
 def optimize(
-    csv_path: str = typer.Argument(..., help="CSV file with 'date' and 'close' columns"),
-    iterations: int = typer.Option(100, help="Number of random search iterations"),
-    seed: int | None = typer.Option(None, help="Random seed for reproducibility"),
-    lambda_drawdown: float = typer.Option(1.0, help="Penalty for drawdown in WFA score"),
+    csv_path: str = typer.Argument(
+        ..., help="CSV file with 'date' and 'close' columns"
+    ),
+    iterations: int = typer.Option(
+        100,
+        help="Number of random search iterations",
+    ),
+    seed: int | None = typer.Option(
+        None,
+        help="Random seed for reproducibility",
+    ),
+    lambda_drawdown: float = typer.Option(
+        1.0,
+        help="Penalty for drawdown in WFA score",
+    ),
 ) -> None:
     """Run a random search over moving-average parameters."""
 
     df = pd.read_csv(csv_path, parse_dates=["date"])
     result = random_search(
-        df["close"], iterations=iterations, seed=seed, lambda_drawdown=lambda_drawdown
+        df["close"],
+        iterations=iterations,
+        seed=seed,
+        lambda_drawdown=lambda_drawdown,
     )
     typer.echo(
-        f"Best short={result.short_window} long={result.long_window} score={result.score:.4f}"
+        f"Best short={result.short_window} long={result.long_window} "
+        f"score={result.score:.4f}"
     )
 
 
