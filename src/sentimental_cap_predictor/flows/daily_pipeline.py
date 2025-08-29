@@ -17,7 +17,7 @@ from loguru import logger
 
 from ..config import ENABLE_TICKER_LOGS
 from ..data import ingest as data_ingest
-from ..model_training import train_and_predict
+from ..model_training import train_model, predict_on_test_data
 from ..preprocessing import preprocess_price_data
 from ..trader_utils import strategy_optimizer as strat_opt
 
@@ -54,13 +54,9 @@ def run(
     test_df = processed.iloc[split_idx:]
 
     # Model training / prediction
-    preds = train_and_predict(
-        processed.copy(),
-        train_df,
-        test_df,
-        mode="train_test",
-        prediction_days=0,
-        sentiment_df=pd.DataFrame(),
+    model = train_model(train_df, random_state=42)
+    preds = predict_on_test_data(
+        processed.copy(), model, test_df, pd.DataFrame()
     )
 
     valid = preds.loc[test_df.index].dropna(subset=["predicted"])
