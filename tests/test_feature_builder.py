@@ -19,7 +19,11 @@ features_mod = importlib.util.module_from_spec(spec)
 sys.modules["sentimental_cap_predictor._features"] = features_mod
 sys.modules.setdefault(
     "sentimental_cap_predictor.model_training",
-    types.SimpleNamespace(train_and_predict=lambda *a, **k: None),
+    types.SimpleNamespace(
+        train_model=lambda *a, **k: None,
+        predict_on_future_data=lambda *a, **k: None,
+        predict_on_test_data=lambda *a, **k: None,
+    ),
 )
 sys.modules.setdefault(
     "modeling.sentiment_analysis",

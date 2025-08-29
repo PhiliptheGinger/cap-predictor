@@ -1,4 +1,5 @@
 import sys
+import sys
 import pandas as pd
 
 from types import SimpleNamespace, ModuleType
@@ -11,7 +12,12 @@ def _stub_prices():
 
 def test_ticker_logs_flag(monkeypatch, caplog, tmp_path):
     stub_module = ModuleType("sentimental_cap_predictor.model_training")
-    stub_module.train_and_predict = lambda processed, train_df, test_df, mode, prediction_days, sentiment_df: processed.assign(predicted=processed['close'])
+    stub_module.train_model = lambda train_df, random_state=None: None
+    stub_module.predict_on_test_data = (
+        lambda processed, model, test_df, sentiment_df: processed.assign(
+            predicted=processed['close']
+        )
+    )
     monkeypatch.setitem(sys.modules, 'sentimental_cap_predictor.model_training', stub_module)
 
     from sentimental_cap_predictor.flows import daily_pipeline as dp
