@@ -66,6 +66,7 @@ ABOUT_TEXT = (
     'If you\'re unsure what to say, just ask "what can you do?"'
 )
 
+
 def _run(cmd_list: list[str]) -> str:
     try:
         proc = subprocess.run(
@@ -79,8 +80,11 @@ def _run(cmd_list: list[str]) -> str:
         return f"Command failed: {e}"
 
 
-def _run_daily_pipeline(ticker: str, period: str, interval: str) -> str:
-    """Run the project's daily pipeline for ``ticker`` via subprocess."""
+def _run_pipeline_from_slots(slots: Dict[str, Any]) -> str:
+    """Build and run the daily pipeline command based on NLU slots."""
+    ticker = slots.get("ticker") or "NVDA"
+    period = slots.get("period") or "5y"
+    interval = slots.get("interval") or "1d"
     args = [
         sys.executable,
         "-m",
@@ -112,16 +116,10 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
 
     # Actions (prefer calling your existing CLI modules via subprocess)
     if intent == "pipeline.run_now":
-        ticker = slots.get("ticker") or "NVDA"
-        period = slots.get("period") or "5y"
-        interval = slots.get("interval") or "1d"
-        return _run_daily_pipeline(ticker, period, interval)
+        return _run_pipeline_from_slots(slots)
 
     if intent == "pipeline.run_daily":
-        ticker = slots.get("ticker") or "NVDA"
-        period = slots.get("period") or "5y"
-        interval = slots.get("interval") or "1d"
-        return _run_daily_pipeline(ticker, period, interval)
+        return _run_pipeline_from_slots(slots)
 
     if intent == "data.ingest":
         tickers = slots.get("tickers") or slots.get("ticker") or []
