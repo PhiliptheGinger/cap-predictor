@@ -10,7 +10,11 @@ import warnings
 import traceback
 
 from .preprocessing import preprocess_price_data, merge_data
-from .model_training import train_and_predict
+from .model_training import (
+    train_model,
+    predict_on_future_data,
+    predict_on_test_data,
+)
 from .data_bundle import DataBundle
 from .dataset import load_data_bundle
 
@@ -143,12 +147,17 @@ def train_and_predict_model(
     mode: str,
     prediction_days: int,
     sentiment_df: pd.DataFrame,
+    seed: int | None = None,
 ):
     """Run model training and prediction."""
     try:
-        price_df = train_and_predict(
-            price_df, train_data, test_data, mode, prediction_days, sentiment_df
-        )
+        model = train_model(train_data, random_state=seed)
+        if mode == "train_test":
+            price_df = predict_on_test_data(price_df, model, test_data, sentiment_df)
+        else:
+            price_df = predict_on_future_data(
+                price_df, model, prediction_days, sentiment_df
+            )
         print_nan_info(price_df, "deep_learning_predictions")
         return price_df
     except Exception as e:  # pragma: no cover - defensive
