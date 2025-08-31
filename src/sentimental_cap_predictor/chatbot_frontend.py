@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
-from sentimental_cap_predictor.config_llm import get_llm_config
-from sentimental_cap_predictor.llm_providers.qwen_local import (
-    QwenLocalProvider,
-)
+import re
+import subprocess
+
+# Heavy dependencies are imported lazily in ``main`` to keep the module light
+# for unit tests and simple command handling.
+
+
+def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
+    """Placeholder for the news lookup helper.
+
+    The real implementation lives in :mod:`sentimental_cap_predictor.dataset`.
+    It is patched in tests to avoid network calls.
+    """
+
+    return ""
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant."
