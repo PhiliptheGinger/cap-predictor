@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import re
-import subprocess
-
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
 # for unit tests and simple command handling.
 
@@ -38,6 +35,9 @@ def handle_command(command: str) -> str:
     headline.  All other commands are executed via the system shell and the
     resulting standard output (or standard error) is returned.
     """
+
+    import re
+    import subprocess
 
     lower = command.lower()
     if "gdelt" in lower or "news" in lower:

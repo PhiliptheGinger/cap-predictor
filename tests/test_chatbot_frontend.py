@@ -24,6 +24,6 @@ def test_handle_command_runs_shell(monkeypatch):
         stdout = "ok"
         stderr = ""
 
-    monkeypatch.setattr(cf.subprocess, "run", lambda *a, **k: DummyCompleted())
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: DummyCompleted())
     out = cf.handle_command("echo hi")
     assert out == "ok"
