@@ -1,9 +1,8 @@
-"""Simple interactive frontend for Qwen chat model using CMD protocol."""
-
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from sentimental_cap_predictor.config_llm import get_llm_config
-from sentimental_cap_predictor.llm_providers.qwen_local import QwenLocalProvider
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant."
@@ -12,8 +11,29 @@ SYSTEM_PROMPT = (
 )
 
 
+def fetch_gdelt_news(query: str) -> str:
+    """Fetch recent news for ``query`` using the GDELT helper.
+
+    A thin wrapper around :func:`dataset.query_gdelt_for_news` that returns the
+    raw articles as a JSON string. The helper queries the last 24 hours of
+    articles to keep requests lightweight.
+    """
+    from sentimental_cap_predictor import dataset
+
+    end = datetime.utcnow()
+    start = end - timedelta(days=1)
+    df = dataset.query_gdelt_for_news(
+        query=query,
+        start_date=start.strftime("%Y%m%d%H%M%S"),
+        end_date=end.strftime("%Y%m%d%H%M%S"),
+    )
+    return df.to_json(orient="records")
+
+
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
+    from sentimental_cap_predictor.llm_providers.qwen_local import QwenLocalProvider
+
     config = get_llm_config()
     provider = QwenLocalProvider(
         model_path=config.model_path, temperature=config.temperature
