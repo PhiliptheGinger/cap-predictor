@@ -7,6 +7,13 @@ from typing import Any, Dict
 
 from sentimental_cap_predictor.chatbot_nlu import qwen_intent
 from sentimental_cap_predictor.data.news import fetch_news
+from sentimental_cap_predictor.connectors import (
+    arxiv_connector,
+    fred_connector,
+    github_connector,
+    openalex_connector,
+    pubmed_connector,
+)
 
 ASSISTANT_NAME = "Cap Assistant"
 ASSISTANT_TAGLINE = (
@@ -21,7 +28,8 @@ I can:
   • Ingest market data (tickers, period, interval)
   • Train/evaluate models
   • Plot reports
-  • Look up recent news
+  • Look up recent news or papers
+  • Query arXiv, PubMed, OpenAlex, FRED and GitHub
   • Explain why I chose an action
 
 Try:
@@ -31,6 +39,11 @@ Try:
   - "train and evaluate on AAPL"
   - "plot results for TSLA YTD"
   - "news about NVDA"
+  - "arxiv machine learning"
+  - "pubmed cancer research"
+  - "openalex reinforcement learning"
+  - "fred GDP"
+  - "github repo openai/gpt-4"
   - "what can you do?"
   - "who are you?"
 """.strip()
@@ -56,6 +69,11 @@ Here's what I can help with right now:
 
 • Info lookup
   - "news about NVDA"
+  - "arxiv machine learning"
+  - "pubmed cancer research"
+  - "openalex reinforcement learning"
+  - "fred GDP"
+  - "github repo openai/gpt-4"
 
 • Explanations
   - "why did you do that?"
@@ -103,6 +121,66 @@ def _run_pipeline_from_slots(slots: Dict[str, Any]) -> str:
         str(interval),
     ]
     return _run(args)
+
+
+def _lookup_arxiv(query: str) -> str:
+    try:
+        papers = arxiv_connector.fetch(query=query, max_results=5)
+    except Exception as exc:  # pragma: no cover - network failure
+        return f"Error fetching arXiv results for '{query}': {exc}"
+    if not papers:
+        return f"No arXiv results for '{query}'."
+    lines = [f"{p['title']} ({p.get('updated', '')[:10]})" for p in papers[:5]]
+    return "Top arXiv hits:\n" + "\n".join(f"- {l}" for l in lines)
+
+
+def _lookup_pubmed(query: str) -> str:
+    try:
+        articles = pubmed_connector.fetch(query=query, max_results=5)
+    except Exception as exc:  # pragma: no cover - network failure
+        return f"Error fetching PubMed results for '{query}': {exc}"
+    if not articles:
+        return f"No PubMed results for '{query}'."
+    lines = [a.get('title', '') for a in articles[:5]]
+    return "Top PubMed hits:\n" + "\n".join(f"- {l}" for l in lines)
+
+
+def _lookup_openalex(search: str) -> str:
+    try:
+        works = openalex_connector.fetch(search=search, per_page=5)
+    except Exception as exc:  # pragma: no cover - network failure
+        return f"Error fetching OpenAlex results for '{search}': {exc}"
+    if not works:
+        return f"No OpenAlex results for '{search}'."
+    lines = [w.get('title', '') for w in works[:5]]
+    return "Top OpenAlex hits:\n" + "\n".join(f"- {l}" for l in lines)
+
+
+def _lookup_fred(series_id: str) -> str:
+    try:
+        observations = fred_connector.fetch_series(series_id, limit=5)
+    except TypeError:
+        # older fetch_series signature
+        try:
+            observations = fred_connector.fetch_series(series_id)
+        except Exception as exc:  # pragma: no cover - network failure
+            return f"Error fetching FRED series '{series_id}': {exc}"
+    except Exception as exc:  # pragma: no cover - network failure
+        return f"Error fetching FRED series '{series_id}': {exc}"
+    if not observations:
+        return f"No data found for FRED series '{series_id}'."
+    lines = [f"{o.get('date')}: {o.get('value')}" for o in observations[:5]]
+    return "FRED observations:\n" + "\n".join(f"- {l}" for l in lines)
+
+
+def _lookup_github(owner: str, repo: str) -> str:
+    try:
+        data = github_connector.fetch_repo(owner, repo)
+    except Exception as exc:  # pragma: no cover - network failure
+        return f"Error fetching repo {owner}/{repo}: {exc}"
+    name = data.get('full_name', f"{owner}/{repo}")
+    desc = data.get('description') or ""
+    return f"{name}: {desc}"
 
 
 def dispatch(intent: str, slots: Dict[str, Any]) -> str:
@@ -193,6 +271,37 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
             for _, row in df.head(5).iterrows()
         ]
         return "Here are some headlines:\n" + "\n".join(f"- {line}" for line in lines)
+
+    if intent == "info.arxiv":
+        query = slots.get("query")
+        if not query:
+            return "What should I search on arXiv? e.g., 'arxiv machine learning'"
+        return _lookup_arxiv(query)
+
+    if intent == "info.pubmed":
+        query = slots.get("query")
+        if not query:
+            return "What topic should I search on PubMed?"
+        return _lookup_pubmed(query)
+
+    if intent == "info.openalex":
+        query = slots.get("query")
+        if not query:
+            return "What should I search on OpenAlex?"
+        return _lookup_openalex(query)
+
+    if intent == "info.fred":
+        series_id = slots.get("series_id")
+        if not series_id:
+            return "Which FRED series? e.g., 'fred GDP'"
+        return _lookup_fred(series_id)
+
+    if intent == "info.github":
+        owner = slots.get("owner")
+        repo = slots.get("repo")
+        if not owner or not repo:
+            return "Which repository? e.g., 'github repo openai/gpt-4'"
+        return _lookup_github(owner, repo)
 
     # Friendly default if we somehow miss
     return "I didn’t catch a supported request.\n\n" + HELP_TEXT
