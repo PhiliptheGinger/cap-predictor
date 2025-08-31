@@ -10,7 +10,9 @@ from sentimental_cap_predictor.config_llm import get_llm_config
 
 SYSTEM = """You are an intent classifier and slot extractor for the Cap Predictor CLI.
 Return ONLY JSON between <json>...</json>. Choose the intent from this FIXED list:
-[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options, bot.identity, smalltalk.greeting, info.lookup]
+[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report,
+ explain.decision, help.show_options, bot.identity, smalltalk.greeting, info.lookup,
+ info.arxiv, info.pubmed, info.openalex, info.fred, info.github]
 Rules:
 - If input is outside these intents, use help.show_options.
 - Extract slots when relevant: tickers[], period, interval, range, split, seed.
@@ -29,6 +31,11 @@ FEWSHOT = """Few-shot:
 "who are you?" -> bot.identity
 "hey! how's it going?" -> smalltalk.greeting
 "news about NVDA" -> info.lookup
+"arxiv machine learning" -> info.arxiv
+"pubmed cancer research" -> info.pubmed
+"openalex reinforcement learning" -> info.openalex
+"fred GDP" -> info.fred
+"github repo openai/gpt-4" -> info.github
 """
 
 
@@ -120,6 +127,12 @@ _PLOT = _re.compile(
     _re.I,
 )
 
+_ARXIV = _re.compile(r"\barxiv\b(?:\s+(?:about|on))?\s+(.+)", _re.I)
+_PUBMED = _re.compile(r"\bpubmed\b(?:\s+(?:about|on))?\s+(.+)", _re.I)
+_OPENALEX = _re.compile(r"\bopenalex\b(?:\s+(?:about|on))?\s+(.+)", _re.I)
+_FRED = _re.compile(r"\bfred\b.*?([A-Za-z0-9_]+)", _re.I)
+_GITHUB = _re.compile(r"\bgithub\s+(?:repo\s+)?([\w-]+)/([\w.-]+)", _re.I)
+
 # Generic information lookups (e.g., "news about NVDA", "lookup inflation data")
 _INFO_LOOKUP = _re.compile(
     r"\b(?:news|info|information|lookup|look up)\b(?:\s+(?:about|on))?\s+(.+)",
@@ -157,6 +170,27 @@ def predict_fallback(utterance: str) -> Dict[str, Any]:
     m = _PLOT.search(text)
     if m:
         return {"intent": "plots.make_report", "slots": _slots_from_match(m)}
+    m = _ARXIV.search(text)
+    if m:
+        return {"intent": "info.arxiv", "slots": {"query": m.group(1).strip()}}
+    m = _PUBMED.search(text)
+    if m:
+        return {"intent": "info.pubmed", "slots": {"query": m.group(1).strip()}}
+    m = _OPENALEX.search(text)
+    if m:
+        return {"intent": "info.openalex", "slots": {"query": m.group(1).strip()}}
+    m = _FRED.search(text)
+    if m:
+        return {
+            "intent": "info.fred",
+            "slots": {"series_id": m.group(1).upper()},
+        }
+    m = _GITHUB.search(text)
+    if m:
+        return {
+            "intent": "info.github",
+            "slots": {"owner": m.group(1), "repo": m.group(2)},
+        }
     m = _INFO_LOOKUP.search(text)
     if m:
         return {"intent": "info.lookup", "slots": {"query": m.group(1).strip()}}

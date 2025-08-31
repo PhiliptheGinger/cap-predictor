@@ -54,3 +54,17 @@ The assistant may request that the external environment run shell commands by
 starting a reply with `CMD:` followed by the command string. The runner detects
 these lines, executes the command in a shell, and feeds the captured output back
 into the conversation so the model can continue the dialogue.
+
+## Connector intents
+
+The chatbot understands simple phrases to pull data from a few external
+sources:
+
+- `arxiv machine learning`
+- `pubmed cancer research`
+- `openalex reinforcement learning`
+- `fred GDP`
+- `github repo openai/gpt-4`
+
+Each phrase maps to an intent (e.g. `info.arxiv`, `info.fred`) which invokes the
+corresponding connector helper.
