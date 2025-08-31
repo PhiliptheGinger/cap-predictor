@@ -81,6 +81,30 @@ def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataF
         return pd.DataFrame()
 
 
+def fetch_first_gdelt_article(query: str) -> str:
+    """Return the body text or headline of the first GDELT article.
+
+    The helper queries the GDELT API for the most recent day using
+    :func:`query_gdelt_for_news`. If article content can be extracted via
+    :func:`extract_article_content`, the body text is returned; otherwise the
+    article's title is used. An empty string is returned when no articles are
+    found.
+    """
+
+    end = dt.utcnow().strftime("%Y%m%d%H%M%S")
+    start = (dt.utcnow() - timedelta(days=1)).strftime("%Y%m%d%H%M%S")
+    df = query_gdelt_for_news(query, start, end)
+    if df.empty:
+        return ""
+    article = df.iloc[0]
+    url = article.get("url")
+    if url:
+        text = extract_article_content(url)
+        if text:
+            return text
+    return article.get("title") or article.get("headline", "")
+
+
 def extract_article_content(url: str, use_headless: bool = False) -> Optional[str]:
     """Extract the main content from a news article URL using newspaper3k.
 

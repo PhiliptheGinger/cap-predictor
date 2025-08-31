@@ -119,4 +119,19 @@ def fetch_news(
     return df[["date", "headline", "source"]]
 
 
-__all__ = ["NewsSource", "FileSource", "GDELTSource", "fetch_news"]
+def fetch_headline(query: str, source: NewsSource | None = None) -> str:
+    """Return the first headline for ``query`` using the provided ``source``.
+
+    When no ``source`` is supplied, :class:`GDELTSource` is used to fetch
+    headlines from the GDELT API. An empty string is returned when no results
+    are available.
+    """
+
+    source = source or GDELTSource(max_records=1)
+    df = source.fetch(query)
+    if df.empty:
+        return ""
+    return str(df.iloc[0]["headline"])
+
+
+__all__ = ["NewsSource", "FileSource", "GDELTSource", "fetch_news", "fetch_headline"]
