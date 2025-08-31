@@ -3,9 +3,11 @@ import pytest
 import requests
 
 from sentimental_cap_predictor import dataset
+from sentimental_cap_predictor.data import news
 from sentimental_cap_predictor.data.news import (
     FileSource,
     GDELTSource,
+    fetch_headline,
     fetch_news,
 )
 
@@ -135,3 +137,29 @@ def test_query_gdelt_for_news_handles_timeout(monkeypatch):
         query="NVDA", start_date="20240101000000", end_date="20240102000000"
     )
     assert df.empty
+
+
+def test_fetch_headline_uses_gdelt_source(monkeypatch):
+    class DummySource:
+        def fetch(self, query):  # noqa: ANN001
+            return pd.DataFrame(
+                {
+                    "date": [pd.Timestamp("2024-01-01")],
+                    "headline": ["Example"],
+                    "source": ["Feed"],
+                }
+            )
+
+    monkeypatch.setattr(news, "GDELTSource", lambda max_records=1: DummySource())
+    headline = news.fetch_headline("NVDA")
+    assert headline == "Example"
+
+
+def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
+    df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
+
+    monkeypatch.setattr(dataset, "query_gdelt_for_news", lambda q, s, e: df)
+    monkeypatch.setattr(dataset, "extract_article_content", lambda url: "Body text")
+
+    text = dataset.fetch_first_gdelt_article("NVDA")
+    assert text == "Body text"
