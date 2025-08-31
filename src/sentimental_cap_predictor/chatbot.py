@@ -6,6 +6,7 @@ import sys
 from typing import Any, Dict
 
 from sentimental_cap_predictor.chatbot_nlu import qwen_intent
+from sentimental_cap_predictor.data.news import fetch_news
 
 ASSISTANT_NAME = "Cap Assistant"
 ASSISTANT_TAGLINE = (
@@ -20,6 +21,7 @@ I can:
   • Ingest market data (tickers, period, interval)
   • Train/evaluate models
   • Plot reports
+  • Look up recent news
   • Explain why I chose an action
 
 Try:
@@ -28,6 +30,7 @@ Try:
   - "ingest NVDA and AAPL for 5d at 1h"
   - "train and evaluate on AAPL"
   - "plot results for TSLA YTD"
+  - "news about NVDA"
   - "what can you do?"
   - "who are you?"
 """.strip()
@@ -51,6 +54,9 @@ Here's what I can help with right now:
   - "plot results for AAPL YTD"
   - "generate charts last week for TSLA"
 
+• Info lookup
+  - "news about NVDA"
+
 • Explanations
   - "why did you do that?"
   - "explain the last action"
@@ -62,7 +68,7 @@ ABOUT_TEXT = (
     f"I'm {ASSISTANT_NAME}. I live inside the Cap Predictor project and route "
     "your requests to project actions.\n"
     "Right now I understand plain-English requests for pipelines, data ingest, "
-    "training, plotting, and explanations.\n"
+    "training, plotting, explanations, and information lookup.\n"
     'If you\'re unsure what to say, just ask "what can you do?"'
 )
 
@@ -171,6 +177,22 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
         ]
         out = _run(args)
         return out or f"Generating report for {ticker}."
+
+    if intent == "info.lookup":
+        query = slots.get("query")
+        if not query:
+            return "What topic should I look up? e.g., 'news about NVDA'"
+        try:
+            df = fetch_news(query)
+        except Exception as exc:  # pragma: no cover - network failure
+            return f"Error fetching info for {query}: {exc}"
+        if df.empty:
+            return f"No news found for '{query}'."
+        lines = [
+            f"{row.date.date()}: {row.headline} ({row.source})"
+            for _, row in df.head(5).iterrows()
+        ]
+        return "Here are some headlines:\n" + "\n".join(f"- {line}" for line in lines)
 
     # Friendly default if we somehow miss
     return "I didn’t catch a supported request.\n\n" + HELP_TEXT
