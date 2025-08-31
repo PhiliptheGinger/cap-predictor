@@ -10,7 +10,7 @@ from sentimental_cap_predictor.config_llm import get_llm_config
 
 SYSTEM = """You are an intent classifier and slot extractor for the Cap Predictor CLI.
 Return ONLY JSON between <json>...</json>. Choose the intent from this FIXED list:
-[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options, bot.identity, smalltalk.greeting]
+[pipeline.run_daily, pipeline.run_now, data.ingest, model.train_eval, plots.make_report, explain.decision, help.show_options, bot.identity, smalltalk.greeting, info.lookup]
 Rules:
 - If input is outside these intents, use help.show_options.
 - Extract slots when relevant: tickers[], period, interval, range, split, seed.
@@ -19,15 +19,16 @@ Rules:
 """
 
 FEWSHOT = """Few-shot:
-- "please run the daily pipeline" -> pipeline.run_daily
-- "run the pipeline now" -> pipeline.run_now
-- "ingest NVDA and AAPL for 5d at 1h" -> data.ingest
-- "train and evaluate on NVDA" -> model.train_eval
-- "plot results for AAPL YTD" -> plots.make_report
-- "why did you do that?" -> explain.decision
-- "what can you do?" -> help.show_options
-- "who are you?" -> bot.identity
-- "hey! how's it going?" -> smalltalk.greeting
+"please run the daily pipeline" -> pipeline.run_daily
+"run the pipeline now" -> pipeline.run_now
+"ingest NVDA and AAPL for 5d at 1h" -> data.ingest
+"train and evaluate on NVDA" -> model.train_eval
+"plot results for AAPL YTD" -> plots.make_report
+"why did you do that?" -> explain.decision
+"what can you do?" -> help.show_options
+"who are you?" -> bot.identity
+"hey! how's it going?" -> smalltalk.greeting
+"news about NVDA" -> info.lookup
 """
 
 
@@ -119,6 +120,12 @@ _PLOT = _re.compile(
     _re.I,
 )
 
+# Generic information lookups (e.g., "news about NVDA", "lookup inflation data")
+_INFO_LOOKUP = _re.compile(
+    r"\b(?:news|info|information|lookup|look up)\b(?:\s+(?:about|on))?\s+(.+)",
+    _re.I,
+)
+
 
 def _slots_from_match(m: _re.Match[str]) -> Dict[str, Any]:
     tickers = [t.upper() for t in _TICKERS.findall(m.group(2))]
@@ -150,4 +157,7 @@ def predict_fallback(utterance: str) -> Dict[str, Any]:
     m = _PLOT.search(text)
     if m:
         return {"intent": "plots.make_report", "slots": _slots_from_match(m)}
+    m = _INFO_LOOKUP.search(text)
+    if m:
+        return {"intent": "info.lookup", "slots": {"query": m.group(1).strip()}}
     return {"intent": "help.show_options", "slots": {}}
