@@ -8,6 +8,11 @@ SYSTEM_PROMPT = (
     "You are a helpful assistant."
     "\nIf you want me to run a shell command, respond with 'CMD: <command>'."
     "\nFor normal replies, respond without the prefix."
+    "\nGDELT articles should be fetched from "
+    "https://api.gdeltproject.org/api/v2/doc/doc."
+    "\nExample: CMD: curl "
+    '"https://api.gdeltproject.org/api/v2/doc/doc?query=ukraine&'
+    'mode=ArtList&format=json"'
 )
 
 
@@ -56,8 +61,13 @@ def main() -> None:
 
         history.append({"role": "user", "content": user})
         reply = provider.chat(history)
-        print(reply)
-        history.append({"role": "assistant", "content": reply})
+        if reply.startswith("CMD:"):
+            output = handle_command(reply[4:].strip())
+            print(output)
+            history.append({"role": "assistant", "content": output})
+        else:
+            print(reply)
+            history.append({"role": "assistant", "content": reply})
 
 
 if __name__ == "__main__":
