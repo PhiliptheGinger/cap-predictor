@@ -48,14 +48,14 @@ def check_for_nan(df: pd.DataFrame, context: str = "") -> None:
             )
 
 
-def query_gdelt_for_news(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """Query GDELT API to get news articles based on a ticker and date range."""
+def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Query the GDELT API for articles matching ``query`` within a date range."""
     url = os.getenv(
         "GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc"
     )  # Default value provided
 
     params = {
-        "query": ticker,
+        "query": query,
         "mode": "artlist",
         "startdatetime": start_date,
         "enddatetime": end_date,
@@ -71,12 +71,12 @@ def query_gdelt_for_news(ticker: str, start_date: str, end_date: str) -> pd.Data
         return pd.DataFrame(articles)
     except requests.Timeout:
         logger.error(
-            f"{Fore.RED}GDELT API request timed out for {ticker}{Style.RESET_ALL}"
+            f"{Fore.RED}GDELT API request timed out for {query}{Style.RESET_ALL}"
         )
         return pd.DataFrame()
     except requests.RequestException as err:
         logger.error(
-            f"{Fore.RED}Error querying GDELT API for {ticker}: {err}{Style.RESET_ALL}"
+            f"{Fore.RED}Error querying GDELT API for {query}: {err}{Style.RESET_ALL}"
         )
         return pd.DataFrame()
 
