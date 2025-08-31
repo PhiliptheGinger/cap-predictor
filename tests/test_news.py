@@ -11,7 +11,12 @@ from sentimental_cap_predictor.data.news import (
 
 
 def test_fetch_news_returns_columns():
-    df = fetch_news("NVDA")
+    df = fetch_news(query="NVDA")
+    assert list(df.columns) == ["date", "headline", "source"]
+
+
+def test_fetch_news_ticker_keyword_backwards_compatibility():
+    df = fetch_news(ticker="NVDA")
     assert list(df.columns) == ["date", "headline", "source"]
 
 
@@ -27,7 +32,7 @@ def test_file_source_reads_csv(tmp_path):
     ).to_csv(csv_path, index=False)
 
     source = FileSource(csv_path)
-    df = source.fetch("NVDA")
+    df = source.fetch(query="NVDA")
     assert len(df) == 1
     assert df.iloc[0]["headline"] == "Example"
     assert list(df.columns) == ["date", "headline", "source"]
@@ -58,7 +63,7 @@ def test_gdelt_source_fetch(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     source = GDELTSource(days=1, max_records=1)
-    df = source.fetch("NVDA")
+    df = source.fetch(query="NVDA")
     assert list(df.columns) == ["date", "headline", "source"]
     assert df.iloc[0]["headline"] == "Example"
     assert df.iloc[0]["source"] == "Feed"
@@ -114,7 +119,7 @@ def test_query_gdelt_for_news_uses_timeout(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     df = dataset.query_gdelt_for_news(
-        "NVDA", "20240101000000", "20240102000000"
+        query="NVDA", start_date="20240101000000", end_date="20240102000000"
     )
     assert captured["timeout"] == 30
     assert isinstance(df, pd.DataFrame)
@@ -127,6 +132,6 @@ def test_query_gdelt_for_news_handles_timeout(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     df = dataset.query_gdelt_for_news(
-        "NVDA", "20240101000000", "20240102000000"
+        query="NVDA", start_date="20240101000000", end_date="20240102000000"
     )
     assert df.empty

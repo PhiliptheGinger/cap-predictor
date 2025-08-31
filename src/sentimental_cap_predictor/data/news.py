@@ -13,7 +13,7 @@ import requests
 class NewsSource(Protocol):
     """Protocol for news data sources."""
 
-    def fetch(self, ticker: str) -> pd.DataFrame: ...
+    def fetch(self, query: str) -> pd.DataFrame: ...
 
 
 @dataclass
@@ -21,18 +21,21 @@ class FileSource:
     """Read news data from a local CSV file.
 
     The CSV is expected to contain columns ``date``, ``headline`` and
-    ``source`` plus an optional ``ticker`` column. Rows are filtered by
-    ``ticker`` when that column is present.
+    ``source`` plus an optional ``query`` column. For backwards
+    compatibility, a column named ``ticker`` is also recognised. Rows are
+    filtered by the provided ``query`` when that column is present.
     """
 
     path: Path = Path("data/news.csv")
 
-    def fetch(self, ticker: str) -> pd.DataFrame:
+    def fetch(self, query: str) -> pd.DataFrame:
         if not self.path.exists():
             return pd.DataFrame(columns=["date", "headline", "source"])
         df = pd.read_csv(self.path, parse_dates=["date"])
-        if "ticker" in df.columns:
-            df = df[df["ticker"] == ticker]
+        if "query" in df.columns:
+            df = df[df["query"] == query]
+        elif "ticker" in df.columns:
+            df = df[df["ticker"] == query]
         return df[["date", "headline", "source"]]
 
 
@@ -40,8 +43,8 @@ class FileSource:
 class GDELTSource:
     """Fetch news headlines from the GDELT API.
 
-    The source queries GDELT's `doc` endpoint for articles mentioning the
-    provided ``ticker`` over the most recent ``days`` window. Only a subset of
+    The source queries GDELT's ``doc`` endpoint for articles matching the
+    provided ``query`` over the most recent ``days`` window. Only a subset of
     fields is returned to keep the resulting dataframe lightweight.
     """
 
@@ -51,11 +54,11 @@ class GDELTSource:
         "GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc"
     )
 
-    def fetch(self, ticker: str) -> pd.DataFrame:
+    def fetch(self, query: str) -> pd.DataFrame:
         end = datetime.utcnow()
         start = end - timedelta(days=self.days)
         params = {
-            "query": ticker,
+            "query": query,
             "mode": "artlist",
             "startdatetime": start.strftime("%Y%m%d000000"),
             "enddatetime": end.strftime("%Y%m%d000000"),
@@ -82,16 +85,23 @@ class GDELTSource:
         return df[["date", "headline", "source"]]
 
 
-def fetch_news(ticker: str, source: NewsSource | None = None) -> pd.DataFrame:
-    """Fetch news headlines for ``ticker``.
+def fetch_news(
+    query: str | None = None,
+    source: NewsSource | None = None,
+    *,
+    ticker: str | None = None,
+) -> pd.DataFrame:
+    """Fetch news headlines for a search ``query``.
 
     Parameters
     ----------
-    ticker:
-        Instrument symbol to fetch headlines for.
+    query:
+        Search term to fetch headlines for.
     source:
         Optional data source implementing :class:`NewsSource`. Defaults to
         :class:`FileSource` reading ``data/news.csv``.
+    ticker:
+        Deprecated alias for ``query`` for backwards compatibility.
 
     Returns
     -------
@@ -99,8 +109,13 @@ def fetch_news(ticker: str, source: NewsSource | None = None) -> pd.DataFrame:
         DataFrame with columns ``date``, ``headline`` and ``source``.
     """
 
+    if query is None:
+        if ticker is None:
+            raise TypeError("fetch_news() missing required argument 'query'")
+        query = ticker
+
     source = source or FileSource()
-    df = source.fetch(ticker)
+    df = source.fetch(query)
     return df[["date", "headline", "source"]]
 
 
