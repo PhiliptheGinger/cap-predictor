@@ -3,6 +3,8 @@ import requests
 import importlib.util
 from pathlib import Path
 
+from sentimental_cap_predictor.data.news import ArticleData
+
 # Import the module directly to avoid triggering package-level side effects
 spec = importlib.util.spec_from_file_location(
     "chatbot_frontend",
@@ -15,45 +17,66 @@ cf = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cf)
 
 
-class DummyResponse:
-    def __init__(self, payload):
-        self._payload = payload
-
-    def json(self):
-        return self._payload
-
-    def raise_for_status(self):
-        pass
-
-
 def test_fetch_first_gdelt_article(monkeypatch):
-    payload = {
-        "articles": [
-            {"title": "Headline", "url": "http://example.com"}
-        ]
-    }
+    captured = {}
 
-    def fake_get(url, params, timeout):  # noqa: ANN001
-        assert params["query"] == "NVDA"
-        return DummyResponse(payload)
+    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
+        captured["prefer_content"] = prefer_content
+        return ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="Body text",
+        )
 
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
+
+    text = cf.fetch_first_gdelt_article("NVDA")
+    assert text == "Body text"
+    assert captured["prefer_content"] is True
+
+
+def test_fetch_first_gdelt_article_fallback(monkeypatch):
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content: ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="",
+        ),
+    )
 
     text = cf.fetch_first_gdelt_article("NVDA")
     assert text == "Headline - http://example.com"
 
 
 def test_handle_command_routes_to_gdelt(monkeypatch):
-    payload = {
-        "articles": [
-            {"title": "Headline", "url": "http://example.com"}
-        ]
-    }
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content: ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="Body text",
+        ),
+    )
 
-    def fake_get(url, params, timeout):  # noqa: ANN001
-        return DummyResponse(payload)
+    text = cf.handle_command(
+        "curl https://api.gdeltproject.org/api/v2/doc/doc?query=NVDA"
+    )
+    assert text == "Body text"
 
-    monkeypatch.setattr(requests, "get", fake_get)
+
+def test_handle_command_returns_headline(monkeypatch):
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content: ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="",
+        ),
+    )
 
     text = cf.handle_command(
         "curl https://api.gdeltproject.org/api/v2/doc/doc?query=NVDA"
@@ -62,29 +85,31 @@ def test_handle_command_routes_to_gdelt(monkeypatch):
 
 
 def test_handle_command_parses_dash_query(monkeypatch):
-    payload = {
-        "articles": [
-            {"title": "Headline", "url": "http://example.com"}
-        ]
-    }
+    captured = {}
 
-    def fake_get(url, params, timeout):  # noqa: ANN001
-        assert params["query"] == "climate change"
-        return DummyResponse(payload)
+    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
+        captured["query"] = query
+        return ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="Body text",
+        )
 
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
     text = cf.handle_command(
         'gdelt search --query "climate change" --limit 5'
     )
-    assert text == "Headline - http://example.com"
+    assert text == "Body text"
+    assert captured["query"] == "climate change"
 
 
 def test_handle_command_fallback(monkeypatch):
-    def fake_get(url, params, timeout):  # noqa: ANN001
-        return DummyResponse({"articles": []})
-
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content: ArticleData(),
+    )
 
     text = cf.handle_command(
         "curl https://api.gdeltproject.org/api/v2/doc/doc?query=NVDA"
@@ -93,20 +118,20 @@ def test_handle_command_fallback(monkeypatch):
 
 
 def test_fetch_first_gdelt_article_error(monkeypatch):
-    def fake_get(url, params, timeout):  # noqa: ANN001
+    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
         raise requests.RequestException("boom")
 
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
     text = cf.fetch_first_gdelt_article("NVDA")
     assert text.startswith("GDELT request failed:")
 
 
 def test_handle_command_reports_network_error(monkeypatch):
-    def fake_get(url, params, timeout):  # noqa: ANN001
+    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
         raise requests.RequestException("boom")
 
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
     text = cf.handle_command(
         "curl https://api.gdeltproject.org/api/v2/doc/doc?query=NVDA"
