@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import requests
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
@@ -13,12 +15,21 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 
-def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
+def fetch_first_gdelt_article(
+    query: str,
+    days: int = 7,
+    startdatetime: str | None = None,
+    enddatetime: str | None = None,
+) -> str:  # pragma: no cover
     """Return the first article title and URL from the GDELT API.
 
-    The helper queries the GDELT ``doc`` endpoint and returns the title and URL
-    of the first article found.  An empty string is returned if no articles are
-    available or the request fails.
+    The helper queries the GDELT ``doc`` endpoint within a configurable time
+    window and returns the title and URL of the first article found.  By
+    default the search spans the last ``days`` days (7 by default) ending at the
+    current time.  ``startdatetime`` and ``enddatetime`` may be supplied in
+    ``YYYYMMDDHHMMSS`` format to specify the window explicitly.
+    An empty string is returned if no articles are available or the request
+    fails.
     """
 
     url = "https://api.gdeltproject.org/api/v2/doc/doc"
@@ -28,6 +39,19 @@ def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
         "format": "json",
         "maxrecords": 1,
     }
+
+    # Determine search window
+    if enddatetime is None:
+        end = datetime.utcnow()
+        enddatetime = end.strftime("%Y%m%d%H%M%S")
+    else:
+        end = datetime.strptime(enddatetime, "%Y%m%d%H%M%S")
+
+    if startdatetime is None:
+        start = end - timedelta(days=days)
+        startdatetime = start.strftime("%Y%m%d%H%M%S")
+
+    params.update({"startdatetime": startdatetime, "enddatetime": enddatetime})
     try:
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
