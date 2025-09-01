@@ -17,15 +17,20 @@ init(autoreset=True)
 
 
 def fetch_first_gdelt_article(query: str) -> str:
-    """Return the first article title and URL from the GDELT API."""
+    """Return text for the first GDELT article matching ``query``.
+
+    The helper requests full article content from
+    :func:`sentimental_cap_predictor.data.news.fetch_first_gdelt_article` and
+    falls back to the headline and URL if content extraction fails.
+    """
 
     try:
-        article = _fetch_first_gdelt_article(query, prefer_content=False)
+        article = _fetch_first_gdelt_article(query, prefer_content=True)
     except requests.RequestException as exc:  # pragma: no cover - network error
         return f"GDELT request failed: {exc}"
 
-    if not article.title and not article.url:
-        return ""
+    if article.content:
+        return article.content
     if article.title and article.url:
         return f"{article.title} - {article.url}"
     return article.title or article.url
