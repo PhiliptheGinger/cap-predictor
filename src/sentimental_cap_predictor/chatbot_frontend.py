@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
-# for unit tests and simple command handling.
+# for unit tests and simple command handling. ``colorama`` is a lightweight
+# dependency used to provide coloured prompts for a nicer CLI experience.
+from colorama import Fore, Style, init
+
+# Initialise colour handling for cross-platform compatibility
+init(autoreset=True)
 
 
 def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
@@ -64,7 +69,7 @@ def main() -> None:
 
     while True:
         try:
-            user = input("user> ").strip()
+            user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
