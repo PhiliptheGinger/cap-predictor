@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 import requests
 
-from sentimental_cap_predictor import dataset
 from sentimental_cap_predictor.data import news
 from sentimental_cap_predictor.data.news import (
     FileSource,
@@ -94,9 +93,9 @@ def test_extract_article_content_user_agent(
         def parse(self):
             pass
 
-    monkeypatch.setattr(dataset, "Article", DummyArticle)
+    monkeypatch.setattr(news, "Article", DummyArticle)
 
-    text = dataset.extract_article_content(
+    text = news.extract_article_content(
         "http://example.com", use_headless=use_headless
     )
     assert text == "body"
@@ -120,7 +119,7 @@ def test_query_gdelt_for_news_uses_timeout(monkeypatch):
 
     monkeypatch.setattr(requests, "get", fake_get)
 
-    df = dataset.query_gdelt_for_news(
+    df = news.query_gdelt_for_news(
         query="NVDA", start_date="20240101000000", end_date="20240102000000"
     )
     assert captured["timeout"] == 30
@@ -133,10 +132,10 @@ def test_query_gdelt_for_news_handles_timeout(monkeypatch):
 
     monkeypatch.setattr(requests, "get", fake_get)
 
-    df = dataset.query_gdelt_for_news(
-        query="NVDA", start_date="20240101000000", end_date="20240102000000"
-    )
-    assert df.empty
+    with pytest.raises(requests.Timeout):
+        news.query_gdelt_for_news(
+            query="NVDA", start_date="20240101000000", end_date="20240102000000"
+        )
 
 
 def test_fetch_headline_uses_gdelt_source(monkeypatch):
@@ -158,8 +157,8 @@ def test_fetch_headline_uses_gdelt_source(monkeypatch):
 def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
-    monkeypatch.setattr(dataset, "query_gdelt_for_news", lambda q, s, e: df)
-    monkeypatch.setattr(dataset, "extract_article_content", lambda url: "Body text")
+    monkeypatch.setattr(news, "query_gdelt_for_news", lambda q, s, e: df)
+    monkeypatch.setattr(news, "extract_article_content", lambda url: "Body text")
 
-    text = dataset.fetch_first_gdelt_article("NVDA")
-    assert text == "Body text"
+    article = news.fetch_first_gdelt_article("NVDA")
+    assert article.content == "Body text"

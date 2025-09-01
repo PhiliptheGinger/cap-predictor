@@ -1,6 +1,4 @@
-import os
-from datetime import datetime as dt
-from datetime import timedelta
+from datetime import datetime as dt, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -11,10 +9,10 @@ import yfinance as yf
 from colorama import Fore, Style, init
 from dotenv import load_dotenv
 from loguru import logger
-from newspaper import Article, Config, ArticleException
 from typing_extensions import Annotated
 
 from .config import RAW_DATA_DIR, ENABLE_TICKER_LOGS
+from .data.news import extract_article_content, query_gdelt_for_news
 from .data_bundle import DataBundle
 from .preprocessing import merge_data
 
@@ -52,105 +50,6 @@ def check_for_nan(df: pd.DataFrame, context: str = "") -> None:
             )
 
 
-def query_gdelt_for_news(
-    query: str, start_date: str, end_date: str
-) -> pd.DataFrame:
-    """Query GDELT for articles matching ``query`` within a date range."""
-    url = os.getenv(
-        "GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc"
-    )  # Default value provided
-
-    params = {
-        "query": query,
-        "mode": "artlist",
-        "startdatetime": start_date,
-        "enddatetime": end_date,
-        "maxrecords": 100,
-        "format": "json",
-    }
-
-    try:
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        articles = data.get("articles", [])
-        return pd.DataFrame(articles)
-    except requests.Timeout:
-        logger.error(
-            f"{Fore.RED}GDELT API request timed out for {query}"
-            f"{Style.RESET_ALL}"
-        )
-        return pd.DataFrame()
-    except requests.RequestException as err:
-        logger.error(
-            f"{Fore.RED}Error querying GDELT API for {query}: {err}"
-            f"{Style.RESET_ALL}"
-        )
-        return pd.DataFrame()
-
-
-def fetch_first_gdelt_article(query: str) -> str:
-    """Return the body text or headline of the first GDELT article.
-
-    The helper queries the GDELT API for the most recent day using
-    :func:`query_gdelt_for_news`. If article content can be extracted via
-    :func:`extract_article_content`, the body text is returned; otherwise the
-    article's title is used. An empty string is returned when no articles are
-    found.
-    """
-
-    end = dt.utcnow().strftime("%Y%m%d%H%M%S")
-    start = (dt.utcnow() - timedelta(days=1)).strftime("%Y%m%d%H%M%S")
-    df = query_gdelt_for_news(query, start, end)
-    if df.empty:
-        return ""
-    article = df.iloc[0]
-    url = article.get("url")
-    if url:
-        text = extract_article_content(url)
-        if text:
-            return text
-    return article.get("title") or article.get("headline", "")
-
-
-def extract_article_content(
-    url: str, use_headless: bool = False
-) -> Optional[str]:
-    """Extract the main content from a news article URL using newspaper3k.
-
-    The ``use_headless`` flag switches the user agent to mimic a headless
-    browser, which can help when sites block default requests. A small request
-    timeout is also applied to avoid hanging when articles are unreachable.
-    """
-    try:
-        config = Config()
-        headless_agent = (
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) HeadlessChrome/120.0.0 Safari/537.36"
-        )
-        default_agent = (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-        )
-        config.browser_user_agent = (
-            headless_agent if use_headless else default_agent
-        )
-        config.request_timeout = 10
-        article = Article(url, config=config, keep_article_html=True)
-        article.download()
-        article.parse()
-        return article.text
-    except (ArticleException, requests.exceptions.RequestException) as e:
-        logger.error(
-            f"{Fore.RED}Error extracting content from {url}: {e}"
-            f"{Style.RESET_ALL}"
-        )
-        return None
-    except Exception as e:
-        logger.exception(
-            f"Unexpected error extracting content from {url}: {e}"
-        )
-        raise
 
 
 def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
