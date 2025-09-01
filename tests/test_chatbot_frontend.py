@@ -81,3 +81,49 @@ def test_handle_command_runs_shell(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: DummyCompleted())
     out = cf.handle_command("echo hi")
     assert out == "ok"
+
+
+def test_retry_on_malformed_output(monkeypatch):
+    """Ensure malformed replies trigger a single retry with a reminder."""
+
+    outputs = ["unexpected", "CMD: echo hi"]
+    calls: list[str] = []
+
+    class DummyProvider:
+        def chat(self, history):  # noqa: ANN001
+            calls.append(history[-1]["content"])
+            return outputs.pop(0)
+
+    import sys
+    from types import SimpleNamespace
+
+    dummy_module = SimpleNamespace(
+        QwenLocalProvider=lambda *a, **k: DummyProvider(),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_providers.qwen_local",
+        dummy_module,
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.config_llm.get_llm_config",
+        lambda: SimpleNamespace(model_path="", temperature=0.0),
+    )
+
+    user_inputs = iter(["hi", "quit"])
+    monkeypatch.setattr("builtins.input", lambda *a, **k: next(user_inputs))
+
+    executed = {}
+
+    def fake_handle(cmd):  # noqa: ANN001
+        executed["cmd"] = cmd
+        return "done"
+
+    monkeypatch.setattr(cf, "handle_command", fake_handle)
+    cf.main()
+
+    assert calls == [
+        "hi",
+        "Output invalid. Remember the CMD contract.",
+    ]
+    assert executed["cmd"] == "echo hi"
