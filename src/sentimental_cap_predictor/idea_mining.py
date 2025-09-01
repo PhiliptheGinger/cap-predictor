@@ -9,7 +9,7 @@ from typing import List
 import faiss  # type: ignore
 from loguru import logger
 
-from .indexer import MODEL_NAME, embed_texts
+from .memory_indexer import MODEL_NAME, TextMemory
 
 INDEX_PATH = Path("data/papers.index")
 METADATA_PATH = Path("data/papers.json")
@@ -32,7 +32,8 @@ def retrieve_context(query: str, k: int = 5) -> List[dict]:
     index = faiss.read_index(str(INDEX_PATH))
     papers = json.loads(METADATA_PATH.read_text())
 
-    query_vec = embed_texts([query], model_name=MODEL_NAME)
+    memory = TextMemory(model_name=MODEL_NAME)
+    query_vec = memory.embed([query])
     distances, indices = index.search(query_vec, k)
 
     results: List[dict] = []
