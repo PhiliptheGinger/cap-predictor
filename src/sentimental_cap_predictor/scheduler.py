@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from . import connectors
-from .indexer import build_index
+from .memory_indexer import TextMemory
 from .research.idea_generator import generate_ideas
 
 load_dotenv()
@@ -116,7 +116,12 @@ def index_papers() -> None:
     metadata_path = DATA_DIR / "papers.json"
     metadata_path.write_text(json.dumps(papers, indent=2))
     index_path = DATA_DIR / "papers.index"
-    build_index(papers, index_path)
+    memory = TextMemory()
+    texts = [
+        f"{p.get('title', '')} {p.get('abstract', '')}".strip() for p in papers
+    ]
+    memory.add(texts)
+    memory.save(index_path)
 
     state = _load_state()
     state["papers_indexed"] = datetime.utcnow().isoformat()
