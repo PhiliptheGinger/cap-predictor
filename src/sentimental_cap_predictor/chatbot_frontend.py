@@ -111,6 +111,13 @@ def main() -> None:
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
 
+    def run_command(cmd: str) -> str:
+        """Execute ``cmd`` via :func:`handle_command` and display the output."""
+
+        output = handle_command(cmd)
+        print(output)
+        return output
+
     while True:
         try:
             user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
@@ -127,8 +134,7 @@ def main() -> None:
         reply = provider.chat(history)
         command, question = extract_cmd(reply)
         if command:
-            output = handle_command(command)
-            print(output)
+            output = run_command(command)
             history.append({"role": "assistant", "content": output})
             continue
         if question:
@@ -146,8 +152,7 @@ def main() -> None:
         reply = provider.chat(history)
         command, question = extract_cmd(reply)
         if command:
-            output = handle_command(command)
-            print(output)
+            output = run_command(command)
             history.append({"role": "assistant", "content": output})
         elif question:
             print(question)
