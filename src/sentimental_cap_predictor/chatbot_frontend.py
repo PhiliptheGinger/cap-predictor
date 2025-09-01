@@ -6,19 +6,36 @@ from __future__ import annotations
 # for unit tests and simple command handling. ``colorama`` is a lightweight
 # dependency used to provide coloured prompts for a nicer CLI experience.
 from colorama import Fore, Style, init
+import requests
 
 # Initialise colour handling for cross-platform compatibility
 init(autoreset=True)
 
-
 def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
-    """Placeholder for the news lookup helper.
+    """Return the first article title and URL from the GDELT API.
 
-    The real implementation lives in :mod:`sentimental_cap_predictor.dataset`.
-    It is patched in tests to avoid network calls.
+    The helper queries the GDELT ``doc`` endpoint and returns the title and URL
+    of the first article found.  An empty string is returned if no articles are
+    available or the request fails.
     """
 
-    return ""
+    url = "https://api.gdeltproject.org/api/v2/doc/doc"
+    params = {"query": query, "mode": "ArtList", "format": "json", "maxrecords": 1}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        articles = data.get("articles") or []
+        if not articles:
+            return ""
+        article = articles[0]
+        title = article.get("title") or article.get("headline") or ""
+        link = article.get("url") or ""
+        if title and link:
+            return f"{title} - {link}"
+        return title or link
+    except requests.RequestException:
+        return ""
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant."
