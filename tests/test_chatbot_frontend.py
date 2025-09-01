@@ -61,6 +61,25 @@ def test_handle_command_routes_to_gdelt(monkeypatch):
     assert text == "Headline - http://example.com"
 
 
+def test_handle_command_parses_dash_query(monkeypatch):
+    payload = {
+        "articles": [
+            {"title": "Headline", "url": "http://example.com"}
+        ]
+    }
+
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        assert params["query"] == "climate change"
+        return DummyResponse(payload)
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    text = cf.handle_command(
+        'gdelt search --query "climate change" --limit 5'
+    )
+    assert text == "Headline - http://example.com"
+
+
 def test_handle_command_fallback(monkeypatch):
     def fake_get(url, params, timeout):  # noqa: ANN001
         return DummyResponse({"articles": []})
