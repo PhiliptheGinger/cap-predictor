@@ -12,7 +12,7 @@ import yfinance as yf
 from colorama import Fore, Style, init
 from dotenv import load_dotenv
 from loguru import logger
-from newspaper import Article, Config
+from newspaper import Article, Config, ArticleException
 from typing_extensions import Annotated
 
 from .config import RAW_DATA_DIR, ENABLE_TICKER_LOGS
@@ -124,11 +124,16 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
         article.download()
         article.parse()
         return article.text
-    except Exception as e:
+    except (ArticleException, requests.exceptions.RequestException) as e:
         logger.error(
             f"{Fore.RED}Error extracting content from {url}: {e}{Style.RESET_ALL}"
         )
         return None
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error extracting content from {url}: {e}"
+        )
+        raise
 
 
 def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
@@ -150,9 +155,16 @@ def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
         df.reset_index(inplace=True)
         check_for_nan(df, "downloading ticker data")
         return df
-    except Exception as err:
-        logger.exception(f"Error getting price data from yfinance: {err}")
+    except (requests.exceptions.RequestException, ValueError) as err:
+        logger.error(
+            f"{Fore.RED}Error getting price data from yfinance: {err}{Style.RESET_ALL}"
+        )
         return pd.DataFrame()
+    except Exception as err:
+        logger.exception(
+            f"Unexpected error getting price data from yfinance: {err}"
+        )
+        raise
 
 
 def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
