@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import logging
 import requests
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
@@ -65,8 +66,9 @@ def fetch_first_gdelt_article(
         if title and link:
             return f"{title} - {link}"
         return title or link
-    except requests.RequestException:
-        return ""
+    except requests.RequestException as exc:
+        logging.exception("GDELT request failed")
+        return f"GDELT request failed: {exc}"
 
 
 SYSTEM_PROMPT = (
@@ -112,7 +114,10 @@ def handle_command(command: str) -> str:
                     break
         if query is None and parts:
             query = parts[-1]
-        return fetch_first_gdelt_article(query) or "No news found."
+        result = fetch_first_gdelt_article(query)
+        if not result:
+            return "No news found."
+        return result
 
     result = subprocess.run(
         command,
