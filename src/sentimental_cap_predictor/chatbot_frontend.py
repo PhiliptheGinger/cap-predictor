@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import requests
+
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
 # for unit tests and simple command handling. ``colorama`` is a lightweight
 # dependency used to provide coloured prompts for a nicer CLI experience.
 from colorama import Fore, Style, init
-import requests
 
 # Initialise colour handling for cross-platform compatibility
 init(autoreset=True)
+
 
 def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
     """Return the first article title and URL from the GDELT API.
@@ -20,7 +22,12 @@ def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
     """
 
     url = "https://api.gdeltproject.org/api/v2/doc/doc"
-    params = {"query": query, "mode": "ArtList", "format": "json", "maxrecords": 1}
+    params = {
+        "query": query,
+        "mode": "ArtList",
+        "format": "json",
+        "maxrecords": 1,
+    }
     try:
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
@@ -44,8 +51,8 @@ SYSTEM_PROMPT = (
     "CMD: <command> to run, or one clarifying question.\n"
     "Do not include code fences, explanations, or extra lines.\n"
     "Available tools:\n"
-    "  • curl \"<url>\" (defaults: -sSL)\n"
-    "  • gdelt search --query \"<q>\" --limit <n> (default --limit 10)\n"
+    '  • curl "<url>" (defaults: -sSL)\n'
+    '  • gdelt search --query "<q>" --limit <n> (default --limit 10)\n'
     "Before responding, self-check that your output abides by these rules."
 )
 
@@ -92,27 +99,9 @@ def handle_command(command: str) -> str:
     return result.stdout.strip() or result.stderr.strip()
 
 
-def extract_cmd(text: str) -> tuple[str | None, str | None]:
-    """Return either a command or a single question from ``text``.
-
-    The function looks for a ``CMD:`` prefix to indicate a shell command. If
-    the response is a lone question, ending with ``?`` and containing no
-    newlines, it is returned as such. When neither pattern matches ``(None,
-    None)`` is returned.
-    """
-
-    import re
-
-    text = text.strip()
-    if match := re.fullmatch(r"CMD:\s*(.+)", text, re.DOTALL):
-        return match.group(1).strip(), None
-    if text.endswith("?") and text.count("?") == 1 and "\n" not in text:
-        return None, text
-    return None, None
-
-
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
+    from sentimental_cap_predictor.cmd_utils import extract_cmd
     from sentimental_cap_predictor.config_llm import get_llm_config
     from sentimental_cap_predictor.llm_providers.qwen_local import (
         QwenLocalProvider,
@@ -127,7 +116,7 @@ def main() -> None:
     ]
 
     def run_command(cmd: str) -> str:
-        """Execute ``cmd`` via :func:`handle_command` and display the output."""
+        """Execute ``cmd`` via :func:`handle_command` and show the output."""
 
         output = handle_command(cmd)
         print(output)
