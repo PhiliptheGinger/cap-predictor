@@ -92,6 +92,28 @@ def test_handle_command_fallback(monkeypatch):
     assert text == "No news found."
 
 
+def test_fetch_first_gdelt_article_error(monkeypatch):
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        raise requests.RequestException("boom")
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    text = cf.fetch_first_gdelt_article("NVDA")
+    assert text.startswith("GDELT request failed:")
+
+
+def test_handle_command_reports_network_error(monkeypatch):
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        raise requests.RequestException("boom")
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    text = cf.handle_command(
+        "curl https://api.gdeltproject.org/api/v2/doc/doc?query=NVDA"
+    )
+    assert text.startswith("GDELT request failed:")
+
+
 def test_handle_command_runs_shell(monkeypatch):
     class DummyCompleted:
         stdout = "ok"
