@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Optional, Protocol
 
 import pandas as pd
 import requests
+from newspaper import Article, ArticleException, Config
+
+logger = logging.getLogger(__name__)
 
 
 class NewsSource(Protocol):
@@ -85,6 +89,83 @@ class GDELTSource:
         return df[["date", "headline", "source"]]
 
 
+@dataclass
+class ArticleData:
+    """Container for article information returned by GDELT."""
+
+    title: str = ""
+    url: str = ""
+    content: str = ""
+
+
+def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Query the GDELT API for articles matching ``query`` within a window."""
+
+    url = os.getenv("GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc")
+    params = {
+        "query": query,
+        "mode": "artlist",
+        "startdatetime": start_date,
+        "enddatetime": end_date,
+        "maxrecords": 100,
+        "format": "json",
+    }
+    response = requests.get(url, params=params, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    articles = data.get("articles", [])
+    return pd.DataFrame(articles)
+
+
+def extract_article_content(url: str, use_headless: bool = False) -> Optional[str]:
+    """Extract main content from a news article using newspaper3k."""
+
+    try:
+        config = Config()
+        headless_agent = (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) HeadlessChrome/120.0.0 Safari/537.36"
+        )
+        default_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
+        config.browser_user_agent = headless_agent if use_headless else default_agent
+        config.request_timeout = 10
+        article = Article(url, config=config, keep_article_html=True)
+        article.download()
+        article.parse()
+        return article.text
+    except (ArticleException, requests.exceptions.RequestException) as exc:
+        logger.error("Error extracting content from %s: %s", url, exc)
+        return None
+    except Exception as exc:  # pragma: no cover - unexpected errors
+        logger.exception("Unexpected error extracting content from %s: %s", url, exc)
+        raise
+
+
+def fetch_first_gdelt_article(
+    query: str, *, prefer_content: bool = True
+) -> ArticleData:
+    """Return information on the first GDELT article matching ``query``."""
+
+    end = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    start = (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%d%H%M%S")
+    df = query_gdelt_for_news(query, start, end)
+    if df.empty:
+        return ArticleData()
+
+    article = df.iloc[0]
+    title = article.get("title") or article.get("headline") or ""
+    url = article.get("url") or ""
+    content = ""
+    if prefer_content and url:
+        text = extract_article_content(url)
+        if text:
+            content = text
+    return ArticleData(title=title, url=url, content=content)
+
+
 def fetch_news(
     query: str | None = None,
     source: NewsSource | None = None,
@@ -134,4 +215,14 @@ def fetch_headline(query: str, source: NewsSource | None = None) -> str:
     return str(df.iloc[0]["headline"])
 
 
-__all__ = ["NewsSource", "FileSource", "GDELTSource", "fetch_news", "fetch_headline"]
+__all__ = [
+    "NewsSource",
+    "FileSource",
+    "GDELTSource",
+    "ArticleData",
+    "query_gdelt_for_news",
+    "extract_article_content",
+    "fetch_first_gdelt_article",
+    "fetch_news",
+    "fetch_headline",
+]
