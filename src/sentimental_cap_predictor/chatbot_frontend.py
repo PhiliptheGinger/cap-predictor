@@ -60,12 +60,27 @@ def handle_command(command: str) -> str:
     """
 
     import re
+    import shlex
     import subprocess
 
     lower = command.lower()
     if "gdelt" in lower or "news" in lower:
-        match = re.search(r"query=([^&\s]+)", command)
-        query = match.group(1) if match else command.split()[-1]
+        parts = shlex.split(command)
+        query: str | None = None
+        for i, part in enumerate(parts):
+            if part.startswith("--query="):
+                query = part.split("=", 1)[1]
+                break
+            if part in {"--query", "query"} and i + 1 < len(parts):
+                query = parts[i + 1]
+                break
+            if "query=" in part:
+                match = re.search(r"query=([^&]+)", part)
+                if match:
+                    query = match.group(1)
+                    break
+        if query is None and parts:
+            query = parts[-1]
         return fetch_first_gdelt_article(query) or "No news found."
 
     result = subprocess.run(
