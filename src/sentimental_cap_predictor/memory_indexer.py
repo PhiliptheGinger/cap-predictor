@@ -1,4 +1,4 @@
-"""Utilities for building and querying a FAISS index over papers."""
+"""Utilities for building and querying a FAISS index over documents."""
 
 from __future__ import annotations
 
@@ -64,42 +64,20 @@ def embed_texts(
 
 
 def build_index(
-    papers: Sequence[dict],
+    documents: Sequence[dict],
     index_path: Path,
     model_name: str = MODEL_NAME,
     tokenizer: AutoTokenizer | None = None,
     model: AutoModel | None = None,
 ) -> Path:
-    """Build a FAISS index for *papers* and persist it to *index_path*.
-
-    The papers are expected to contain ``title`` and ``abstract`` fields.  The
-    embeddings are constructed from the concatenation of these fields.
-
-    Parameters
-    ----------
-    papers:
-        Iterable of paper metadata dictionaries.
-    index_path:
-        Destination for the written FAISS index.
-    model_name:
-        Name of the model to load if ``tokenizer`` or ``model`` are not
-        supplied.
-    tokenizer, model:
-        Optionally supply a pre-loaded tokenizer and model to reuse across
-        multiple invocations.
-
-    Returns
-    -------
-    Path
-        The path to the written index.
-    """
+    """Build a FAISS index for *documents* and persist it to *index_path*."""
 
     texts: List[str] = []
-    for p in papers:
-        text = f"{p.get('title', '')} {p.get('abstract', '')}".strip()
+    for doc in documents:
+        text = f"{doc.get('title', '')} {doc.get('abstract', '')}".strip()
         texts.append(text)
     if not texts:
-        raise ValueError("No papers supplied")
+        raise ValueError("No documents supplied")
     embeddings = embed_texts(
         texts, model_name=model_name, tokenizer=tokenizer, model=model
     )
@@ -116,10 +94,64 @@ def build_index(
     return index_path
 
 
-def load_papers(path: Path) -> List[dict]:
-    """Load papers metadata from *path* (JSON list)."""
+def load_documents(path: Path) -> List[dict]:
+    """Load document metadata from *path* (JSON list)."""
 
     return json.loads(path.read_text())
 
 
-__all__ = ["embed_texts", "build_index", "load_papers"]
+class TextMemory:
+    """In-memory collection of text embeddings backed by FAISS."""
+
+    def __init__(
+        self,
+        model_name: str = MODEL_NAME,
+        tokenizer: AutoTokenizer | None = None,
+        model: AutoModel | None = None,
+    ) -> None:
+        if tokenizer is None or model is None:
+            tokenizer, model = _load_model(model_name)
+        self.model_name = model_name
+        self.tokenizer = tokenizer
+        self.model = model
+        self.index: faiss.Index | None = None
+
+    def embed(self, texts: Sequence[str]) -> "np.ndarray":
+        """Return embeddings for *texts* using the configured model."""
+
+        return embed_texts(
+            texts,
+            model_name=self.model_name,
+            tokenizer=self.tokenizer,
+            model=self.model,
+        )
+
+    def add(self, texts: List[str]) -> None:
+        """Add *texts* to the memory, creating the index if needed."""
+
+        embeddings = self.embed(texts)
+        if self.index is None:
+            self.index = faiss.IndexFlatL2(embeddings.shape[1])
+        self.index.add(embeddings)
+
+    def save(self, path: Path) -> Path:
+        """Persist the FAISS index to *path*."""
+
+        if self.index is None:
+            raise ValueError("No texts have been added")
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        faiss.write_index(self.index, str(path))
+        return path
+
+    @classmethod
+    def load(cls, path: Path, model_name: str = MODEL_NAME) -> "TextMemory":
+        """Load a saved FAISS index from *path*."""
+
+        memory = cls(model_name=model_name)
+        memory.index = faiss.read_index(str(path))
+        return memory
+
+
+__all__ = ["embed_texts", "build_index", "load_documents", "TextMemory"]
+
