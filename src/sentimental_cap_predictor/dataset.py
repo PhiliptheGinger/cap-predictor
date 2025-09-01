@@ -1,4 +1,3 @@
-# flake8: noqa
 import os
 from datetime import datetime as dt
 from datetime import timedelta
@@ -28,28 +27,35 @@ app = typer.Typer()
 
 
 def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize column names by converting to lowercase and removing spaces."""
+    """Normalize column names by converting to lowercase.
+
+    Spaces are replaced with underscores.
+    """
     df.columns = df.columns.str.lower().str.replace(" ", "_")
     return df
 
 
 def check_for_nan(df: pd.DataFrame, context: str = "") -> None:
-    """Check for NaN values in the dataframe and log them along with context."""
+    """Check for NaN values and log them with context."""
     nan_values = df.isna().sum().sum()
     if nan_values > 0:
         logger.warning(
-            f"{Fore.RED}Warning: Found {nan_values} NaN values after {context}.{Style.RESET_ALL}"
+            f"{Fore.RED}Found {nan_values} NaNs after {context}."
+            f"{Style.RESET_ALL}"
         )
         logger.warning(df[df.isna().any(axis=1)].to_string())
     else:
         if ENABLE_TICKER_LOGS:
             logger.info(
-                f"{Fore.GREEN}No NaN values found after {context}.{Style.RESET_ALL}"
+                f"{Fore.GREEN}No NaN values found after {context}."
+                f"{Style.RESET_ALL}"
             )
 
 
-def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """Query the GDELT API for articles matching ``query`` within a date range."""
+def query_gdelt_for_news(
+    query: str, start_date: str, end_date: str
+) -> pd.DataFrame:
+    """Query GDELT for articles matching ``query`` within a date range."""
     url = os.getenv(
         "GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc"
     )  # Default value provided
@@ -71,12 +77,14 @@ def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataF
         return pd.DataFrame(articles)
     except requests.Timeout:
         logger.error(
-            f"{Fore.RED}GDELT API request timed out for {query}{Style.RESET_ALL}"
+            f"{Fore.RED}GDELT API request timed out for {query}"
+            f"{Style.RESET_ALL}"
         )
         return pd.DataFrame()
     except requests.RequestException as err:
         logger.error(
-            f"{Fore.RED}Error querying GDELT API for {query}: {err}{Style.RESET_ALL}"
+            f"{Fore.RED}Error querying GDELT API for {query}: {err}"
+            f"{Style.RESET_ALL}"
         )
         return pd.DataFrame()
 
@@ -105,19 +113,27 @@ def fetch_first_gdelt_article(query: str) -> str:
     return article.get("title") or article.get("headline", "")
 
 
-def extract_article_content(url: str, use_headless: bool = False) -> Optional[str]:
+def extract_article_content(
+    url: str, use_headless: bool = False
+) -> Optional[str]:
     """Extract the main content from a news article URL using newspaper3k.
 
     The ``use_headless`` flag switches the user agent to mimic a headless
-    browser, which can help when sites block default requests.  A small request
+    browser, which can help when sites block default requests. A small request
     timeout is also applied to avoid hanging when articles are unreachable.
     """
     try:
         config = Config()
+        headless_agent = (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) HeadlessChrome/120.0.0 Safari/537.36"
+        )
+        default_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
         config.browser_user_agent = (
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/120.0.0 Safari/537.36"
-            if use_headless
-            else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            headless_agent if use_headless else default_agent
         )
         config.request_timeout = 10
         article = Article(url, config=config, keep_article_html=True)
@@ -126,7 +142,8 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
         return article.text
     except (ArticleException, requests.exceptions.RequestException) as e:
         logger.error(
-            f"{Fore.RED}Error extracting content from {url}: {e}{Style.RESET_ALL}"
+            f"{Fore.RED}Error extracting content from {url}: {e}"
+            f"{Style.RESET_ALL}"
         )
         return None
     except Exception as e:
@@ -137,10 +154,12 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
 
 
 def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
-    """Download the price data for a specific period for a ticker from yfinance."""
+    """Download price data for a ticker from yfinance for a given period."""
     if ENABLE_TICKER_LOGS:
         logger.info(
-            f"{Fore.YELLOW}Starting price data download for {ticker} for period: {period}.{Style.RESET_ALL}"
+            f"{Fore.YELLOW}Starting price data download for {ticker} "
+            f"for period: {period}."
+            f"{Style.RESET_ALL}"
         )
     try:
         stock = yf.Ticker(ticker)
@@ -157,7 +176,8 @@ def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
         return df
     except (requests.exceptions.RequestException, ValueError) as err:
         logger.error(
-            f"{Fore.RED}Error getting price data from yfinance: {err}{Style.RESET_ALL}"
+            f"{Fore.RED}Error getting price data from yfinance: {err}"
+            f"{Style.RESET_ALL}"
         )
         return pd.DataFrame()
     except Exception as err:
@@ -168,7 +188,7 @@ def download_ticker_from_yfinance(ticker: str, period: str) -> pd.DataFrame:
 
 
 def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Handle missing data without introducing NaNs in already complete columns."""
+    """Handle missing data without adding NaNs to complete columns."""
     if ENABLE_TICKER_LOGS:
         logger.info(f"{Fore.YELLOW}Handling missing data.{Style.RESET_ALL}")
 
@@ -185,7 +205,10 @@ def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     final_missing = df.isnull().sum().sum()
     if ENABLE_TICKER_LOGS:
         logger.info(
-            f"{Fore.GREEN}Missing data handled. Initial NaNs: {initial_missing}, Remaining NaNs after processing: {final_missing}.{Style.RESET_ALL}"
+            f"{Fore.GREEN}Handled missing data. "
+            f"Initial NaNs: {initial_missing}, "
+            f"remaining after processing: {final_missing}."
+            f"{Style.RESET_ALL}"
         )
 
     check_for_nan(df, "handling missing data")
@@ -195,11 +218,10 @@ def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
 def load_data_bundle(ticker: str) -> DataBundle:
     """Load price and news data for ``ticker`` into a :class:`DataBundle`.
 
-    The function expects that :mod:`dataset.main` has previously stored point-in-
-    time price and news data in ``RAW_DATA_DIR``.  It converts the ``date``
-    column to a ``DatetimeIndex`` and ensures both frames are aligned before
-    returning the validated bundle.  Any rows with timestamps in the future are
-    dropped to guard against look-ahead bias.
+    The function expects :mod:`dataset.main` to have stored point-in-time price
+    and news data in ``RAW_DATA_DIR``. The ``date`` column becomes a
+    ``DatetimeIndex`` and aligned before returning the validated bundle.
+    Rows with timestamps in the future are dropped to avoid look-ahead bias.
     """
 
     price_path = RAW_DATA_DIR / f"{ticker}.feather"
@@ -225,7 +247,9 @@ def load_data_bundle(ticker: str) -> DataBundle:
     # Align news data to price index to avoid accidental look-ahead
     news_df = news_df.reindex(price_df.index).fillna(method="ffill")
 
-    bundle = DataBundle(prices=price_df, sentiment=news_df, metadata={"ticker": ticker})
+    bundle = DataBundle(
+        prices=price_df, sentiment=news_df, metadata={"ticker": ticker}
+    )
     return bundle.validate()
 
 
@@ -238,8 +262,9 @@ def main(
             "--period",
             "-p",
             help=(
-                "Period for data collection (e.g., '1Y', '1M', '1W', or 'max'). "
-                "Can also be provided positionally for backward compatibility."
+                "Period for data collection (e.g., '1Y', '1M', '1W', "
+                "or 'max'). Can also be provided positionally for backward "
+                "compatibility."
             ),
         ),
     ] = "max",
@@ -259,7 +284,8 @@ def main(
         period = period_arg
     if ENABLE_TICKER_LOGS:
         logger.info(
-            f"{Fore.YELLOW}Starting data collection for ticker: {ticker}.{Style.RESET_ALL}"
+            f"{Fore.YELLOW}Starting data collection for ticker: {ticker}."
+            f"{Style.RESET_ALL}"
         )
 
     if not output_path:
@@ -273,19 +299,24 @@ def main(
         existing_price_df = pd.read_feather(output_path)
         if ENABLE_TICKER_LOGS:
             logger.info(
-                f"{Fore.GREEN}Loaded existing price data from {output_path}.{Style.RESET_ALL}"
+                f"{Fore.GREEN}Loaded existing price data from {output_path}."
+                f"{Style.RESET_ALL}"
             )
     else:
         if ENABLE_TICKER_LOGS:
             logger.info(
-                f"{Fore.YELLOW}No existing price data found for {ticker}. Creating a new file.{Style.RESET_ALL}"
+                f"{Fore.YELLOW}No existing price data found for {ticker}. "
+                f"Creating a new file.{Style.RESET_ALL}"
             )
         existing_price_df = pd.DataFrame()
 
     # Download new price data
     new_price_df = download_ticker_from_yfinance(ticker, period)
     if new_price_df.empty:
-        logger.error(f"{Fore.RED}No data available for {ticker}.{Style.RESET_ALL}")
+        logger.error(
+            f"{Fore.RED}No data available for {ticker}."
+            f"{Style.RESET_ALL}"
+        )
         return
 
     # Normalize and handle missing data
@@ -293,7 +324,9 @@ def main(
     new_price_df = handle_missing_data(new_price_df)
 
     # Merge new data with existing data
-    merged_price_df = merge_data(existing_price_df, new_price_df, merge_on="date")
+    merged_price_df = merge_data(
+        existing_price_df, new_price_df, merge_on="date"
+    )
 
     # Save merged data back to feather file
     merged_price_df.to_feather(output_path)
@@ -305,7 +338,8 @@ def main(
         existing_news_df = pd.read_feather(news_output_path)
         if ENABLE_TICKER_LOGS:
             logger.info(
-                f"{Fore.GREEN}Loaded existing news data from {news_output_path}.{Style.RESET_ALL}"
+                f"{Fore.GREEN}Loaded news data from {news_output_path}."
+                f"{Style.RESET_ALL}"
             )
     else:
         if ENABLE_TICKER_LOGS:
@@ -339,12 +373,15 @@ def main(
 
         if ENABLE_TICKER_LOGS:
             logger.info(
-                f"{Fore.GREEN}Successfully extracted content from {successful_extractions} "
-                f"out of {len(new_news_df)} articles.{Style.RESET_ALL}"
+                f"{Fore.GREEN}Successfully extracted content from "
+                f"{successful_extractions} out of {len(new_news_df)} articles."
+                f"{Style.RESET_ALL}"
             )
 
         # Merge new news data with existing data
-        merged_news_df = merge_data(existing_news_df, new_news_df, merge_on="url")
+        merged_news_df = merge_data(
+            existing_news_df, new_news_df, merge_on="url"
+        )
 
         # Save merged news data back to feather file
         merged_news_df.to_feather(news_output_path)
