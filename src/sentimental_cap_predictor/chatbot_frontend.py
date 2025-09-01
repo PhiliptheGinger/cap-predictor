@@ -115,6 +115,11 @@ def main() -> None:
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
 
+    # ``pending_cmd`` stores a command produced by the model that has not yet
+    # been executed.  This avoids ``UnboundLocalError`` when the loop checks
+    # the variable before the model has suggested any command.
+    pending_cmd: str | None = None
+
     def run_command(cmd: str) -> str:
         """Execute ``cmd`` via :func:`handle_command` and show the output."""
 
@@ -123,6 +128,14 @@ def main() -> None:
         return output
 
     while True:
+        # Execute any command left over from the previous iteration before
+        # prompting the user again.
+        if pending_cmd:
+            output = run_command(pending_cmd)
+            history.append({"role": "assistant", "content": output})
+            pending_cmd = None
+            continue
+
         try:
             user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -138,8 +151,7 @@ def main() -> None:
         reply = provider.chat(history)
         command, question = extract_cmd(reply)
         if command:
-            output = run_command(command)
-            history.append({"role": "assistant", "content": output})
+            pending_cmd = command
             continue
         if question:
             print(question)
@@ -156,8 +168,7 @@ def main() -> None:
         reply = provider.chat(history)
         command, question = extract_cmd(reply)
         if command:
-            output = run_command(command)
-            history.append({"role": "assistant", "content": output})
+            pending_cmd = command
         elif question:
             print(question)
             history.append({"role": "assistant", "content": question})
