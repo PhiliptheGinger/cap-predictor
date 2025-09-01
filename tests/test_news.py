@@ -162,3 +162,15 @@ def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
 
     article = news.fetch_first_gdelt_article("NVDA")
     assert article.content == "Body text"
+
+
+def test_fetch_first_gdelt_article_fallback_on_missing_content(monkeypatch):
+    df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
+
+    monkeypatch.setattr(news, "query_gdelt_for_news", lambda q, s, e: df)
+    monkeypatch.setattr(news, "extract_article_content", lambda url: None)
+
+    article = news.fetch_first_gdelt_article("NVDA")
+    assert article.content == ""
+    assert article.title == "Headline"
+    assert article.url == "http://example.com"
