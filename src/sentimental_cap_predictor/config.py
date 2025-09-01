@@ -11,7 +11,11 @@ load_dotenv()
 # Paths
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJ_ROOT = PACKAGE_DIR.parents[1]
-logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
+
+
+def log_project_root() -> None:
+    """Log the resolved project root path."""
+    logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
 
 DATA_DIR = PROJ_ROOT / "data"
 RAW_DATA_DIR = Path(os.getenv("RAW_DATA_DIR", DATA_DIR / "raw"))
@@ -107,3 +111,7 @@ TICKER_LIST = [ticker.strip() for ticker in TICKER_LIST if ticker.strip()]
 
 if ENABLE_TICKER_LOGS:
     logger.info(f"Final ticker list: {TICKER_LIST}")
+
+
+if __name__ == "__main__":
+    log_project_root()
