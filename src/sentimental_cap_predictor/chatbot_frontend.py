@@ -20,6 +20,7 @@ def fetch_first_gdelt_article(query: str) -> str:  # pragma: no cover
 
     return ""
 
+
 SYSTEM_PROMPT = (
     "You are a helpful assistant."
     "\nIf you want me to run a shell command, respond with 'CMD: <command>'."
@@ -50,14 +51,40 @@ def handle_command(command: str) -> str:
         query = match.group(1) if match else command.split()[-1]
         return fetch_first_gdelt_article(query) or "No news found."
 
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    result = subprocess.run(
+        command,
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
     return result.stdout.strip() or result.stderr.strip()
+
+
+def extract_cmd(text: str) -> tuple[str | None, str | None]:
+    """Return either a command or a single question from ``text``.
+
+    The function looks for a ``CMD:`` prefix to indicate a shell command. If
+    the response is a lone question, ending with ``?`` and containing no
+    newlines, it is returned as such. When neither pattern matches ``(None,
+    None)`` is returned.
+    """
+
+    import re
+
+    text = text.strip()
+    if match := re.fullmatch(r"CMD:\s*(.+)", text, re.DOTALL):
+        return match.group(1).strip(), None
+    if text.endswith("?") and text.count("?") == 1 and "\n" not in text:
+        return None, text
+    return None, None
 
 
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     from sentimental_cap_predictor.config_llm import get_llm_config
-    from sentimental_cap_predictor.llm_providers.qwen_local import QwenLocalProvider
+    from sentimental_cap_predictor.llm_providers.qwen_local import (
+        QwenLocalProvider,
+    )
 
     config = get_llm_config()
     provider = QwenLocalProvider(
@@ -81,10 +108,33 @@ def main() -> None:
 
         history.append({"role": "user", "content": user})
         reply = provider.chat(history)
-        if reply.startswith("CMD:"):
-            output = handle_command(reply[4:].strip())
+        command, question = extract_cmd(reply)
+        if command:
+            output = handle_command(command)
             print(output)
             history.append({"role": "assistant", "content": output})
+            continue
+        if question:
+            print(question)
+            history.append({"role": "assistant", "content": question})
+            continue
+
+        # Retry once with a reminder about the expected format
+        history.append(
+            {
+                "role": "user",
+                "content": "Output invalid. Remember the CMD contract.",
+            }
+        )
+        reply = provider.chat(history)
+        command, question = extract_cmd(reply)
+        if command:
+            output = handle_command(command)
+            print(output)
+            history.append({"role": "assistant", "content": output})
+        elif question:
+            print(question)
+            history.append({"role": "assistant", "content": question})
         else:
             print(reply)
             history.append({"role": "assistant", "content": reply})
