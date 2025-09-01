@@ -2,73 +2,33 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-
-import logging
 import requests
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
 # for unit tests and simple command handling. ``colorama`` is a lightweight
 # dependency used to provide coloured prompts for a nicer CLI experience.
 from colorama import Fore, Style, init
+from sentimental_cap_predictor.data.news import (
+    fetch_first_gdelt_article as _fetch_first_gdelt_article,
+)
 
 # Initialise colour handling for cross-platform compatibility
 init(autoreset=True)
 
 
-def fetch_first_gdelt_article(
-    query: str,
-    days: int = 7,
-    startdatetime: str | None = None,
-    enddatetime: str | None = None,
-) -> str:  # pragma: no cover
-    """Return the first article title and URL from the GDELT API.
+def fetch_first_gdelt_article(query: str) -> str:
+    """Return the first article title and URL from the GDELT API."""
 
-    The helper queries the GDELT ``doc`` endpoint within a configurable time
-    window and returns the title and URL of the first article found.  By
-    default the search spans the last ``days`` days (7 by default) ending at the
-    current time.  ``startdatetime`` and ``enddatetime`` may be supplied in
-    ``YYYYMMDDHHMMSS`` format to specify the window explicitly.
-    An empty string is returned if no articles are available or the request
-    fails.
-    """
-
-    url = "https://api.gdeltproject.org/api/v2/doc/doc"
-    params = {
-        "query": query,
-        "mode": "ArtList",
-        "format": "json",
-        "maxrecords": 1,
-    }
-
-    # Determine search window
-    if enddatetime is None:
-        end = datetime.utcnow()
-        enddatetime = end.strftime("%Y%m%d%H%M%S")
-    else:
-        end = datetime.strptime(enddatetime, "%Y%m%d%H%M%S")
-
-    if startdatetime is None:
-        start = end - timedelta(days=days)
-        startdatetime = start.strftime("%Y%m%d%H%M%S")
-
-    params.update({"startdatetime": startdatetime, "enddatetime": enddatetime})
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        articles = data.get("articles") or []
-        if not articles:
-            return ""
-        article = articles[0]
-        title = article.get("title") or article.get("headline") or ""
-        link = article.get("url") or ""
-        if title and link:
-            return f"{title} - {link}"
-        return title or link
-    except requests.RequestException as exc:
-        logging.exception("GDELT request failed")
+        article = _fetch_first_gdelt_article(query, prefer_content=False)
+    except requests.RequestException as exc:  # pragma: no cover - network error
         return f"GDELT request failed: {exc}"
+
+    if not article.title and not article.url:
+        return ""
+    if article.title and article.url:
+        return f"{article.title} - {article.url}"
+    return article.title or article.url
 
 
 SYSTEM_PROMPT = (
