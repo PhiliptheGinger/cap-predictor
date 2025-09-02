@@ -10,10 +10,10 @@ import requests
 # for unit tests and simple command handling. ``colorama`` is a lightweight
 # dependency used to provide coloured prompts for a nicer CLI experience.
 from colorama import Fore, Style, init
+
 from sentimental_cap_predictor.data.news import (
     fetch_first_gdelt_article as _fetch_first_gdelt_article,
 )
-
 
 _MEMORY_INDEX = Path("data/memory.faiss")
 
@@ -31,7 +31,7 @@ def fetch_first_gdelt_article(query: str) -> str:
 
     try:
         article = _fetch_first_gdelt_article(query, prefer_content=True)
-    except requests.RequestException as exc:  # pragma: no cover - network error
+    except requests.RequestException as exc:  # pragma: no cover
         return f"GDELT request failed: {exc}"
 
     if article.content:
@@ -57,7 +57,8 @@ SYSTEM_PROMPT = (
     "Do not include code fences, explanations, or extra lines.\n"
     "Available tools:\n"
     '  • curl "<url>" (defaults: -sSL)\n'
-    '  • gdelt search --query "<q>" --limit <n> (default --limit 10)\n'
+    '  • gdelt search --query "<q>" --limit <n> '
+    "(default --limit 10)\n"
     "Before responding, self-check that your output abides by these rules."
 )
 
@@ -71,11 +72,43 @@ def handle_command(command: str) -> str:
     resulting standard output (or standard error) is returned.
     """
 
+    import json
     import re
     import shlex
     import subprocess
 
     lower = command.lower()
+    if lower.startswith("memory search"):
+        from sentimental_cap_predictor.memory_indexer import TextMemory
+
+        index_path = _MEMORY_INDEX
+        if not index_path.exists():
+            return "No memory index found."
+
+        memory = TextMemory.load(index_path)
+        meta_path = index_path.with_suffix(".json")
+        if not meta_path.exists():
+            return "No memory metadata found."
+        metadata = json.loads(meta_path.read_text())
+
+        query = command.removeprefix("memory search").strip()
+        if query.startswith('"') and query.endswith('"'):
+            query = query[1:-1]
+        embedding = memory.embed([query])
+        distances, indices = memory.index.search(
+            embedding,
+            min(5, len(metadata)),
+        )
+        results: list[str] = []
+        for idx in indices[0]:
+            if idx < len(metadata):
+                doc = metadata[idx]
+                title = doc.get("title")
+                url = doc.get("url")
+                if title and url:
+                    results.append(f"{title} - {url}")
+        return "\n".join(results) if results else "No matches found."
+
     if "gdelt" in lower or "news" in lower:
         parts = shlex.split(command)
         query: str | None = None
