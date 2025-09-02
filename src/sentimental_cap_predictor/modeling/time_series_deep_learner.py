@@ -16,22 +16,38 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 from tqdm import tqdm
 
-# Load environment variables from .env file
-load_dotenv()
 
-# Initialize colorama
-init(autoreset=True)
+# Default hyperparameters; overriden by :func:`setup` reading from the
+# environment.  This avoids performing any side effects when the module is
+# imported purely for type checking or documentation.
+LEARNING_RATE = 0.001
+LNN_UNITS = 64
+DROPOUT_RATE = 0.2
+WINDOW_SIZE = 10
+BATCH_SIZE = 32
+EPOCHS = 50
+PREDICTION_DAYS = 14
+TRAIN_SIZE_RATIO = 0.8
+DATA_PATH = "./data/your_data.csv"
 
-# Get hyperparameters from environment variables
-LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.001))
-LNN_UNITS = int(os.getenv("LNN_UNITS", 64))
-DROPOUT_RATE = float(os.getenv("DROPOUT_RATE", 0.2))
-WINDOW_SIZE = int(os.getenv("WINDOW_SIZE", 10))
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", 32))
-EPOCHS = int(os.getenv("EPOCHS", 50))
-PREDICTION_DAYS = int(os.getenv("PREDICTION_DAYS", 14))
-TRAIN_SIZE_RATIO = float(os.getenv("TRAIN_SIZE_RATIO", 0.8))
-DATA_PATH = os.getenv("DATA_PATH", "./data/your_data.csv")
+
+def setup() -> None:
+    """Load environment variables and configure colour handling."""
+    load_dotenv()
+    init(autoreset=True)
+
+    global LEARNING_RATE, LNN_UNITS, DROPOUT_RATE, WINDOW_SIZE
+    global BATCH_SIZE, EPOCHS, PREDICTION_DAYS, TRAIN_SIZE_RATIO, DATA_PATH
+
+    LEARNING_RATE = float(os.getenv("LEARNING_RATE", LEARNING_RATE))
+    LNN_UNITS = int(os.getenv("LNN_UNITS", LNN_UNITS))
+    DROPOUT_RATE = float(os.getenv("DROPOUT_RATE", DROPOUT_RATE))
+    WINDOW_SIZE = int(os.getenv("WINDOW_SIZE", WINDOW_SIZE))
+    BATCH_SIZE = int(os.getenv("BATCH_SIZE", BATCH_SIZE))
+    EPOCHS = int(os.getenv("EPOCHS", EPOCHS))
+    PREDICTION_DAYS = int(os.getenv("PREDICTION_DAYS", PREDICTION_DAYS))
+    TRAIN_SIZE_RATIO = float(os.getenv("TRAIN_SIZE_RATIO", TRAIN_SIZE_RATIO))
+    DATA_PATH = os.getenv("DATA_PATH", DATA_PATH)
 
 
 # Custom Liquid Time-Constant (LTC) Layer
@@ -304,6 +320,7 @@ def generate_predictions(df, window_size, mode="train_test"):
 
 
 if __name__ == "__main__":
+    setup()
     df = pd.read_csv(DATA_PATH)
     df["Date"] = pd.to_datetime(df["Date"])
     df.set_index("Date", inplace=True)
