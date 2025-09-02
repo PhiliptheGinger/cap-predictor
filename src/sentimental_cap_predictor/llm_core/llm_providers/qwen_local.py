@@ -44,6 +44,7 @@ class QwenLocalProvider(LLMProvider):
         config = AutoConfig.from_pretrained(model_path)
         with init_empty_weights():
             model = AutoModelForCausalLM.from_config(config)
+        model.tie_weights()
         self.model = load_checkpoint_and_dispatch(
             model,
             model_path,
