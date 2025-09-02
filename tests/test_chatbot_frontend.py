@@ -19,10 +19,26 @@ class ArticleData:
 # Provide lightweight stand-ins to avoid importing the full package
 dummy_news = types.ModuleType("sentimental_cap_predictor.data.news")
 dummy_news.fetch_first_gdelt_article = lambda *a, **k: None
+
+
+@dataclass
+class FetchArticleSpec:
+    query: str
+    days: int = 1
+    max_records: int = 100
+    must_contain_any: tuple[str, ...] = ()
+    avoid_domains: tuple[str, ...] = ()
+    require_text_accessible: bool = False
+    novelty_against_urls: tuple[str, ...] = ()
+
+
+dummy_news.fetch_article = lambda spec: ArticleData()
+dummy_news.FetchArticleSpec = FetchArticleSpec
 dummy_data = types.ModuleType("sentimental_cap_predictor.data")
 dummy_data.__path__ = []  # mark as package
 dummy_data.news = dummy_news
 sys.modules.setdefault("sentimental_cap_predictor.data", dummy_data)
+sys.modules.setdefault("sentimental_cap_predictor.data.news", dummy_news)
 sys.modules.setdefault("sentimental_cap_predictor.data.news", dummy_news)
 
 
