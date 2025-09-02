@@ -51,10 +51,8 @@ class QwenLocalProvider(LLMProvider):
                 repo_id=local_model_path.as_posix(),
             )
 
-        # Debug print to show the resolved checkpoint path. The previous
-        # implementation attempted to reference ``model_id`` which does not
-        # exist in this context. Use ``checkpoint_path`` instead so the
-        # message reflects the actual path used to load the model weights.
+        # Debug print to show the resolved checkpoint path used to load the
+        # model weights.
         print(f"Using checkpoint at: {checkpoint_path}")
 
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
