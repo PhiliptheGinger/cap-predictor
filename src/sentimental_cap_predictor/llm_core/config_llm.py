@@ -16,6 +16,7 @@ class LLMConfig:
 
     model_path: str
     temperature: float
+    max_new_tokens: int = 512
 
 
 def get_llm_config() -> LLMConfig:
@@ -23,4 +24,9 @@ def get_llm_config() -> LLMConfig:
 
     model_path = os.getenv("QWEN_MODEL_PATH", "Qwen/Qwen2-1.5B-Instruct")
     temperature = float(os.getenv("LLM_TEMPERATURE", 0.7))
-    return LLMConfig(model_path=model_path, temperature=temperature)
+    max_new_tokens = int(os.getenv("LLM_MAX_NEW_TOKENS", 512))
+    return LLMConfig(
+        model_path=model_path,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+    )
