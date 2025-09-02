@@ -103,7 +103,10 @@ def query_gdelt_for_news(
 ) -> pd.DataFrame:
     """Query the GDELT API for articles matching ``query`` within a window."""
 
-    url = os.getenv("GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc")
+    url = os.getenv(
+        "GDELT_API_URL",
+        "https://api.gdeltproject.org/api/v2/doc/doc",
+    )
     params = {
         "query": query,
         "mode": "artlist",
@@ -119,7 +122,10 @@ def query_gdelt_for_news(
     return pd.DataFrame(articles)
 
 
-def extract_article_content(url: str, use_headless: bool = False) -> Optional[str]:
+def extract_article_content(
+    url: str,
+    use_headless: bool = False,
+) -> Optional[str]:
     """Extract main content from a news article using newspaper3k."""
 
     try:
@@ -132,7 +138,8 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         )
-        config.browser_user_agent = headless_agent if use_headless else default_agent
+        agent = headless_agent if use_headless else default_agent
+        config.browser_user_agent = agent
         config.request_timeout = 10
         article = Article(url, config=config, keep_article_html=True)
         article.download()
@@ -142,7 +149,11 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
         logger.error("Error extracting content from %s: %s", url, exc)
         return None
     except Exception as exc:  # pragma: no cover - unexpected errors
-        logger.exception("Unexpected error extracting content from %s: %s", url, exc)
+        logger.exception(
+            "Unexpected error extracting content from %s: %s",
+            url,
+            exc,
+        )
         raise
 
 
@@ -154,7 +165,10 @@ class FetchArticleSpec:
     days: int = 1
     max_records: int = 100
     must_contain_any: tuple[str, ...] = ()
-    avoid_domains: tuple[str, ...] = ()
+    # Some domains require authentication which prevents article extraction.
+    # ``seekingalpha.com`` is included by default as its content is typically
+    # behind a paywall.  Additional domains may be supplied by callers.
+    avoid_domains: tuple[str, ...] = ("seekingalpha.com",)
     require_text_accessible: bool = False
     novelty_against_urls: tuple[str, ...] = ()
 
@@ -177,13 +191,28 @@ def is_valid_candidate(article: pd.Series, spec: FetchArticleSpec) -> bool:
     return True
 
 
-def try_to_extract(url: str) -> tuple[str, bool]:
-    """Attempt to extract article text returning ``(text, success)``."""
+def try_to_extract(url: str) -> Optional[str]:
+    """Attempt to extract article text.
+
+    The helper performs multiple extraction attempts using different user
+    agents.  ``None`` is returned when no readable text could be obtained.
+    """
 
     if not url:
-        return "", False
+        return None
+
+    # First attempt with the default user agent
     text = extract_article_content(url)
-    return (text or "", bool(text))
+    if text and text.strip():
+        return text
+
+    # Second attempt using a headless browser user agent which can sometimes
+    # bypass simple bot protections.
+    text = extract_article_content(url, use_headless=True)
+    if text and text.strip():
+        return text
+
+    return None
 
 
 def novelty_score(article: dict, spec: FetchArticleSpec) -> float:
@@ -207,7 +236,8 @@ def title_novelty(title: str, seen_titles: Iterable[str]) -> float:
 
 
 def rank_candidates(
-    candidates: list[dict], spec: FetchArticleSpec, seen_titles: Iterable[str] = ()
+    candidates: list[dict],
+    spec: FetchArticleSpec,
 ) -> list[dict]:
     """Rank candidates prioritising accessible text and novelty."""
 
@@ -236,15 +266,15 @@ def fetch_article(
         max_records=spec.max_records,
     )
     if df.empty:
-        return ArticleData()
+        raise RuntimeError("No articles returned for query")
 
     candidates: list[dict] = []
     for _, row in df.iterrows():
         if not is_valid_candidate(row, spec):
             continue
         url = row.get("url") or ""
-        text, ok = try_to_extract(url)
-        if spec.require_text_accessible and not ok:
+        text = try_to_extract(url)
+        if spec.require_text_accessible and not text:
             continue
         candidates.append(
             {
@@ -255,18 +285,16 @@ def fetch_article(
         )
 
     if not candidates:
-        # Fallback to the first result without validation
-        row = df.iloc[0]
-        url = row.get("url") or ""
-        text, ok = try_to_extract(url)
-        return ArticleData(
-            title=row.get("title") or row.get("headline") or "",
-            url=url,
-            content=text if ok else "",
-        )
+        raise RuntimeError("No candidate articles matched filters")
 
-    best = rank_candidates(candidates, spec, seen_titles)[0]
-    return ArticleData(title=best["title"], url=best["url"], content=best["content"])
+    for candidate in rank_candidates(candidates, spec):
+        if candidate.get("content"):
+            return ArticleData(
+                title=candidate["title"],
+                url=candidate["url"],
+                content=candidate["content"] or "",
+            )
+    raise RuntimeError("No readable article found")
 
 
 def fetch_first_gdelt_article(
