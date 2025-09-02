@@ -368,7 +368,9 @@ def main() -> None:
 
     config = get_llm_config()
     provider = QwenLocalProvider(
-        model_path=config.model_path, temperature=config.temperature
+        model_path=config.model_path,
+        temperature=config.temperature,
+        max_new_tokens=config.max_new_tokens,
     )
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},

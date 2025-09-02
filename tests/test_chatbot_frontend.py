@@ -324,7 +324,9 @@ def test_retry_on_malformed_output(monkeypatch):
         sys.modules,
         "sentimental_cap_predictor.llm_core.config_llm",
         SimpleNamespace(
-            get_llm_config=lambda: SimpleNamespace(model_path="", temperature=0.0)
+            get_llm_config=lambda: SimpleNamespace(
+                model_path="", temperature=0.0, max_new_tokens=512
+            )
         ),
     )
     monkeypatch.setitem(
