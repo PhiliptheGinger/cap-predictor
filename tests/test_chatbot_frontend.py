@@ -238,6 +238,21 @@ def test_handle_command_parses_options(monkeypatch):
     assert captured["max_records"] == 5
 
 
+def test_handle_command_plain_word(monkeypatch):
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="Body text",
+        ),
+    )
+
+    text = cf.handle_command("NVDA")
+    assert text == "Body text"
+
+
 def test_handle_command_fallback(monkeypatch):
     monkeypatch.setattr(
         cf,
