@@ -39,7 +39,7 @@ def fetch_first_gdelt_article(
         return f"GDELT request failed: {exc}"
 
     if article.content:
-        from .memory_indexer import TextMemory
+        from sentimental_cap_predictor.llm_core.memory_indexer import TextMemory
 
         index_path = _MEMORY_INDEX
         if index_path.exists():
@@ -48,6 +48,22 @@ def fetch_first_gdelt_article(
             memory = TextMemory()
         memory.add([article.content])
         memory.save(index_path)
+
+        meta_path = index_path.with_suffix(".json")
+        import json
+
+        metadata: list[dict[str, str]]
+        if meta_path.exists():
+            try:
+                metadata = json.loads(meta_path.read_text())
+            except json.JSONDecodeError:
+                metadata = []
+        else:
+            metadata = []
+        metadata.append({"title": article.title, "url": article.url})
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(json.dumps(metadata))
+
         return article.content
     if article.title and article.url:
         return f"{article.title} - {article.url}"
@@ -83,7 +99,7 @@ def handle_command(command: str) -> str:
 
     lower = command.lower()
     if lower.startswith("memory search"):
-        from .memory_indexer import TextMemory
+        from sentimental_cap_predictor.llm_core.memory_indexer import TextMemory
 
         index_path = _MEMORY_INDEX
         if not index_path.exists():
@@ -171,8 +187,8 @@ def handle_command(command: str) -> str:
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     from sentimental_cap_predictor.cmd_utils import extract_cmd
-    from .config_llm import get_llm_config
-    from .llm_providers.qwen_local import (
+    from sentimental_cap_predictor.llm_core.config_llm import get_llm_config
+    from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
         QwenLocalProvider,
     )
 

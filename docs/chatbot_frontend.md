@@ -57,9 +57,11 @@ into the conversation so the model can continue the dialogue.
 
 ### Memory search
 
-The `memory search "<query>"` command loads a local FAISS index of past article
-content and performs a similarity search. The handler returns the titles and
-URLs of the most relevant matches:
+Articles fetched via `gdelt` commands are automatically embedded and appended to
+`data/memory.faiss`, with their titles and URLs recorded in `data/memory.json`.
+The `memory search "<query>"` command loads this index of past article content
+and performs a similarity search. The handler returns the titles and URLs of the
+most relevant matches:
 
 ```bash
 memory search "climate change policy"

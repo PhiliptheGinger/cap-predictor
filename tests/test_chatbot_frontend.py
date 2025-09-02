@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import subprocess
 import sys
 import types
@@ -57,7 +58,7 @@ cf = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cf)
 
 
-def test_fetch_first_gdelt_article(monkeypatch):
+def test_fetch_first_gdelt_article(monkeypatch, tmp_path):
     captured = {}
 
     def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
@@ -69,6 +70,7 @@ def test_fetch_first_gdelt_article(monkeypatch):
         )
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
+    monkeypatch.setattr(cf, "_MEMORY_INDEX", tmp_path / "memory.faiss")
 
     text = cf.fetch_first_gdelt_article("NVDA")
     assert text == "Body text"
@@ -95,7 +97,6 @@ def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
             cls.loaded = True
             return cls()
 
-    import sys
     from types import SimpleNamespace
 
     dummy_module = SimpleNamespace(TextMemory=DummyMemory)
@@ -121,6 +122,9 @@ def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
     assert DummyMemory.added == ["Body text"]
     assert DummyMemory.saved_path == index_path
     assert DummyMemory.loaded is True
+
+    meta = json.loads(index_path.with_suffix(".json").read_text())
+    assert meta == [{"title": "Headline", "url": "http://example.com"}]
 
 
 def test_fetch_first_gdelt_article_fallback(monkeypatch):
