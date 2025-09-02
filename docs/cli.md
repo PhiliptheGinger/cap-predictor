@@ -99,6 +99,15 @@ python -m sentimental_cap_predictor.llm_core.chatbot \
     --experimental-model mistralai/Mistral-7B-Instruct-v0.2
 ```
 
+## News utilities
+
+Basic news helpers are available through the chatbot's command interface:
+
+```bash
+CMD: news.fetch_gdelt --query "<terms>" --max 1
+CMD: news.read --url "<article_url>" --summarize --analyze --chunks 1000
+```
+
 ## GitHub Repository Data
 
 Utilities that pull information from the GitHub API can optionally use a
