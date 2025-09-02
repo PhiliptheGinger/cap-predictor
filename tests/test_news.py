@@ -254,3 +254,21 @@ def test_fetch_article_applies_filters_and_novelty(monkeypatch):
     )
     article = news.fetch_article(spec)
     assert article.url == "http://new.com/b"
+
+
+def test_fetch_article_title_novelty(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {"title": "Seen headline", "url": "http://old.com/a"},
+            {"title": "Fresh perspective", "url": "http://new.com/b"},
+        ]
+    )
+
+    monkeypatch.setattr(
+        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+    )
+    monkeypatch.setattr(news, "extract_article_content", lambda url: "")
+
+    spec = news.FetchArticleSpec(query="q")
+    article = news.fetch_article(spec, seen_titles=("Seen headline",))
+    assert article.url == "http://new.com/b"

@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Iterable, Optional, Protocol
 
 import pandas as pd
 import requests
@@ -195,19 +195,36 @@ def novelty_score(article: dict, spec: FetchArticleSpec) -> float:
     return 0.0 if url in spec.novelty_against_urls else 1.0
 
 
+def title_novelty(title: str, seen_titles: Iterable[str]) -> float:
+    """Return a novelty score based on similarity to ``seen_titles``."""
+
+    if not title or not seen_titles:
+        return 1.0
+    from difflib import SequenceMatcher
+
+    max_sim = max(SequenceMatcher(None, title, t).ratio() for t in seen_titles)
+    return 1.0 - max_sim
+
+
 def rank_candidates(
-    candidates: list[dict], spec: FetchArticleSpec
+    candidates: list[dict], spec: FetchArticleSpec, seen_titles: Iterable[str] = ()
 ) -> list[dict]:
     """Rank candidates prioritising accessible text and novelty."""
 
     return sorted(
         candidates,
-        key=lambda c: (bool(c.get("content")), novelty_score(c, spec)),
+        key=lambda c: (
+            bool(c.get("content")),
+            novelty_score(c, spec),
+            title_novelty(c.get("title", ""), seen_titles),
+        ),
         reverse=True,
     )
 
 
-def fetch_article(spec: FetchArticleSpec) -> ArticleData:
+def fetch_article(
+    spec: FetchArticleSpec, *, seen_titles: Iterable[str] = ()
+) -> ArticleData:
     """Fetch an article using ``spec`` applying validations and ranking."""
 
     end = datetime.utcnow()
@@ -248,7 +265,7 @@ def fetch_article(spec: FetchArticleSpec) -> ArticleData:
             content=text if ok else "",
         )
 
-    best = rank_candidates(candidates, spec)[0]
+    best = rank_candidates(candidates, spec, seen_titles)[0]
     return ArticleData(title=best["title"], url=best["url"], content=best["content"])
 
 
