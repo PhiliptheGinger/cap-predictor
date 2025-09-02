@@ -7,6 +7,7 @@ import types
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
 import requests
 
 
@@ -73,6 +74,16 @@ spec = importlib.util.spec_from_file_location(
 )
 cf = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cf)
+
+
+@pytest.fixture(autouse=True)
+def _reset_seen(tmp_path, monkeypatch):
+    monkeypatch.setattr(cf, "_SEEN_META_PATH", tmp_path / "seen.json")
+    monkeypatch.setattr(cf, "_MEMORY_INDEX", tmp_path / "memory.faiss")
+    monkeypatch.setattr(cf, "_SEEN_METADATA", [])
+    monkeypatch.setattr(cf, "_SEEN_URLS", set())
+    monkeypatch.setattr(cf, "_SEEN_TITLES", set())
+    monkeypatch.setattr(cf, "_SEEN_LOADED", False)
 
 
 def test_fetch_first_gdelt_article(monkeypatch, tmp_path):
@@ -162,6 +173,24 @@ def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
 
     meta = json.loads(index_path.with_suffix(".json").read_text())
     assert meta == [{"title": "Headline", "url": "http://example.com"}]
+
+
+def test_fetch_first_gdelt_article_persists_seen(monkeypatch):
+    cf._SEEN_META_PATH.write_text('[{"title": "Old", "url": "http://old"}]')
+    cf._SEEN_LOADED = False
+
+    def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
+        assert "http://old" in cf._SEEN_URLS
+        assert "Old" in cf._SEEN_TITLES
+        return ArticleData(title="New", url="http://new", content="")
+
+    monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
+
+    cf.fetch_first_gdelt_article("NVDA")
+
+    data = json.loads(cf._SEEN_META_PATH.read_text())
+    assert {"title": "Old", "url": "http://old"} in data
+    assert {"title": "New", "url": "http://new"} in data
 
 
 def test_fetch_first_gdelt_article_fallback(monkeypatch):
