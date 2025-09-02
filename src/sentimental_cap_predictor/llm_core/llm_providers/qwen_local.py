@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, List
 
 import torch
 from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from huggingface_hub import snapshot_download
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from .base import ChatMessage, LLMProvider
@@ -40,14 +42,21 @@ class QwenLocalProvider(LLMProvider):
 
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        config = AutoConfig.from_pretrained(model_path)
+
+        model_path = Path(model_path)
+        if model_path.exists():
+            checkpoint_path = str(model_path)
+        else:
+            checkpoint_path = snapshot_download(repo_id=str(model_path))
+
+        self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+        config = AutoConfig.from_pretrained(checkpoint_path)
         with init_empty_weights():
             model = AutoModelForCausalLM.from_config(config)
         model.tie_weights()
         self.model = load_checkpoint_and_dispatch(
             model,
-            model_path,
+            checkpoint=checkpoint_path,
             device_map="auto",
             offload_folder=offload_folder,
         )
