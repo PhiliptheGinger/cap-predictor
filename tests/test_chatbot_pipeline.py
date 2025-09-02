@@ -1,4 +1,4 @@
-from sentimental_cap_predictor import chatbot
+from sentimental_cap_predictor.llm_core import chatbot
 
 
 def test_pipeline_intents_call_helper(monkeypatch):

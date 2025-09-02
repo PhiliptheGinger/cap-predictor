@@ -45,7 +45,7 @@ can be loaded entirely offline.
 ## Run
 
 ```bash
-python -m sentimental_cap_predictor.chatbot_frontend
+python -m sentimental_cap_predictor.llm_core.chatbot_frontend
 ```
 
 ## CMD protocol

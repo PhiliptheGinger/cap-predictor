@@ -45,7 +45,7 @@ Each module exposes a Typer application:
 - `sentimental_cap_predictor.dataset` – download price and news data
 - `sentimental_cap_predictor.plots` – visualize processed data
 - `sentimental_cap_predictor.modeling.sentiment_analysis` – train and evaluate sentiment models
-- `sentimental_cap_predictor.chatbot` – chat with a local Mistral-powered assistant that consults main and experimental models and explains its decisions
+- `sentimental_cap_predictor.llm_core.chatbot` – chat with a local Mistral-powered assistant that consults main and experimental models and explains its decisions
 
 Run `--help` with any module for detailed options.
 
@@ -58,8 +58,8 @@ Hugging Face and set `QWEN_MODEL_PATH` to its directory (defaults to
 chatbot:
 
 ```bash
-alias capbot="python -m sentimental_cap_predictor.chatbot"
-python -m sentimental_cap_predictor.chatbot
+alias capbot="python -m sentimental_cap_predictor.llm_core.chatbot"
+python -m sentimental_cap_predictor.llm_core.chatbot
 ```
 
 Responses that begin with `CMD:` request that your environment execute the

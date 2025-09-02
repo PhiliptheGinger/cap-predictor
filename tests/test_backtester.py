@@ -1,9 +1,9 @@
 import pandas as pd
 import pytest
 
-from sentimental_cap_predictor.backtester import backtest
+from sentimental_cap_predictor.trading.backtester import backtest
 from sentimental_cap_predictor.data_bundle import DataBundle
-from sentimental_cap_predictor.strategy import StrategyIdea
+from sentimental_cap_predictor.trading.strategy import StrategyIdea
 
 
 class DummyStrategy(StrategyIdea):
