@@ -177,7 +177,7 @@ def test_fetch_headline_uses_gdelt_source(monkeypatch):
     assert headline == "Example"
 
 
-def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
+def test_fetch_article_prefers_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
     monkeypatch.setattr(
@@ -185,11 +185,12 @@ def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
     )
     monkeypatch.setattr(news, "extract_article_content", lambda url: "Body text")
 
-    article = news.fetch_first_gdelt_article("NVDA")
+    spec = news.FetchArticleSpec(query="NVDA")
+    article = news.fetch_article(spec)
     assert article.content == "Body text"
 
 
-def test_fetch_first_gdelt_article_fallback_on_missing_content(monkeypatch):
+def test_fetch_article_fallback_on_missing_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
     monkeypatch.setattr(
@@ -197,13 +198,14 @@ def test_fetch_first_gdelt_article_fallback_on_missing_content(monkeypatch):
     )
     monkeypatch.setattr(news, "extract_article_content", lambda url: None)
 
-    article = news.fetch_first_gdelt_article("NVDA")
+    spec = news.FetchArticleSpec(query="NVDA")
+    article = news.fetch_article(spec)
     assert article.content == ""
     assert article.title == "Headline"
     assert article.url == "http://example.com"
 
 
-def test_fetch_first_gdelt_article_custom_window_and_limit(monkeypatch):
+def test_fetch_article_custom_window_and_limit(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
     captured: dict[str, str | int] = {}
 
@@ -222,8 +224,33 @@ def test_fetch_first_gdelt_article_custom_window_and_limit(monkeypatch):
 
     monkeypatch.setattr(news, "datetime", DummyDateTime)
 
-    article = news.fetch_first_gdelt_article("NVDA", days=3, max_records=5)
+    spec = news.FetchArticleSpec(query="NVDA", days=3, max_records=5)
+    article = news.fetch_article(spec)
     assert article.title == "Headline"
     assert captured["start"] == "20240107120000"
     assert captured["end"] == "20240110120000"
     assert captured["max"] == 5
+
+
+def test_fetch_article_applies_filters_and_novelty(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {"title": "Keyword match", "url": "http://known.com/a"},
+            {"title": "Keyword match", "url": "http://new.com/b"},
+            {"title": "Other", "url": "http://bad.com/c"},
+        ]
+    )
+
+    monkeypatch.setattr(
+        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+    )
+    monkeypatch.setattr(news, "extract_article_content", lambda url: "text")
+
+    spec = news.FetchArticleSpec(
+        query="q",
+        must_contain_any=("keyword",),
+        avoid_domains=("bad.com",),
+        novelty_against_urls=("http://known.com/a",),
+    )
+    article = news.fetch_article(spec)
+    assert article.url == "http://new.com/b"

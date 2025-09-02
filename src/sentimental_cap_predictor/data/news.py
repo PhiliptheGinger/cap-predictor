@@ -146,6 +146,112 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
         raise
 
 
+@dataclass
+class FetchArticleSpec:
+    """Specification for fetching and validating an article."""
+
+    query: str
+    days: int = 1
+    max_records: int = 100
+    must_contain_any: tuple[str, ...] = ()
+    avoid_domains: tuple[str, ...] = ()
+    require_text_accessible: bool = False
+    novelty_against_urls: tuple[str, ...] = ()
+
+
+def is_valid_candidate(article: pd.Series, spec: FetchArticleSpec) -> bool:
+    """Return ``True`` if ``article`` satisfies keyword and domain filters."""
+
+    title = str(article.get("title") or article.get("headline") or "")
+    url = str(article.get("url") or "")
+    if spec.must_contain_any:
+        lower = title.lower()
+        if not any(k.lower() in lower for k in spec.must_contain_any):
+            return False
+    if spec.avoid_domains and url:
+        from urllib.parse import urlparse
+
+        domain = urlparse(url).netloc.lower()
+        if any(domain.endswith(d.lower()) for d in spec.avoid_domains):
+            return False
+    return True
+
+
+def try_to_extract(url: str) -> tuple[str, bool]:
+    """Attempt to extract article text returning ``(text, success)``."""
+
+    if not url:
+        return "", False
+    text = extract_article_content(url)
+    return (text or "", bool(text))
+
+
+def novelty_score(article: dict, spec: FetchArticleSpec) -> float:
+    """Simple score indicating how novel ``article`` is."""
+
+    if not spec.novelty_against_urls:
+        return 1.0
+    url = article.get("url", "")
+    return 0.0 if url in spec.novelty_against_urls else 1.0
+
+
+def rank_candidates(
+    candidates: list[dict], spec: FetchArticleSpec
+) -> list[dict]:
+    """Rank candidates prioritising accessible text and novelty."""
+
+    return sorted(
+        candidates,
+        key=lambda c: (bool(c.get("content")), novelty_score(c, spec)),
+        reverse=True,
+    )
+
+
+def fetch_article(spec: FetchArticleSpec) -> ArticleData:
+    """Fetch an article using ``spec`` applying validations and ranking."""
+
+    end = datetime.utcnow()
+    start = end - timedelta(days=spec.days)
+    df = query_gdelt_for_news(
+        spec.query,
+        start.strftime("%Y%m%d%H%M%S"),
+        end.strftime("%Y%m%d%H%M%S"),
+        max_records=spec.max_records,
+    )
+    if df.empty:
+        return ArticleData()
+
+    candidates: list[dict] = []
+    for _, row in df.iterrows():
+        if not is_valid_candidate(row, spec):
+            continue
+        url = row.get("url") or ""
+        text, ok = try_to_extract(url)
+        if spec.require_text_accessible and not ok:
+            continue
+        candidates.append(
+            {
+                "title": row.get("title") or row.get("headline") or "",
+                "url": url,
+                "content": text,
+            }
+        )
+
+    if not candidates:
+        # Fallback to the first result without validation
+        row = df.iloc[0]
+        url = row.get("url") or ""
+        text, ok = try_to_extract(url)
+        return ArticleData(
+            title=row.get("title") or row.get("headline") or "",
+            url=url,
+            content=text if ok else "",
+        )
+
+    best = rank_candidates(candidates, spec)[0]
+    return ArticleData(title=best["title"], url=best["url"], content=best["content"])
+
+
 def fetch_first_gdelt_article(
     query: str,
     *,
@@ -153,23 +259,15 @@ def fetch_first_gdelt_article(
     days: int = 1,
     max_records: int = 100,
 ) -> ArticleData:
-    """Return information on the first GDELT article matching ``query``."""
+    """Backward compatible wrapper around :func:`fetch_article`."""
 
-    end = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    start = (datetime.utcnow() - timedelta(days=days)).strftime("%Y%m%d%H%M%S")
-    df = query_gdelt_for_news(query, start, end, max_records=max_records)
-    if df.empty:
-        return ArticleData()
-
-    article = df.iloc[0]
-    title = article.get("title") or article.get("headline") or ""
-    url = article.get("url") or ""
-    content = ""
-    if prefer_content and url:
-        text = extract_article_content(url)
-        if text:
-            content = text
-    return ArticleData(title=title, url=url, content=content)
+    spec = FetchArticleSpec(
+        query=query,
+        days=days,
+        max_records=max_records,
+        require_text_accessible=prefer_content,
+    )
+    return fetch_article(spec)
 
 
 def fetch_news(
@@ -226,8 +324,10 @@ __all__ = [
     "FileSource",
     "GDELTSource",
     "ArticleData",
+    "FetchArticleSpec",
     "query_gdelt_for_news",
     "extract_article_content",
+    "fetch_article",
     "fetch_first_gdelt_article",
     "fetch_news",
     "fetch_headline",

@@ -12,13 +12,30 @@ import requests
 from colorama import Fore, Style, init
 
 from sentimental_cap_predictor.data.news import (
-    fetch_first_gdelt_article as _fetch_first_gdelt_article,
+    fetch_article as _fetch_article,
+    FetchArticleSpec,
 )
 
 _MEMORY_INDEX = Path("data/memory.faiss")
 
 # Initialise colour handling for cross-platform compatibility
 init(autoreset=True)
+
+
+def _fetch_first_gdelt_article(
+    query: str,
+    *,
+    prefer_content: bool = True,
+    days: int = 1,
+    max_records: int = 100,
+):
+    spec = FetchArticleSpec(
+        query=query,
+        days=days,
+        max_records=max_records,
+        require_text_accessible=prefer_content,
+    )
+    return _fetch_article(spec)
 
 
 def fetch_first_gdelt_article(
