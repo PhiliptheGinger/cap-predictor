@@ -54,8 +54,9 @@ Run `--help` with any module for detailed options.
 The project includes a lightweight frontend that chats with a **local** Qwen
 model and supports a simple command protocol. Download a Qwen checkpoint from
 Hugging Face and set `QWEN_MODEL_PATH` to its directory (defaults to
-`Qwen/Qwen2-1.5B-Instruct`). For convenience, alias the module and then run the
-chatbot:
+`Qwen/Qwen2-1.5B-Instruct`). If the model does not fit entirely in GPU or CPU
+memory, set `QWEN_OFFLOAD_FOLDER` to a directory where the remaining weights can
+be offloaded. For convenience, alias the module and then run the chatbot:
 
 ```bash
 alias capbot="python -m sentimental_cap_predictor.llm_core.chatbot"
