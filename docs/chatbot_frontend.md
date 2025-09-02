@@ -55,6 +55,19 @@ starting a reply with `CMD:` followed by the command string. The runner detects
 these lines, executes the command in a shell, and feeds the captured output back
 into the conversation so the model can continue the dialogue.
 
+### Memory search
+
+The `memory search "<query>"` command loads a local FAISS index of past article
+content and performs a similarity search. The handler returns the titles and
+URLs of the most relevant matches:
+
+```bash
+memory search "climate change policy"
+```
+
+If the memory index (`data/memory.faiss`) or accompanying metadata JSON is not
+found, a message describing the missing resource is returned instead.
+
 ## Connector intents
 
 The chatbot understands simple phrases to pull data from a few external

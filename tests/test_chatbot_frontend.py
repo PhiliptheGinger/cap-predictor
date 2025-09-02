@@ -1,10 +1,11 @@
-import subprocess
-import requests
 import importlib.util
-from pathlib import Path
-from dataclasses import dataclass
+import subprocess
 import sys
 import types
+from dataclasses import dataclass
+from pathlib import Path
+
+import requests
 
 
 @dataclass
@@ -38,7 +39,10 @@ class _StubMemory:
 
 dummy_memory = types.ModuleType("sentimental_cap_predictor.memory_indexer")
 dummy_memory.TextMemory = _StubMemory
-sys.modules.setdefault("sentimental_cap_predictor.memory_indexer", dummy_memory)
+sys.modules.setdefault(
+    "sentimental_cap_predictor.memory_indexer",
+    dummy_memory,
+)
 
 # Import the module directly to avoid triggering package-level side effects
 spec = importlib.util.spec_from_file_location(
@@ -94,7 +98,9 @@ def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
     from types import SimpleNamespace
 
     dummy_module = SimpleNamespace(TextMemory=DummyMemory)
-    monkeypatch.setitem(sys.modules, "sentimental_cap_predictor.memory_indexer", dummy_module)
+    monkeypatch.setitem(
+        sys.modules, "sentimental_cap_predictor.memory_indexer", dummy_module
+    )
 
     monkeypatch.setattr(cf, "_MEMORY_INDEX", index_path)
     monkeypatch.setattr(
@@ -176,9 +182,7 @@ def test_handle_command_parses_dash_query(monkeypatch):
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
-    text = cf.handle_command(
-        'gdelt search --query "climate change" --limit 5'
-    )
+    text = cf.handle_command('gdelt search --query "climate change" --limit 5')
     assert text == "Body text"
     assert captured["query"] == "climate change"
 
@@ -272,3 +276,40 @@ def test_retry_on_malformed_output(monkeypatch):
         "Output invalid. Remember the CMD contract.",
     ]
     assert executed["cmd"] == "echo hi"
+
+
+def test_handle_command_memory_search(monkeypatch, tmp_path):
+    index_path = tmp_path / "memory.faiss"
+    index_path.touch()
+    meta_path = tmp_path / "memory.json"
+    meta_path.write_text(
+        '[{"title": "First", "url": "http://a"}, '
+        '{"title": "Second", "url": "http://b"}]'
+    )
+
+    class DummyIndex:
+        def search(self, embeddings, k):  # noqa: ANN001
+            return [[0.0]], [[0]]
+
+    class DummyMemory:
+        def __init__(self):
+            self.index = DummyIndex()
+
+        def embed(self, texts):  # noqa: ANN001
+            return [[0.0]]
+
+        @classmethod
+        def load(cls, path, model_name=None):  # noqa: ANN001
+            return cls()
+
+    import sys
+    from types import SimpleNamespace
+
+    dummy_module = SimpleNamespace(TextMemory=DummyMemory)
+    monkeypatch.setitem(
+        sys.modules, "sentimental_cap_predictor.memory_indexer", dummy_module
+    )
+    monkeypatch.setattr(cf, "_MEMORY_INDEX", index_path)
+
+    text = cf.handle_command('memory search "query"')
+    assert "First - http://a" in text
