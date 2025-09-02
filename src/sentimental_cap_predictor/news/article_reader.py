@@ -47,7 +47,8 @@ def extract_main(html: str, url: str | None = None) -> str:
 
     The function first tries :mod:`trafilatura` which performs excellent
     extraction.  If it is not available or fails, it falls back to using
-    :mod:`readability` and :class:`~bs4.BeautifulSoup`.
+    :mod:`readability` and :class:`~bs4.BeautifulSoup`.  When all parsers fail
+    the function returns the raw text with HTML tags stripped.
 
     Parameters
     ----------
@@ -60,7 +61,8 @@ def extract_main(html: str, url: str | None = None) -> str:
     Returns
     -------
     str
-        Plain text of the article.  Empty string if extraction fails.
+        Plain text of the article or a simple tag-stripped version if parsing
+        fails.
     """
 
     # Try trafilatura if installed.
@@ -84,7 +86,9 @@ def extract_main(html: str, url: str | None = None) -> str:
         return soup.get_text("\n")
     except Exception as exc:  # pragma: no cover - missing deps
         logger.warning("Failed to extract main text: %s", exc)
-        return ""
+
+    # Final fallback: strip HTML tags to return raw text
+    return re.sub(r"<[^>]+>", " ", html)
 
 
 def strip_ads(text: str) -> str:
@@ -212,9 +216,13 @@ def translate(text: str, target_lang: str) -> str:
 
     try:  # pragma: no cover - optional dependency
         from googletrans import Translator
+    except Exception:
+        return "Translation disabled"
 
+    try:  # pragma: no cover - translation may fail at runtime
         translator = Translator()
         result = translator.translate(text, dest=target_lang)
         return result.text
-    except Exception:
+    except Exception as exc:
+        logger.warning("Translation failed: %s", exc)
         return "Translation disabled"
