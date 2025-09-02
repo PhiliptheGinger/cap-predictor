@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import Any, Dict
 
-from sentimental_cap_predictor.data.news import fetch_news
+from sentimental_cap_predictor.data.news import FetchArticleSpec, fetch_article
 
 from .chatbot_nlu import qwen_intent
 from .connectors import (
@@ -261,17 +261,25 @@ def dispatch(intent: str, slots: Dict[str, Any]) -> str:
         query = slots.get("query")
         if not query:
             return "What topic should I look up? e.g., 'news about NVDA'"
+        keywords = slots.get("keywords") or []
+        spec = FetchArticleSpec(query=query, must_contain_any=tuple(keywords))
         try:
-            df = fetch_news(query)
+            article = fetch_article(spec)
+        except RuntimeError:
+            if keywords:
+                joined = ", ".join(keywords)
+                return (
+                    f"I couldn't find any articles about '{query}' matching keywords: {joined}. "
+                    "Could you clarify or try different keywords?"
+                )
+            return f"No news found for '{query}'."
         except Exception as exc:  # pragma: no cover - network failure
             return f"Error fetching info for {query}: {exc}"
-        if df.empty:
-            return f"No news found for '{query}'."
-        lines = [
-            f"{row.date.date()}: {row.headline} ({row.source})"
-            for _, row in df.head(5).iterrows()
-        ]
-        return "Here are some headlines:\n" + "\n".join(f"- {line}" for line in lines)
+        if article.content:
+            return article.content
+        if article.title and article.url:
+            return f"{article.title} - {article.url}"
+        return article.title or article.url
 
     if intent == "info.arxiv":
         query = slots.get("query")
