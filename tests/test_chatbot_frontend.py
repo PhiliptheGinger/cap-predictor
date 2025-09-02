@@ -59,7 +59,7 @@ spec.loader.exec_module(cf)
 def test_fetch_first_gdelt_article(monkeypatch):
     captured = {}
 
-    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
+    def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
         captured["prefer_content"] = prefer_content
         return ArticleData(
             title="Headline",
@@ -106,7 +106,7 @@ def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
     monkeypatch.setattr(
         cf,
         "_fetch_first_gdelt_article",
-        lambda query, *, prefer_content: ArticleData(
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(
             title="Headline",
             url="http://example.com",
             content="Body text",
@@ -124,7 +124,7 @@ def test_fetch_first_gdelt_article_fallback(monkeypatch):
     monkeypatch.setattr(
         cf,
         "_fetch_first_gdelt_article",
-        lambda query, *, prefer_content: ArticleData(
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(
             title="Headline",
             url="http://example.com",
             content="",
@@ -139,7 +139,7 @@ def test_handle_command_routes_to_gdelt(monkeypatch):
     monkeypatch.setattr(
         cf,
         "_fetch_first_gdelt_article",
-        lambda query, *, prefer_content: ArticleData(
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(
             title="Headline",
             url="http://example.com",
             content="Body text",
@@ -156,7 +156,7 @@ def test_handle_command_returns_headline(monkeypatch):
     monkeypatch.setattr(
         cf,
         "_fetch_first_gdelt_article",
-        lambda query, *, prefer_content: ArticleData(
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(
             title="Headline",
             url="http://example.com",
             content="",
@@ -169,11 +169,13 @@ def test_handle_command_returns_headline(monkeypatch):
     assert text == "Headline - http://example.com"
 
 
-def test_handle_command_parses_dash_query(monkeypatch):
+def test_handle_command_parses_options(monkeypatch):
     captured = {}
 
-    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
-        captured["query"] = query
+    def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
+        captured.update(
+            query=query, prefer_content=prefer_content, days=days, max_records=max_records
+        )
         return ArticleData(
             title="Headline",
             url="http://example.com",
@@ -182,16 +184,20 @@ def test_handle_command_parses_dash_query(monkeypatch):
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
-    text = cf.handle_command('gdelt search --query "climate change" --limit 5')
+    text = cf.handle_command(
+        'gdelt search --query "climate change" --limit 5 --days 2'
+    )
     assert text == "Body text"
     assert captured["query"] == "climate change"
+    assert captured["days"] == 2
+    assert captured["max_records"] == 5
 
 
 def test_handle_command_fallback(monkeypatch):
     monkeypatch.setattr(
         cf,
         "_fetch_first_gdelt_article",
-        lambda query, *, prefer_content: ArticleData(),
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(),
     )
 
     text = cf.handle_command(
@@ -201,7 +207,7 @@ def test_handle_command_fallback(monkeypatch):
 
 
 def test_fetch_first_gdelt_article_error(monkeypatch):
-    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
+    def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
         raise requests.RequestException("boom")
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
@@ -211,7 +217,7 @@ def test_fetch_first_gdelt_article_error(monkeypatch):
 
 
 def test_handle_command_reports_network_error(monkeypatch):
-    def fake_fetch(query, *, prefer_content):  # noqa: ANN001
+    def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
         raise requests.RequestException("boom")
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
@@ -254,9 +260,23 @@ def test_retry_on_malformed_output(monkeypatch):
         "sentimental_cap_predictor.llm_providers.qwen_local",
         dummy_module,
     )
-    monkeypatch.setattr(
-        "sentimental_cap_predictor.config_llm.get_llm_config",
-        lambda: SimpleNamespace(model_path="", temperature=0.0),
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.config_llm",
+        SimpleNamespace(
+            get_llm_config=lambda: SimpleNamespace(model_path="", temperature=0.0)
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.cmd_utils",
+        SimpleNamespace(
+            extract_cmd=lambda reply: (
+                (reply.split("CMD:", 1)[1].strip(), None)
+                if reply.startswith("CMD:")
+                else (None, None)
+            )
+        ),
     )
 
     user_inputs = iter(["hi", "quit"])

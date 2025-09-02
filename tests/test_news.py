@@ -1,14 +1,37 @@
+from datetime import datetime
+from pathlib import Path
+import importlib.util
+import types
+import sys
+
 import pandas as pd
 import pytest
 import requests
 
-from sentimental_cap_predictor.data import news
-from sentimental_cap_predictor.data.news import (
-    FileSource,
-    GDELTSource,
-    fetch_headline,
-    fetch_news,
+dummy_pkg = types.ModuleType("sentimental_cap_predictor")
+dummy_pkg.__path__ = []
+dummy_data_pkg = types.ModuleType("sentimental_cap_predictor.data")
+dummy_data_pkg.__path__ = []
+sys.modules.setdefault("sentimental_cap_predictor", dummy_pkg)
+sys.modules.setdefault("sentimental_cap_predictor.data", dummy_data_pkg)
+
+module_name = "sentimental_cap_predictor.data.news"
+spec = importlib.util.spec_from_file_location(
+    module_name,
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "sentimental_cap_predictor"
+    / "data"
+    / "news.py",
 )
+news = importlib.util.module_from_spec(spec)
+sys.modules[module_name] = news
+spec.loader.exec_module(news)
+
+FileSource = news.FileSource
+GDELTSource = news.GDELTSource
+fetch_headline = news.fetch_headline
+fetch_news = news.fetch_news
 
 
 def test_fetch_news_returns_columns():
@@ -157,7 +180,9 @@ def test_fetch_headline_uses_gdelt_source(monkeypatch):
 def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
-    monkeypatch.setattr(news, "query_gdelt_for_news", lambda q, s, e: df)
+    monkeypatch.setattr(
+        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+    )
     monkeypatch.setattr(news, "extract_article_content", lambda url: "Body text")
 
     article = news.fetch_first_gdelt_article("NVDA")
@@ -167,10 +192,38 @@ def test_fetch_first_gdelt_article_prefers_content(monkeypatch):
 def test_fetch_first_gdelt_article_fallback_on_missing_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
-    monkeypatch.setattr(news, "query_gdelt_for_news", lambda q, s, e: df)
+    monkeypatch.setattr(
+        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+    )
     monkeypatch.setattr(news, "extract_article_content", lambda url: None)
 
     article = news.fetch_first_gdelt_article("NVDA")
     assert article.content == ""
     assert article.title == "Headline"
     assert article.url == "http://example.com"
+
+
+def test_fetch_first_gdelt_article_custom_window_and_limit(monkeypatch):
+    df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
+    captured: dict[str, str | int] = {}
+
+    def fake_query(q, s, e, *, max_records):  # noqa: ANN001
+        captured["start"] = s
+        captured["end"] = e
+        captured["max"] = max_records
+        return df
+
+    monkeypatch.setattr(news, "query_gdelt_for_news", fake_query)
+
+    class DummyDateTime(datetime):
+        @classmethod
+        def utcnow(cls):  # noqa: D401
+            return cls(2024, 1, 10, 12, 0, 0)
+
+    monkeypatch.setattr(news, "datetime", DummyDateTime)
+
+    article = news.fetch_first_gdelt_article("NVDA", days=3, max_records=5)
+    assert article.title == "Headline"
+    assert captured["start"] == "20240107120000"
+    assert captured["end"] == "20240110120000"
+    assert captured["max"] == 5
