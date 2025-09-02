@@ -98,7 +98,9 @@ class ArticleData:
     content: str = ""
 
 
-def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataFrame:
+def query_gdelt_for_news(
+    query: str, start_date: str, end_date: str, *, max_records: int = 100
+) -> pd.DataFrame:
     """Query the GDELT API for articles matching ``query`` within a window."""
 
     url = os.getenv("GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc")
@@ -107,7 +109,7 @@ def query_gdelt_for_news(query: str, start_date: str, end_date: str) -> pd.DataF
         "mode": "artlist",
         "startdatetime": start_date,
         "enddatetime": end_date,
-        "maxrecords": 100,
+        "maxrecords": max_records,
         "format": "json",
     }
     response = requests.get(url, params=params, timeout=30)
@@ -145,13 +147,17 @@ def extract_article_content(url: str, use_headless: bool = False) -> Optional[st
 
 
 def fetch_first_gdelt_article(
-    query: str, *, prefer_content: bool = True
+    query: str,
+    *,
+    prefer_content: bool = True,
+    days: int = 1,
+    max_records: int = 100,
 ) -> ArticleData:
     """Return information on the first GDELT article matching ``query``."""
 
     end = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    start = (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%d%H%M%S")
-    df = query_gdelt_for_news(query, start, end)
+    start = (datetime.utcnow() - timedelta(days=days)).strftime("%Y%m%d%H%M%S")
+    df = query_gdelt_for_news(query, start, end, max_records=max_records)
     if df.empty:
         return ArticleData()
 
