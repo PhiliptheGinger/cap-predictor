@@ -16,10 +16,16 @@ from sentimental_cap_predictor.data.news import (
     FetchArticleSpec,
 )
 
-_MEMORY_INDEX = Path("data/memory.faiss")
 
-# Initialise colour handling for cross-platform compatibility
-init(autoreset=True)
+_MEMORY_INDEX: Path | None = None
+
+
+def setup(memory_index: Path | None = None) -> None:
+    """Configure colour handling and default paths."""
+    init(autoreset=True)
+    global _MEMORY_INDEX
+    if _MEMORY_INDEX is None:
+        _MEMORY_INDEX = memory_index or Path("data/memory.faiss")
 
 
 def _fetch_first_gdelt_article(
@@ -47,6 +53,9 @@ def fetch_first_gdelt_article(
     :func:`sentimental_cap_predictor.data.news.fetch_first_gdelt_article` and
     falls back to the headline and URL if content extraction fails.
     """
+
+    if _MEMORY_INDEX is None:
+        setup()
 
     try:
         article = _fetch_first_gdelt_article(
@@ -113,6 +122,9 @@ def handle_command(command: str) -> str:
     import re
     import shlex
     import subprocess
+
+    if _MEMORY_INDEX is None:
+        setup()
 
     lower = command.lower()
     if lower.startswith("memory search"):
@@ -203,6 +215,7 @@ def handle_command(command: str) -> str:
 
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
+    setup()
     from sentimental_cap_predictor.cmd_utils import extract_cmd
     from sentimental_cap_predictor.llm_core.config_llm import get_llm_config
     from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
