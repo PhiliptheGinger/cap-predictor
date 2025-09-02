@@ -21,7 +21,9 @@ _MEMORY_INDEX = Path("data/memory.faiss")
 init(autoreset=True)
 
 
-def fetch_first_gdelt_article(query: str) -> str:
+def fetch_first_gdelt_article(
+    query: str, *, days: int = 1, limit: int = 100
+) -> str:
     """Return text for the first GDELT article matching ``query``.
 
     The helper requests full article content from
@@ -30,7 +32,9 @@ def fetch_first_gdelt_article(query: str) -> str:
     """
 
     try:
-        article = _fetch_first_gdelt_article(query, prefer_content=True)
+        article = _fetch_first_gdelt_article(
+            query, prefer_content=True, days=days, max_records=limit
+        )
     except requests.RequestException as exc:  # pragma: no cover
         return f"GDELT request failed: {exc}"
 
@@ -112,21 +116,45 @@ def handle_command(command: str) -> str:
     if "gdelt" in lower or "news" in lower:
         parts = shlex.split(command)
         query: str | None = None
+        days: int | None = None
+        limit: int | None = None
         for i, part in enumerate(parts):
             if part.startswith("--query="):
                 query = part.split("=", 1)[1]
-                break
-            if part in {"--query", "query"} and i + 1 < len(parts):
+            elif part in {"--query", "query"} and i + 1 < len(parts):
                 query = parts[i + 1]
-                break
-            if "query=" in part:
+            elif "query=" in part:
                 match = re.search(r"query=([^&]+)", part)
                 if match:
                     query = match.group(1)
-                    break
+            elif part.startswith("--days="):
+                try:
+                    days = int(part.split("=", 1)[1])
+                except ValueError:
+                    pass
+            elif part == "--days" and i + 1 < len(parts):
+                try:
+                    days = int(parts[i + 1])
+                except ValueError:
+                    pass
+            elif part.startswith("--limit="):
+                try:
+                    limit = int(part.split("=", 1)[1])
+                except ValueError:
+                    pass
+            elif part in {"--limit", "limit"} and i + 1 < len(parts):
+                try:
+                    limit = int(parts[i + 1])
+                except ValueError:
+                    pass
         if query is None and parts:
             query = parts[-1]
-        result = fetch_first_gdelt_article(query)
+        kwargs = {}
+        if days is not None:
+            kwargs["days"] = days
+        if limit is not None:
+            kwargs["limit"] = limit
+        result = fetch_first_gdelt_article(query, **kwargs)
         if not result:
             return "No news found."
         return result
