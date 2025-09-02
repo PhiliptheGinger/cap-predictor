@@ -12,12 +12,13 @@ import requests
 from colorama import Fore, Style, init
 
 from sentimental_cap_predictor.data.news import (
-    fetch_article as _fetch_article,
     FetchArticleSpec,
 )
-
+from sentimental_cap_predictor.data.news import fetch_article as _fetch_article
 
 _MEMORY_INDEX: Path | None = None
+_SEEN_URLS: set[str] = set()
+_SEEN_TITLES: set[str] = set()
 
 
 def setup(memory_index: Path | None = None) -> None:
@@ -51,7 +52,10 @@ def _fetch_first_gdelt_article(
 
 
 def fetch_first_gdelt_article(
-    query: str, *, days: int = 1, limit: int = 100
+    query: str,
+    *,
+    days: int = 1,
+    limit: int = 100,
 ) -> str:
     """Return text for the first GDELT article matching ``query``.
 
@@ -71,7 +75,9 @@ def fetch_first_gdelt_article(
         return f"GDELT request failed: {exc}"
 
     if article.content:
-        from sentimental_cap_predictor.llm_core.memory_indexer import TextMemory
+        from sentimental_cap_predictor.llm_core.memory_indexer import (
+            TextMemory,
+        )
 
         index_path = _MEMORY_INDEX
         if index_path.exists():
@@ -134,7 +140,9 @@ def handle_command(command: str) -> str:
 
     lower = command.lower()
     if lower.startswith("memory search"):
-        from sentimental_cap_predictor.llm_core.memory_indexer import TextMemory
+        from sentimental_cap_predictor.llm_core.memory_indexer import (
+            TextMemory,
+        )
 
         index_path = _MEMORY_INDEX
         if not index_path.exists():
@@ -163,6 +171,129 @@ def handle_command(command: str) -> str:
                 if title and url:
                     results.append(f"{title} - {url}")
         return "\n".join(results) if results else "No matches found."
+
+    if lower.startswith("news.fetch_gdelt"):
+        import contextlib
+        import io
+
+        from sentimental_cap_predictor.news.cli import fetch_gdelt_command
+
+        parts = shlex.split(command)
+        query: str | None = None
+        max_results = 3
+        for i, part in enumerate(parts[1:], start=1):
+            if part in {"--query", "-q"} and i + 1 < len(parts):
+                query = parts[i + 1]
+            elif part.startswith("--query=") or part.startswith("-q="):
+                query = part.split("=", 1)[1]
+            elif part in {"--max", "-m"} and i + 1 < len(parts):
+                try:
+                    max_results = int(parts[i + 1])
+                except ValueError:
+                    pass
+            elif part.startswith("--max=") or part.startswith("-m="):
+                try:
+                    max_results = int(part.split("=", 1)[1])
+                except ValueError:
+                    pass
+        if query is None and len(parts) > 1:
+            query = parts[-1]
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            fetch_gdelt_command(query=query, max_results=max_results)
+        return buf.getvalue().strip()
+
+    if lower.startswith("news.read"):
+        import contextlib
+        import io
+
+        from sentimental_cap_predictor.news.cli import (
+            TranslateMode,
+            read_command,
+        )
+
+        parts = shlex.split(command)
+        url: str | None = None
+        summarize = False
+        analyze = False
+        chunks: int | None = None
+        overlap = 0
+        translate = TranslateMode.off
+        i = 1
+        while i < len(parts):
+            part = parts[i]
+            if part in {"--url", "-u"} and i + 1 < len(parts):
+                url = parts[i + 1]
+                i += 2
+                continue
+            if part.startswith("--url=") or part.startswith("-u="):
+                url = part.split("=", 1)[1]
+                i += 1
+                continue
+            if part == "--summarize":
+                summarize = True
+                i += 1
+                continue
+            if part == "--analyze":
+                analyze = True
+                i += 1
+                continue
+            if part.startswith("--chunks="):
+                try:
+                    chunks = int(part.split("=", 1)[1])
+                except ValueError:
+                    pass
+                i += 1
+                continue
+            if part == "--chunks" and i + 1 < len(parts):
+                try:
+                    chunks = int(parts[i + 1])
+                except ValueError:
+                    pass
+                i += 2
+                continue
+            if part.startswith("--overlap="):
+                try:
+                    overlap = int(part.split("=", 1)[1])
+                except ValueError:
+                    pass
+                i += 1
+                continue
+            if part == "--overlap" and i + 1 < len(parts):
+                try:
+                    overlap = int(parts[i + 1])
+                except ValueError:
+                    pass
+                i += 2
+                continue
+            if part.startswith("--translate="):
+                try:
+                    translate = TranslateMode(part.split("=", 1)[1])
+                except ValueError:
+                    pass
+                i += 1
+                continue
+            if part == "--translate" and i + 1 < len(parts):
+                try:
+                    translate = TranslateMode(parts[i + 1])
+                except ValueError:
+                    pass
+                i += 2
+                continue
+            i += 1
+        if url is None and len(parts) > 1:
+            url = parts[-1]
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            read_command(
+                url=url,
+                summarize=summarize,
+                analyze=analyze,
+                chunks=chunks,
+                overlap=overlap,
+                translate=translate,
+            )
+        return buf.getvalue().strip()
 
     if "gdelt" in lower or "news" in lower:
         parts = shlex.split(command)
