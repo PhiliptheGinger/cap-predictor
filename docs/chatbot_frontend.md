@@ -70,6 +70,19 @@ memory search "climate change policy"
 If the memory index (`data/memory.faiss`) or accompanying metadata JSON is not
 found, a message describing the missing resource is returned instead.
 
+### News commands
+
+Utilities from the news CLI can be accessed through `CMD:` directives:
+
+```bash
+CMD: news.fetch_gdelt --query "<terms>" --max 1
+CMD: news.read --url "<article_url>" --summarize --analyze --chunks 1000
+```
+
+The first command returns matching GDELT articles as JSON. The second retrieves
+an article, summarises it, performs a basic analysis and optionally chunks the
+text for further processing.
+
 ## Connector intents
 
 The chatbot understands simple phrases to pull data from a few external

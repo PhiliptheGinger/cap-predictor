@@ -380,3 +380,69 @@ def test_handle_command_memory_search(monkeypatch, tmp_path):
 
     text = cf.handle_command('memory search "query"')
     assert "First - http://a" in text
+
+
+def test_handle_command_news_fetch_gdelt(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    captured: dict[str, object] = {}
+
+    def fake_fetch_gdelt_command(query, max_results=3):  # noqa: ANN001
+        captured["query"] = query
+        captured["max_results"] = max_results
+        print("ok")
+
+    dummy_cli = SimpleNamespace(fetch_gdelt_command=fake_fetch_gdelt_command)
+    monkeypatch.setitem(sys.modules, "sentimental_cap_predictor.news.cli", dummy_cli)
+
+    out = cf.handle_command("news.fetch_gdelt --query NVDA --max 1")
+    assert out == "ok"
+    assert captured == {"query": "NVDA", "max_results": 1}
+
+
+def test_handle_command_news_read(monkeypatch):
+    import sys
+    from enum import Enum
+    from types import SimpleNamespace
+
+    class DummyTranslateMode(str, Enum):
+        off = "off"
+        en = "en"
+
+    captured: dict[str, object] = {}
+
+    def fake_read_command(
+        url,
+        *,
+        summarize=False,
+        analyze=False,
+        chunks=None,
+        overlap=0,
+        translate=DummyTranslateMode.off,
+    ):  # noqa: ANN001
+        captured.update(
+            url=url,
+            summarize=summarize,
+            analyze=analyze,
+            chunks=chunks,
+            overlap=overlap,
+            translate=translate,
+        )
+        print("done")
+
+    dummy_cli = SimpleNamespace(
+        read_command=fake_read_command, TranslateMode=DummyTranslateMode
+    )
+    monkeypatch.setitem(sys.modules, "sentimental_cap_predictor.news.cli", dummy_cli)
+
+    out = cf.handle_command(
+        "news.read --url http://example.com --summarize --analyze --chunks 1000"
+    )
+    assert out == "done"
+    assert captured["url"] == "http://example.com"
+    assert captured["summarize"] is True
+    assert captured["analyze"] is True
+    assert captured["chunks"] == 1000
+    assert captured["overlap"] == 0
+    assert captured["translate"] is DummyTranslateMode.off
