@@ -64,7 +64,11 @@ def call_qwen(utterance: str) -> str:
 
         cfg = get_llm_config()
         # Use deterministic settings for intent classification
-        _LOCAL_PROVIDER = QwenLocalProvider(model_path=cfg.model_path, temperature=0.0)
+        _LOCAL_PROVIDER = QwenLocalProvider(
+            model_path=cfg.model_path,
+            temperature=0.0,
+            max_new_tokens=cfg.max_new_tokens,
+        )
 
     messages = [
         {"role": "system", "content": SYSTEM},
