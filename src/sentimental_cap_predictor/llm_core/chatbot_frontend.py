@@ -295,6 +295,13 @@ def handle_command(command: str) -> str:
             )
         return buf.getvalue().strip()
 
+    # Treat single bare words without a matching executable as GDELT queries.
+    import shutil
+
+    stripped = command.strip()
+    if " " not in stripped and not shutil.which(stripped):
+        return fetch_first_gdelt_article(stripped)
+
     if "gdelt" in lower or "news" in lower:
         parts = shlex.split(command)
         query: str | None = None
