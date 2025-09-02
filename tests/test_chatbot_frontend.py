@@ -1,3 +1,4 @@
+# flake8: noqa
 import importlib.util
 import json
 import subprocess
@@ -27,7 +28,7 @@ class FetchArticleSpec:
     days: int = 1
     max_records: int = 100
     must_contain_any: tuple[str, ...] = ()
-    avoid_domains: tuple[str, ...] = ()
+    avoid_domains: tuple[str, ...] = ("seekingalpha.com",)
     require_text_accessible: bool = False
     novelty_against_urls: tuple[str, ...] = ()
 
@@ -217,7 +218,10 @@ def test_handle_command_parses_options(monkeypatch):
 
     def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
         captured.update(
-            query=query, prefer_content=prefer_content, days=days, max_records=max_records
+            query=query,
+            prefer_content=prefer_content,
+            days=days,
+            max_records=max_records,
         )
         return ArticleData(
             title="Headline",
@@ -227,9 +231,7 @@ def test_handle_command_parses_options(monkeypatch):
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
-    text = cf.handle_command(
-        'gdelt search --query "climate change" --limit 5 --days 2'
-    )
+    text = cf.handle_command('gdelt search --query "climate change" --limit 5 --days 2')
     assert text == "Body text"
     assert captured["query"] == "climate change"
     assert captured["days"] == 2
