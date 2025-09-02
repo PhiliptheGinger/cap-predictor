@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
 import requests
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
@@ -19,6 +20,29 @@ from sentimental_cap_predictor.data.news import fetch_article as _fetch_article
 _MEMORY_INDEX: Path | None = None
 _SEEN_URLS: set[str] = set()
 _SEEN_TITLES: set[str] = set()
+# JSON file for persisting seen articles to avoid repeated headlines.
+# Stored at ``data/gdelt_seen.json`` as a list of objects with ``title`` and ``url`` keys.
+_SEEN_META_PATH = Path("data/gdelt_seen.json")
+_SEEN_METADATA: list[dict[str, str]] = []
+_SEEN_LOADED = False
+
+
+def _load_seen_metadata() -> None:
+    """Populate seen URL/title sets from :data:`_SEEN_META_PATH` if available."""
+    global _SEEN_LOADED
+    if _SEEN_LOADED:
+        return
+    _SEEN_LOADED = True
+    if _SEEN_META_PATH.exists():
+        try:
+            _SEEN_METADATA[:] = json.loads(_SEEN_META_PATH.read_text())
+        except json.JSONDecodeError:
+            _SEEN_METADATA.clear()
+        for item in _SEEN_METADATA:
+            if url := item.get("url"):
+                _SEEN_URLS.add(url)
+            if title := item.get("title"):
+                _SEEN_TITLES.add(title)
 
 
 def setup(memory_index: Path | None = None) -> None:
@@ -66,6 +90,7 @@ def fetch_first_gdelt_article(
 
     if _MEMORY_INDEX is None:
         setup()
+    _load_seen_metadata()
 
     try:
         article = _fetch_first_gdelt_article(
@@ -73,6 +98,13 @@ def fetch_first_gdelt_article(
         )
     except requests.RequestException as exc:  # pragma: no cover
         return f"GDELT request failed: {exc}"
+
+    if article.title or article.url:
+        entry = {"title": article.title, "url": article.url}
+        if entry not in _SEEN_METADATA:
+            _SEEN_METADATA.append(entry)
+            _SEEN_META_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _SEEN_META_PATH.write_text(json.dumps(_SEEN_METADATA))
 
     if article.content:
         from sentimental_cap_predictor.llm_core.memory_indexer import (
@@ -88,7 +120,6 @@ def fetch_first_gdelt_article(
         memory.save(index_path)
 
         meta_path = index_path.with_suffix(".json")
-        import json
 
         metadata: list[dict[str, str]]
         if meta_path.exists():
