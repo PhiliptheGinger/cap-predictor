@@ -17,6 +17,7 @@ def log_project_root() -> None:
     """Log the resolved project root path."""
     logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
 
+
 DATA_DIR = PROJ_ROOT / "data"
 RAW_DATA_DIR = Path(os.getenv("RAW_DATA_DIR", DATA_DIR / "raw"))
 INTERIM_DATA_DIR = Path(
@@ -33,6 +34,11 @@ TRADER_DIR = PACKAGE_DIR / "trading" / "trader_utils"
 
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
+
+# API endpoints
+GDELT_API_URL = os.getenv(
+    "GDELT_API_URL", "https://api.gdeltproject.org/api/v2/doc/doc"
+)
 
 # Model hyperparameters
 LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.001))
