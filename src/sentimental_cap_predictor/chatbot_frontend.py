@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import requests
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
@@ -11,6 +13,9 @@ from colorama import Fore, Style, init
 from sentimental_cap_predictor.data.news import (
     fetch_first_gdelt_article as _fetch_first_gdelt_article,
 )
+
+
+_MEMORY_INDEX = Path("data/memory.faiss")
 
 # Initialise colour handling for cross-platform compatibility
 init(autoreset=True)
@@ -30,6 +35,15 @@ def fetch_first_gdelt_article(query: str) -> str:
         return f"GDELT request failed: {exc}"
 
     if article.content:
+        from sentimental_cap_predictor.memory_indexer import TextMemory
+
+        index_path = _MEMORY_INDEX
+        if index_path.exists():
+            memory = TextMemory.load(index_path)
+        else:
+            memory = TextMemory()
+        memory.add([article.content])
+        memory.save(index_path)
         return article.content
     if article.title and article.url:
         return f"{article.title} - {article.url}"

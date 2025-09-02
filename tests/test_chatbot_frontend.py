@@ -2,8 +2,43 @@ import subprocess
 import requests
 import importlib.util
 from pathlib import Path
+from dataclasses import dataclass
+import sys
+import types
 
-from sentimental_cap_predictor.data.news import ArticleData
+
+@dataclass
+class ArticleData:
+    title: str = ""
+    url: str = ""
+    content: str = ""
+
+
+# Provide lightweight stand-ins to avoid importing the full package
+dummy_news = types.ModuleType("sentimental_cap_predictor.data.news")
+dummy_news.fetch_first_gdelt_article = lambda *a, **k: None
+dummy_data = types.ModuleType("sentimental_cap_predictor.data")
+dummy_data.__path__ = []  # mark as package
+dummy_data.news = dummy_news
+sys.modules.setdefault("sentimental_cap_predictor.data", dummy_data)
+sys.modules.setdefault("sentimental_cap_predictor.data.news", dummy_news)
+
+
+class _StubMemory:
+    def add(self, texts):  # noqa: ANN001
+        pass
+
+    def save(self, path):  # noqa: ANN001
+        pass
+
+    @classmethod
+    def load(cls, path, model_name=None):  # noqa: ANN001
+        return cls()
+
+
+dummy_memory = types.ModuleType("sentimental_cap_predictor.memory_indexer")
+dummy_memory.TextMemory = _StubMemory
+sys.modules.setdefault("sentimental_cap_predictor.memory_indexer", dummy_memory)
 
 # Import the module directly to avoid triggering package-level side effects
 spec = importlib.util.spec_from_file_location(
@@ -33,6 +68,50 @@ def test_fetch_first_gdelt_article(monkeypatch):
     text = cf.fetch_first_gdelt_article("NVDA")
     assert text == "Body text"
     assert captured["prefer_content"] is True
+
+
+def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
+    index_path = tmp_path / "memory.faiss"
+    index_path.touch()
+
+    class DummyMemory:
+        added: list[str] = []
+        saved_path = None
+        loaded = False
+
+        def add(self, texts):  # noqa: ANN001
+            DummyMemory.added.extend(texts)
+
+        def save(self, path):  # noqa: ANN001
+            DummyMemory.saved_path = path
+
+        @classmethod
+        def load(cls, path, model_name=None):  # noqa: ANN001
+            cls.loaded = True
+            return cls()
+
+    import sys
+    from types import SimpleNamespace
+
+    dummy_module = SimpleNamespace(TextMemory=DummyMemory)
+    monkeypatch.setitem(sys.modules, "sentimental_cap_predictor.memory_indexer", dummy_module)
+
+    monkeypatch.setattr(cf, "_MEMORY_INDEX", index_path)
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content: ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="Body text",
+        ),
+    )
+
+    text = cf.fetch_first_gdelt_article("NVDA")
+    assert text == "Body text"
+    assert DummyMemory.added == ["Body text"]
+    assert DummyMemory.saved_path == index_path
+    assert DummyMemory.loaded is True
 
 
 def test_fetch_first_gdelt_article_fallback(monkeypatch):
