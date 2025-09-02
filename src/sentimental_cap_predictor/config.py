@@ -29,7 +29,7 @@ EXTERNAL_DATA_DIR = DATA_DIR / "external"
 
 MODELS_DIR = PROJ_ROOT / "models"
 MODELING_DIR = Path(os.getenv("MODELING_DIR", PACKAGE_DIR / "modeling"))
-TRADER_DIR = PACKAGE_DIR / "trader_utils"
+TRADER_DIR = PACKAGE_DIR / "trading" / "trader_utils"
 
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
