@@ -15,8 +15,29 @@ class QwenLocalProvider(LLMProvider):
     """Implementation of :class:`LLMProvider` for a local Qwen model."""
 
     def __init__(
-        self, model_path: str, temperature: float, max_new_tokens: int = 512
+        self,
+        model_path: str,
+        temperature: float,
+        max_new_tokens: int = 512,
+        offload_folder: str | None = None,
     ) -> None:
+        """Create a provider backed by a local Qwen model.
+
+        Parameters
+        ----------
+        model_path:
+            Path to the model weights on disk or a Hugging Face repository
+            name.
+        temperature:
+            Sampling temperature for text generation.
+        max_new_tokens:
+            Default ``max_new_tokens`` value used when chatting with the model.
+        offload_folder:
+            Directory used by ``accelerate`` to offload model weights when the
+            full model cannot fit in device memory. If ``None`` the model is
+            loaded entirely on the GPU/CPU indicated by ``device_map``.
+        """
+
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -24,7 +45,10 @@ class QwenLocalProvider(LLMProvider):
         with init_empty_weights():
             model = AutoModelForCausalLM.from_config(config)
         self.model = load_checkpoint_and_dispatch(
-            model, model_path, device_map="auto"
+            model,
+            model_path,
+            device_map="auto",
+            offload_folder=offload_folder,
         )
         self.model.eval()
 
@@ -34,15 +58,17 @@ class QwenLocalProvider(LLMProvider):
         prompt = self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        tokenized = self.tokenizer(prompt, return_tensors="pt")
+        inputs = tokenized.to(self.model.device)
         kwargs.setdefault("max_new_tokens", self.max_new_tokens)
         kwargs.setdefault(
-            "max_length", inputs["input_ids"].shape[-1] + kwargs["max_new_tokens"]
+            "max_length",
+            inputs["input_ids"].shape[-1] + kwargs["max_new_tokens"],
         )
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs, temperature=self.temperature, **kwargs
             )
-        generated = outputs[0, inputs["input_ids"].shape[-1] :]
+        start = inputs["input_ids"].shape[-1]
+        generated = outputs[0, start:]
         return self.tokenizer.decode(generated, skip_special_tokens=True)
-

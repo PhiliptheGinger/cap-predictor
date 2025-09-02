@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-import json
 import requests
 
 # Heavy dependencies are imported lazily in ``main`` to keep the module light
@@ -21,14 +21,15 @@ _MEMORY_INDEX: Path | None = None
 _SEEN_URLS: set[str] = set()
 _SEEN_TITLES: set[str] = set()
 # JSON file for persisting seen articles to avoid repeated headlines.
-# Stored at ``data/gdelt_seen.json`` as a list of objects with ``title`` and ``url`` keys.
+# Stored at ``data/gdelt_seen.json`` as a list of objects with ``title`` and
+# ``url`` keys.
 _SEEN_META_PATH = Path("data/gdelt_seen.json")
 _SEEN_METADATA: list[dict[str, str]] = []
 _SEEN_LOADED = False
 
 
 def _load_seen_metadata() -> None:
-    """Populate seen URL/title sets from :data:`_SEEN_META_PATH` if available."""
+    """Populate seen URL/title sets from _SEEN_META_PATH if available."""
     global _SEEN_LOADED
     if _SEEN_LOADED:
         return
@@ -402,6 +403,7 @@ def main() -> None:
         model_path=config.model_path,
         temperature=config.temperature,
         max_new_tokens=config.max_new_tokens,
+        offload_folder=getattr(config, "offload_folder", None),
     )
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},

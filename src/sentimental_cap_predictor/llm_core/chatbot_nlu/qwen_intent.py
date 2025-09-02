@@ -68,6 +68,7 @@ def call_qwen(utterance: str) -> str:
             model_path=cfg.model_path,
             temperature=0.0,
             max_new_tokens=cfg.max_new_tokens,
+            offload_folder=getattr(cfg, "offload_folder", None),
         )
 
     messages = [
