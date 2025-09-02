@@ -17,6 +17,9 @@ class LLMConfig:
     model_path: str
     temperature: float
     max_new_tokens: int = 512
+    # Optional directory used by ``accelerate`` to offload model weights. If
+    # ``None`` a directory named "offload" inside the model checkpoint is used
+    # automatically.
     offload_folder: str | None = None
 
 
