@@ -12,6 +12,7 @@ defaults when they are unset:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `QWEN_MODEL_PATH` | `Qwen/Qwen2-1.5B-Instruct` | Local path or HF repository for the weights |
+| `QWEN_OFFLOAD_FOLDER` | `(unset)` | Directory for weights offloaded from device memory |
 | `LLM_TEMPERATURE` | `0.7` | Sampling temperature |
 
 Variables can be placed in a `.env` file which is loaded automatically.
@@ -40,7 +41,9 @@ huggingface-cli download Qwen/Qwen2-1.5B-Instruct --local-dir /path/to/qwen
 ```
 
 Set `QWEN_MODEL_PATH` to the directory containing the weights so the model
-can be loaded entirely offline.
+can be loaded entirely offline. If memory is constrained, use
+`QWEN_OFFLOAD_FOLDER` to specify a directory for any weights that need to be
+offloaded from the main device.
 
 ## Run
 
