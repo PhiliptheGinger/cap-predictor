@@ -5,9 +5,10 @@ import subprocess
 import sys
 from typing import Any, Dict
 
-from sentimental_cap_predictor.chatbot_nlu import qwen_intent
 from sentimental_cap_predictor.data.news import fetch_news
-from sentimental_cap_predictor.connectors import (
+
+from .chatbot_nlu import qwen_intent
+from .connectors import (
     arxiv_connector,
     fred_connector,
     github_connector,

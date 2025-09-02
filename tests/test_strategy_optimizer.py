@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from sentimental_cap_predictor.trader_utils.strategy_optimizer import (
+from sentimental_cap_predictor.trading.trader_utils.strategy_optimizer import (
     moving_average_crossover,
     random_search,
     walk_forward_eval,

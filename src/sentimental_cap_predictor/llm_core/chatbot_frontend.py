@@ -39,7 +39,7 @@ def fetch_first_gdelt_article(
         return f"GDELT request failed: {exc}"
 
     if article.content:
-        from sentimental_cap_predictor.memory_indexer import TextMemory
+        from .memory_indexer import TextMemory
 
         index_path = _MEMORY_INDEX
         if index_path.exists():
@@ -83,7 +83,7 @@ def handle_command(command: str) -> str:
 
     lower = command.lower()
     if lower.startswith("memory search"):
-        from sentimental_cap_predictor.memory_indexer import TextMemory
+        from .memory_indexer import TextMemory
 
         index_path = _MEMORY_INDEX
         if not index_path.exists():
@@ -171,8 +171,8 @@ def handle_command(command: str) -> str:
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     from sentimental_cap_predictor.cmd_utils import extract_cmd
-    from sentimental_cap_predictor.config_llm import get_llm_config
-    from sentimental_cap_predictor.llm_providers.qwen_local import (
+    from .config_llm import get_llm_config
+    from .llm_providers.qwen_local import (
         QwenLocalProvider,
     )
 

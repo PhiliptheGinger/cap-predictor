@@ -37,10 +37,10 @@ class _StubMemory:
         return cls()
 
 
-dummy_memory = types.ModuleType("sentimental_cap_predictor.memory_indexer")
+dummy_memory = types.ModuleType("sentimental_cap_predictor.llm_core.memory_indexer")
 dummy_memory.TextMemory = _StubMemory
 sys.modules.setdefault(
-    "sentimental_cap_predictor.memory_indexer",
+    "sentimental_cap_predictor.llm_core.memory_indexer",
     dummy_memory,
 )
 
@@ -50,6 +50,7 @@ spec = importlib.util.spec_from_file_location(
     Path(__file__).resolve().parents[1]
     / "src"
     / "sentimental_cap_predictor"
+    / "llm_core"
     / "chatbot_frontend.py",
 )
 cf = importlib.util.module_from_spec(spec)
@@ -99,7 +100,9 @@ def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
 
     dummy_module = SimpleNamespace(TextMemory=DummyMemory)
     monkeypatch.setitem(
-        sys.modules, "sentimental_cap_predictor.memory_indexer", dummy_module
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.memory_indexer",
+        dummy_module,
     )
 
     monkeypatch.setattr(cf, "_MEMORY_INDEX", index_path)
@@ -257,12 +260,12 @@ def test_retry_on_malformed_output(monkeypatch):
     )
     monkeypatch.setitem(
         sys.modules,
-        "sentimental_cap_predictor.llm_providers.qwen_local",
+        "sentimental_cap_predictor.llm_core.llm_providers.qwen_local",
         dummy_module,
     )
     monkeypatch.setitem(
         sys.modules,
-        "sentimental_cap_predictor.config_llm",
+        "sentimental_cap_predictor.llm_core.config_llm",
         SimpleNamespace(
             get_llm_config=lambda: SimpleNamespace(model_path="", temperature=0.0)
         ),
@@ -327,7 +330,9 @@ def test_handle_command_memory_search(monkeypatch, tmp_path):
 
     dummy_module = SimpleNamespace(TextMemory=DummyMemory)
     monkeypatch.setitem(
-        sys.modules, "sentimental_cap_predictor.memory_indexer", dummy_module
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.memory_indexer",
+        dummy_module,
     )
     monkeypatch.setattr(cf, "_MEMORY_INDEX", index_path)
 

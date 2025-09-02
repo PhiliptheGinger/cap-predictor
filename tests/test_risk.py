@@ -1,4 +1,4 @@
-from sentimental_cap_predictor.trader_utils.risk import enforce_limits
+from sentimental_cap_predictor.trading.trader_utils.risk import enforce_limits
 
 
 def test_enforce_limits_no_breach():

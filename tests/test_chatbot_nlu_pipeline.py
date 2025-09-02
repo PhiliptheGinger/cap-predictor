@@ -1,7 +1,7 @@
 import pytest
 
-from sentimental_cap_predictor.chatbot import _predict_intent
-from sentimental_cap_predictor.chatbot_nlu import qwen_intent
+from sentimental_cap_predictor.llm_core.chatbot import _predict_intent
+from sentimental_cap_predictor.llm_core.chatbot_nlu import qwen_intent
 
 
 @pytest.mark.parametrize(
