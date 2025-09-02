@@ -36,8 +36,9 @@ class QwenLocalProvider(LLMProvider):
             Default ``max_new_tokens`` value used when chatting with the model.
         offload_folder:
             Directory used by ``accelerate`` to offload model weights when the
-            full model cannot fit in device memory. If ``None`` the model is
-            loaded entirely on the GPU/CPU indicated by ``device_map``.
+            full model cannot fit in device memory. If ``None`` a subdirectory
+            named ``"offload"`` inside the resolved checkpoint directory is
+            created and used automatically.
         """
 
         self.temperature = temperature
@@ -60,11 +61,19 @@ class QwenLocalProvider(LLMProvider):
         with init_empty_weights():
             model = AutoModelForCausalLM.from_config(config)
         model.tie_weights()
+
+        offload_dir = (
+            Path(offload_folder)
+            if offload_folder is not None
+            else Path(checkpoint_path) / "offload"
+        )
+        offload_dir.mkdir(parents=True, exist_ok=True)
+
         self.model = load_checkpoint_and_dispatch(
             model,
             checkpoint=checkpoint_path,
             device_map="auto",
-            offload_folder=offload_folder,
+            offload_folder=str(offload_dir),
         )
         self.model.eval()
 
