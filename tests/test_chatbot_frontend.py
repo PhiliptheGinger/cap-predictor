@@ -33,7 +33,7 @@ class FetchArticleSpec:
     novelty_against_urls: tuple[str, ...] = ()
 
 
-dummy_news.fetch_article = lambda spec: ArticleData()
+dummy_news.fetch_article = lambda spec, seen_titles=(): ArticleData()
 dummy_news.FetchArticleSpec = FetchArticleSpec
 dummy_data = types.ModuleType("sentimental_cap_predictor.data")
 dummy_data.__path__ = []  # mark as package
@@ -92,6 +92,26 @@ def test_fetch_first_gdelt_article(monkeypatch, tmp_path):
     text = cf.fetch_first_gdelt_article("NVDA")
     assert text == "Body text"
     assert captured["prefer_content"] is True
+
+
+def test_seen_sets_update_and_pass(monkeypatch):
+    monkeypatch.setattr(cf, "_SEEN_URLS", set())
+    monkeypatch.setattr(cf, "_SEEN_TITLES", set())
+
+    captures: list[tuple[str, ...]] = []
+
+    def fake_fetch(spec, seen_titles=()):  # noqa: ANN001
+        captures.append(spec.novelty_against_urls)
+        return ArticleData(title="Headline", url="http://example.com")
+
+    monkeypatch.setattr(cf, "_fetch_article", fake_fetch)
+
+    cf._fetch_first_gdelt_article("NVDA")
+    cf._fetch_first_gdelt_article("NVDA")
+
+    assert captures == [(), ("http://example.com",)]
+    assert cf._SEEN_URLS == {"http://example.com"}
+    assert cf._SEEN_TITLES == {"Headline"}
 
 
 def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
