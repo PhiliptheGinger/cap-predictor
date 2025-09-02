@@ -15,8 +15,8 @@ Return ONLY JSON between <json>...</json>. Choose the intent from this FIXED lis
  info.arxiv, info.pubmed, info.openalex, info.fred, info.github]
 Rules:
 - If input is outside these intents, use help.show_options.
-- Extract slots when relevant: tickers[], period, interval, range, split, seed.
-- Normalize tickers to uppercase. Omit unknown slots.
+- Extract slots when relevant: tickers[], period, interval, range, split, seed, keywords[].
+- Normalize tickers and keywords to uppercase. Omit unknown slots.
 - If unsure, also include "alt_intent" with the runner-up.
 """
 
@@ -30,7 +30,7 @@ FEWSHOT = """Few-shot:
 "what can you do?" -> help.show_options
 "who are you?" -> bot.identity
 "hey! how's it going?" -> smalltalk.greeting
-"news about NVDA" -> info.lookup
+"news about NVDA" -> info.lookup {"keywords":["NVDA"]}
 "arxiv machine learning" -> info.arxiv
 "pubmed cancer research" -> info.pubmed
 "openalex reinforcement learning" -> info.openalex
@@ -149,6 +149,18 @@ def _slots_from_match(m: _re.Match[str]) -> Dict[str, Any]:
     return {"tickers": tickers}
 
 
+def _extract_keywords(text: str) -> list[str]:
+    tokens = _re.findall(r"[A-Za-z0-9\.]+", text)
+    keywords: list[str] = []
+    for tok in tokens:
+        if tok.lower() in {"and", "or", "the", "a", "an", "on", "about"}:
+            continue
+        up = tok.upper()
+        if up not in keywords:
+            keywords.append(up)
+    return keywords
+
+
 def predict_fallback(utterance: str) -> Dict[str, Any]:
     text = utterance.strip()
     if _HELLO.search(text):
@@ -193,5 +205,9 @@ def predict_fallback(utterance: str) -> Dict[str, Any]:
         }
     m = _INFO_LOOKUP.search(text)
     if m:
-        return {"intent": "info.lookup", "slots": {"query": m.group(1).strip()}}
+        query = m.group(1).strip()
+        return {
+            "intent": "info.lookup",
+            "slots": {"query": query, "keywords": _extract_keywords(query)},
+        }
     return {"intent": "help.show_options", "slots": {}}

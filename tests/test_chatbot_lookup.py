@@ -1,6 +1,3 @@
-import pandas as pd
-import pytest
-
 from sentimental_cap_predictor.llm_core import chatbot
 from sentimental_cap_predictor.llm_core.chatbot import _predict_intent
 from sentimental_cap_predictor.llm_core.chatbot_nlu import qwen_intent
@@ -8,28 +5,33 @@ from sentimental_cap_predictor.llm_core.chatbot_nlu import qwen_intent
 
 def test_info_lookup_intent_fallback(monkeypatch):
     monkeypatch.setattr(qwen_intent, "predict", lambda _: None)
-    out = _predict_intent("news about NVDA")
+    out = _predict_intent("news about NVDA and AAPL")
     assert out["intent"] == "info.lookup"
-    assert out["slots"] == {"query": "NVDA"}
+    assert out["slots"] == {"query": "NVDA and AAPL", "keywords": ["NVDA", "AAPL"]}
 
 
-def test_info_lookup_dispatch_calls_fetch_news(monkeypatch):
-    calls = []
+def test_info_lookup_dispatch_builds_spec(monkeypatch):
+    captured = {}
 
-    def fake_fetch_news(query):
-        calls.append(query)
-        return pd.DataFrame(
-            {
-                "date": [pd.Timestamp("2024-01-01")],
-                "headline": ["Sample headline"],
-                "source": ["Test"],
-            }
-        )
+    def fake_fetch_article(spec):  # noqa: ANN001
+        captured["keywords"] = spec.must_contain_any
+        from sentimental_cap_predictor.data.news import ArticleData
 
-    monkeypatch.setattr(chatbot, "fetch_news", fake_fetch_news)
-    out = chatbot.dispatch("info.lookup", {"query": "NVDA"})
-    assert "Sample headline" in out
-    assert calls == ["NVDA"]
+        return ArticleData(title="Headline", url="http://example.com", content="")
+
+    monkeypatch.setattr(chatbot, "fetch_article", fake_fetch_article)
+    out = chatbot.dispatch("info.lookup", {"query": "NVDA", "keywords": ["NVDA"]})
+    assert "Headline" in out
+    assert captured["keywords"] == ("NVDA",)
+
+
+def test_info_lookup_dispatch_handles_no_match(monkeypatch):
+    def fake_fetch_article(spec):  # noqa: ANN001
+        raise RuntimeError("No candidate articles matched filters")
+
+    monkeypatch.setattr(chatbot, "fetch_article", fake_fetch_article)
+    msg = chatbot.dispatch("info.lookup", {"query": "NVDA", "keywords": ["NVDA"]})
+    assert "couldn't find" in msg.lower()
 
 
 def test_arxiv_intent_and_dispatch(monkeypatch):
