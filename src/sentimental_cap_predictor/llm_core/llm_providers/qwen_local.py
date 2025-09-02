@@ -43,11 +43,13 @@ class QwenLocalProvider(LLMProvider):
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
 
-        model_path = Path(model_path)
-        if model_path.exists():
-            checkpoint_path = str(model_path)
+        local_model_path = Path(model_path)
+        if local_model_path.exists():
+            checkpoint_path = model_path
         else:
-            checkpoint_path = snapshot_download(repo_id=str(model_path))
+            checkpoint_path = snapshot_download(
+                repo_id=local_model_path.as_posix(),
+            )
 
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
         config = AutoConfig.from_pretrained(checkpoint_path)
