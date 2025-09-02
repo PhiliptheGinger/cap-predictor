@@ -1,8 +1,8 @@
+import importlib.util
+import sys
+import types
 from datetime import datetime
 from pathlib import Path
-import importlib.util
-import types
-import sys
 
 import pandas as pd
 import pytest
@@ -119,7 +119,8 @@ def test_extract_article_content_user_agent(
     monkeypatch.setattr(news, "Article", DummyArticle)
 
     text = news.extract_article_content(
-        "http://example.com", use_headless=use_headless
+        "http://example.com",
+        use_headless=use_headless,
     )
     assert text == "body"
     assert expected in captured["ua"]
@@ -157,7 +158,9 @@ def test_query_gdelt_for_news_handles_timeout(monkeypatch):
 
     with pytest.raises(requests.Timeout):
         news.query_gdelt_for_news(
-            query="NVDA", start_date="20240101000000", end_date="20240102000000"
+            query="NVDA",
+            start_date="20240101000000",
+            end_date="20240102000000",
         )
 
 
@@ -172,7 +175,11 @@ def test_fetch_headline_uses_gdelt_source(monkeypatch):
                 }
             )
 
-    monkeypatch.setattr(news, "GDELTSource", lambda max_records=1: DummySource())
+    monkeypatch.setattr(
+        news,
+        "GDELTSource",
+        lambda max_records=1: DummySource(),
+    )
     headline = news.fetch_headline("NVDA")
     assert headline == "Example"
 
@@ -183,26 +190,32 @@ def test_fetch_article_prefers_content(monkeypatch):
     monkeypatch.setattr(
         news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
     )
-    monkeypatch.setattr(news, "extract_article_content", lambda url: "Body text")
+    monkeypatch.setattr(
+        news,
+        "extract_article_content",
+        lambda *a, **k: "Body text",
+    )
 
     spec = news.FetchArticleSpec(query="NVDA")
     article = news.fetch_article(spec)
     assert article.content == "Body text"
 
 
-def test_fetch_article_fallback_on_missing_content(monkeypatch):
+def test_fetch_article_raises_on_missing_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
     monkeypatch.setattr(
         news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
     )
-    monkeypatch.setattr(news, "extract_article_content", lambda url: None)
+    monkeypatch.setattr(
+        news,
+        "extract_article_content",
+        lambda *a, **k: None,
+    )
 
     spec = news.FetchArticleSpec(query="NVDA")
-    article = news.fetch_article(spec)
-    assert article.content == ""
-    assert article.title == "Headline"
-    assert article.url == "http://example.com"
+    with pytest.raises(RuntimeError):
+        news.fetch_article(spec)
 
 
 def test_fetch_article_custom_window_and_limit(monkeypatch):
@@ -216,6 +229,11 @@ def test_fetch_article_custom_window_and_limit(monkeypatch):
         return df
 
     monkeypatch.setattr(news, "query_gdelt_for_news", fake_query)
+    monkeypatch.setattr(
+        news,
+        "extract_article_content",
+        lambda *a, **k: "Body",
+    )
 
     class DummyDateTime(datetime):
         @classmethod
@@ -253,4 +271,22 @@ def test_fetch_article_applies_filters_and_novelty(monkeypatch):
         novelty_against_urls=("http://known.com/a",),
     )
     article = news.fetch_article(spec)
+    assert article.url == "http://new.com/b"
+
+
+def test_fetch_article_title_novelty(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {"title": "Seen headline", "url": "http://old.com/a"},
+            {"title": "Fresh perspective", "url": "http://new.com/b"},
+        ]
+    )
+
+    monkeypatch.setattr(
+        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+    )
+    monkeypatch.setattr(news, "extract_article_content", lambda url: "")
+
+    spec = news.FetchArticleSpec(query="q")
+    article = news.fetch_article(spec, seen_titles=("Seen headline",))
     assert article.url == "http://new.com/b"

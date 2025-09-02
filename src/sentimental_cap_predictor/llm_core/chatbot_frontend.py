@@ -40,8 +40,14 @@ def _fetch_first_gdelt_article(
         days=days,
         max_records=max_records,
         require_text_accessible=prefer_content,
+        novelty_against_urls=tuple(_SEEN_URLS),
     )
-    return _fetch_article(spec)
+    article = _fetch_article(spec, seen_titles=_SEEN_TITLES)
+    if article.url:
+        _SEEN_URLS.add(article.url)
+    if article.title:
+        _SEEN_TITLES.add(article.title)
+    return article
 
 
 def fetch_first_gdelt_article(
