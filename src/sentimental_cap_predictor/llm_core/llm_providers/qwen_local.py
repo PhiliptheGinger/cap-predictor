@@ -14,8 +14,11 @@ from .base import ChatMessage, LLMProvider
 class QwenLocalProvider(LLMProvider):
     """Implementation of :class:`LLMProvider` for a local Qwen model."""
 
-    def __init__(self, model_path: str, temperature: float) -> None:
+    def __init__(
+        self, model_path: str, temperature: float, max_new_tokens: int = 512
+    ) -> None:
         self.temperature = temperature
+        self.max_new_tokens = max_new_tokens
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         config = AutoConfig.from_pretrained(model_path)
         with init_empty_weights():
@@ -32,6 +35,10 @@ class QwenLocalProvider(LLMProvider):
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        kwargs.setdefault("max_new_tokens", self.max_new_tokens)
+        kwargs.setdefault(
+            "max_length", inputs["input_ids"].shape[-1] + kwargs["max_new_tokens"]
+        )
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs, temperature=self.temperature, **kwargs
