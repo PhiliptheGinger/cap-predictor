@@ -16,10 +16,12 @@ from .data.news import extract_article_content, query_gdelt_for_news
 from .data_bundle import DataBundle
 from .preprocessing import merge_data
 
-load_dotenv()
 
-# Initialize colorama
-init(autoreset=True)
+# Lazy initialisation to avoid side effects on import
+def setup() -> None:
+    """Load environment variables and configure colour handling."""
+    load_dotenv()
+    init(autoreset=True)
 
 app = typer.Typer()
 
@@ -294,4 +296,5 @@ def main(
 
 
 if __name__ == "__main__":
+    setup()
     app()
