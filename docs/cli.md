@@ -6,7 +6,7 @@
 Run the moving-average strategy optimizer using Typer:
 
 ```bash
-python -m sentimental_cap_predictor.trader_utils.strategy_optimizer optimize data/processed/NVDA_prices.csv --iterations 250 --seed 42
+python -m sentimental_cap_predictor.trading.trader_utils.strategy_optimizer optimize data/processed/NVDA_prices.csv --iterations 250 --seed 42
 ```
 
 The CSV must contain two columns:
@@ -94,7 +94,7 @@ chatbot queries both a *main* and an *experimental* model for every question
 and explains which answer was chosen:
 
 ```bash
-python -m sentimental_cap_predictor.chatbot \
+python -m sentimental_cap_predictor.llm_core.chatbot \
     --main-model mistralai/Mistral-7B-v0.1 \
     --experimental-model mistralai/Mistral-7B-Instruct-v0.2
 ```

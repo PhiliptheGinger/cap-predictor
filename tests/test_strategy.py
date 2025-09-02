@@ -1,8 +1,8 @@
 import pandas as pd
 
 from sentimental_cap_predictor.data_bundle import DataBundle
-from sentimental_cap_predictor.strategy import BuyAndHoldStrategy
-from sentimental_cap_predictor.backtester import backtest
+from sentimental_cap_predictor.trading.strategy import BuyAndHoldStrategy
+from sentimental_cap_predictor.trading.backtester import backtest
 
 
 def test_buy_and_hold_generates_weight_dataframe():

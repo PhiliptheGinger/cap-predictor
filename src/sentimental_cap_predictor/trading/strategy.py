@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from .data_bundle import DataBundle
+from ..data_bundle import DataBundle
 
 
 @dataclass

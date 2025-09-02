@@ -6,7 +6,7 @@ import os
 import re as _re
 from typing import Any, Dict
 
-from sentimental_cap_predictor.config_llm import get_llm_config
+from ..config_llm import get_llm_config
 
 SYSTEM = """You are an intent classifier and slot extractor for the Cap Predictor CLI.
 Return ONLY JSON between <json>...</json>. Choose the intent from this FIXED list:
@@ -58,7 +58,7 @@ def call_qwen(utterance: str) -> str:
 
     global _LOCAL_PROVIDER
     if _LOCAL_PROVIDER is None:
-        from sentimental_cap_predictor.llm_providers.qwen_local import (
+        from ..llm_providers.qwen_local import (
             QwenLocalProvider,
         )
 

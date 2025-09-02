@@ -19,7 +19,7 @@ from ..config import ENABLE_TICKER_LOGS
 from ..data import ingest as data_ingest
 from ..model_training import train_model, predict_on_test_data
 from ..preprocessing import preprocess_price_data
-from ..trader_utils import strategy_optimizer as strat_opt
+from ..trading.trader_utils import strategy_optimizer as strat_opt
 
 TRAIN_RATIO = 0.8
 

@@ -4,10 +4,10 @@ from typing import Mapping, Optional
 
 import pandas as pd
 
-from .data_bundle import DataBundle
+from ..data_bundle import DataBundle
 from .strategy import StrategyIdea
 from .backtest_result import BacktestResult
-from .evaluation import compute_metrics
+from ..evaluation import compute_metrics
 
 
 def backtest(

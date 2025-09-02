@@ -1,9 +1,9 @@
 import pandas as pd
 import pytest
 
-from sentimental_cap_predictor import chatbot
-from sentimental_cap_predictor.chatbot import _predict_intent
-from sentimental_cap_predictor.chatbot_nlu import qwen_intent
+from sentimental_cap_predictor.llm_core import chatbot
+from sentimental_cap_predictor.llm_core.chatbot import _predict_intent
+from sentimental_cap_predictor.llm_core.chatbot_nlu import qwen_intent
 
 
 def test_info_lookup_intent_fallback(monkeypatch):

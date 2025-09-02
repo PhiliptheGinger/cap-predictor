@@ -61,11 +61,12 @@ indexer_path = (
     Path(__file__).resolve().parents[1]
     / "src"
     / "sentimental_cap_predictor"
+    / "llm_core"
     / "memory_indexer.py"
 )
 spec = importlib.util.spec_from_file_location("memory_indexer", indexer_path)
 indexer = importlib.util.module_from_spec(spec)
-sys.modules["sentimental_cap_predictor.memory_indexer"] = indexer
+sys.modules["sentimental_cap_predictor.llm_core.memory_indexer"] = indexer
 spec.loader.exec_module(indexer)
 
 
