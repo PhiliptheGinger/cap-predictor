@@ -1,3 +1,4 @@
+# flake8: noqa
 import importlib.util
 import json
 import subprocess
@@ -27,12 +28,12 @@ class FetchArticleSpec:
     days: int = 1
     max_records: int = 100
     must_contain_any: tuple[str, ...] = ()
-    avoid_domains: tuple[str, ...] = ()
+    avoid_domains: tuple[str, ...] = ("seekingalpha.com",)
     require_text_accessible: bool = False
     novelty_against_urls: tuple[str, ...] = ()
 
 
-dummy_news.fetch_article = lambda spec: ArticleData()
+dummy_news.fetch_article = lambda spec, seen_titles=(): ArticleData()
 dummy_news.FetchArticleSpec = FetchArticleSpec
 dummy_data = types.ModuleType("sentimental_cap_predictor.data")
 dummy_data.__path__ = []  # mark as package
@@ -91,6 +92,26 @@ def test_fetch_first_gdelt_article(monkeypatch, tmp_path):
     text = cf.fetch_first_gdelt_article("NVDA")
     assert text == "Body text"
     assert captured["prefer_content"] is True
+
+
+def test_seen_sets_update_and_pass(monkeypatch):
+    monkeypatch.setattr(cf, "_SEEN_URLS", set())
+    monkeypatch.setattr(cf, "_SEEN_TITLES", set())
+
+    captures: list[tuple[str, ...]] = []
+
+    def fake_fetch(spec, seen_titles=()):  # noqa: ANN001
+        captures.append(spec.novelty_against_urls)
+        return ArticleData(title="Headline", url="http://example.com")
+
+    monkeypatch.setattr(cf, "_fetch_article", fake_fetch)
+
+    cf._fetch_first_gdelt_article("NVDA")
+    cf._fetch_first_gdelt_article("NVDA")
+
+    assert captures == [(), ("http://example.com",)]
+    assert cf._SEEN_URLS == {"http://example.com"}
+    assert cf._SEEN_TITLES == {"Headline"}
 
 
 def test_fetch_first_gdelt_article_appends_memory(monkeypatch, tmp_path):
@@ -197,7 +218,10 @@ def test_handle_command_parses_options(monkeypatch):
 
     def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
         captured.update(
-            query=query, prefer_content=prefer_content, days=days, max_records=max_records
+            query=query,
+            prefer_content=prefer_content,
+            days=days,
+            max_records=max_records,
         )
         return ArticleData(
             title="Headline",
@@ -207,9 +231,7 @@ def test_handle_command_parses_options(monkeypatch):
 
     monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
 
-    text = cf.handle_command(
-        'gdelt search --query "climate change" --limit 5 --days 2'
-    )
+    text = cf.handle_command('gdelt search --query "climate change" --limit 5 --days 2')
     assert text == "Body text"
     assert captured["query"] == "climate change"
     assert captured["days"] == 2
