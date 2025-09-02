@@ -238,6 +238,7 @@ def title_novelty(title: str, seen_titles: Iterable[str]) -> float:
 def rank_candidates(
     candidates: list[dict],
     spec: FetchArticleSpec,
+    seen_titles: Iterable[str] = (),
 ) -> list[dict]:
     """Rank candidates prioritising accessible text and novelty."""
 
@@ -287,7 +288,7 @@ def fetch_article(
     if not candidates:
         raise RuntimeError("No candidate articles matched filters")
 
-    for candidate in rank_candidates(candidates, spec):
+    for candidate in rank_candidates(candidates, spec, seen_titles):
         if candidate.get("content"):
             return ArticleData(
                 title=candidate["title"],
