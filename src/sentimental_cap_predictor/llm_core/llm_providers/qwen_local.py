@@ -93,12 +93,6 @@ class QwenLocalProvider(LLMProvider):
         )
         self.model.eval()
 
-        # Safe optional debug (or remove it entirely)
-        print(
-            f"[runtime] model={self.model_id} device_map={device_map} "
-            f"dtype={_dtype} offload={offload_dir}"
-        )
-
     def chat(self, messages: List[ChatMessage], **kwargs: Any) -> str:
         """Return the model's response to a list of chat messages."""
 
