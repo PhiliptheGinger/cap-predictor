@@ -52,12 +52,10 @@ class QwenLocalProvider(LLMProvider):
                 repo_id=local_model_path.as_posix(),
             )
 
-        prefs = {"device_map": "auto", "dtype": torch.float16}
-        # Debug print to show runtime configuration for the model load.
-        print(
-            f"[runtime] model={checkpoint_path} "
-            f"device_map={prefs['device_map']} dtype={prefs['dtype']}"
-        )
+        self.model_id = checkpoint_path
+        # Debug print to show the resolved checkpoint path used to load the
+        # model weights.
+        print(f"Using checkpoint at: {self.model_id}")
 
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
         config = AutoConfig.from_pretrained(checkpoint_path)
