@@ -22,6 +22,8 @@ class QwenLocalProvider(LLMProvider):
         temperature: float,
         max_new_tokens: int = 512,
         offload_folder: str | None = None,
+        device_map: str | dict | None = "auto",
+        dtype: str | torch.dtype | None = None,
     ) -> None:
         """Create a provider backed by a local Qwen model.
 
@@ -39,6 +41,13 @@ class QwenLocalProvider(LLMProvider):
             full model cannot fit in device memory. If ``None`` a subdirectory
             named ``"offload"`` inside the resolved checkpoint directory is
             created and used automatically.
+        device_map:
+            Device placement for the model. Passed directly to
+            :func:`load_checkpoint_and_dispatch`.
+        dtype:
+            Data type used when loading the model weights. Passed directly to
+            :func:`load_checkpoint_and_dispatch`. ``None`` lets
+            :mod:`accelerate` choose a suitable type automatically.
         """
 
         self.temperature = temperature
@@ -70,12 +79,15 @@ class QwenLocalProvider(LLMProvider):
         )
         offload_dir.mkdir(parents=True, exist_ok=True)
 
+        if dtype == "auto":
+            dtype = None
+
         self.model = load_checkpoint_and_dispatch(
             model,
             checkpoint=checkpoint_path,
-            device_map=prefs["device_map"],
+            device_map=device_map,
             offload_folder=str(offload_dir),
-            dtype=prefs["dtype"],
+            dtype=dtype,
         )
         self.model.eval()
 
