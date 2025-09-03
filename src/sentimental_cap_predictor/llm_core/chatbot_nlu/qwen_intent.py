@@ -2,11 +2,13 @@ from __future__ import annotations
 
 # flake8: noqa
 import json
-import os
 import re as _re
-from typing import Any, Dict
+from typing import Any, Dict, TYPE_CHECKING
 
 from ..config_llm import get_llm_config
+
+if TYPE_CHECKING:  # pragma: no cover - for type checkers only
+    from ..llm_providers.qwen_local import QwenLocalProvider
 
 SYSTEM = """You are an intent classifier and slot extractor for the Cap Predictor CLI.
 Return ONLY JSON between <json>...</json>. Choose the intent from this FIXED list:
