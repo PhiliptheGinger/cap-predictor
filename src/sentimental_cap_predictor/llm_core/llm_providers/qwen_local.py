@@ -79,24 +79,30 @@ class QwenLocalProvider(LLMProvider):
         )
         offload_dir.mkdir(parents=True, exist_ok=True)
 
-        # allow "auto" dtype strings without tripping over torch.auto
-        if isinstance(dtype, str) and dtype.lower() == "auto":
-            _dtype = None
-        else:
-            _dtype = dtype
+        # Normalize dtype: allow "auto" string, torch.dtype, or None
+        _dtype = None
+        if dtype is not None:
+            if isinstance(dtype, str):
+                if dtype.lower() == "auto":
+                    _dtype = None
+                else:
+                    _dtype = getattr(torch, dtype, None)
+            else:
+                _dtype = dtype
+
         self.model = load_checkpoint_and_dispatch(
             model,
             checkpoint=checkpoint_path,
-            device_map=device_map,  # ok to be "auto"
+            device_map=device_map,
             offload_folder=str(offload_dir),
-            dtype=_dtype,  # None lets accelerate choose
+            dtype=_dtype,
         )
         self.model.eval()
 
-        # sane debug line (no undefined names)
+        # Safe optional debug (or remove it entirely)
         print(
             f"[runtime] model={self.model_id} device_map={device_map} "
-            f"dtype={dtype} offload={offload_dir}"
+            f"dtype={_dtype} offload={offload_dir}"
         )
 
     def chat(self, messages: List[ChatMessage], **kwargs: Any) -> str:
