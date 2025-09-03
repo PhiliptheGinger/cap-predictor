@@ -62,9 +62,6 @@ class QwenLocalProvider(LLMProvider):
             )
 
         self.model_id = checkpoint_path
-        # Debug print to show the resolved checkpoint path used to load the
-        # model weights.
-        print(f"Using checkpoint at: {self.model_id}")
 
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
         config = AutoConfig.from_pretrained(checkpoint_path)
@@ -82,12 +79,9 @@ class QwenLocalProvider(LLMProvider):
         # Normalize dtype: allow "auto" string, torch.dtype, or None
         _dtype = None
         if dtype is not None:
-            if isinstance(dtype, str):
-                if dtype.lower() == "auto":
-                    _dtype = None
-                else:
-                    _dtype = getattr(torch, dtype, None)
-            else:
+            if isinstance(dtype, str) and dtype.lower() != "auto":
+                _dtype = getattr(torch, dtype, None)
+            elif not isinstance(dtype, str):
                 _dtype = dtype
 
         self.model = load_checkpoint_and_dispatch(
@@ -98,12 +92,6 @@ class QwenLocalProvider(LLMProvider):
             dtype=_dtype,
         )
         self.model.eval()
-
-        # Safe optional debug (or remove it entirely)
-        print(
-            f"[runtime] model={self.model_id} device_map={device_map} "
-            f"dtype={_dtype} offload={offload_dir}"
-        )
 
     def chat(self, messages: List[ChatMessage], **kwargs: Any) -> str:
         """Return the model's response to a list of chat messages."""
