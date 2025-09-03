@@ -23,7 +23,7 @@ class QwenLocalProvider(LLMProvider):
         max_new_tokens: int = 512,
         offload_folder: str | None = None,
         device_map: str | dict | None = "auto",
-        dtype: str | torch.dtype | None = "auto",
+        dtype: str | torch.dtype | None = None,
     ) -> None:
         """Create a provider backed by a local Qwen model.
 
@@ -46,7 +46,8 @@ class QwenLocalProvider(LLMProvider):
             :func:`load_checkpoint_and_dispatch`.
         dtype:
             Data type used when loading the model weights. Passed directly to
-            :func:`load_checkpoint_and_dispatch`.
+            :func:`load_checkpoint_and_dispatch`. ``None`` lets
+            :mod:`accelerate` choose a suitable type automatically.
         """
 
         self.temperature = temperature
@@ -77,6 +78,9 @@ class QwenLocalProvider(LLMProvider):
             else Path(checkpoint_path) / "offload"
         )
         offload_dir.mkdir(parents=True, exist_ok=True)
+
+        if dtype == "auto":
+            dtype = None
 
         self.model = load_checkpoint_and_dispatch(
             model,
