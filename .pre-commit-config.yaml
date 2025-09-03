@@ -15,4 +15,5 @@ repos:
     rev: v0.12.9
     hooks:
       - id: ruff
+        args: [--select, F821,E999]
       - id: ruff-format
