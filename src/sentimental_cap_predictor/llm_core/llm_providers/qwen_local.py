@@ -73,8 +73,9 @@ class QwenLocalProvider(LLMProvider):
         self.model = load_checkpoint_and_dispatch(
             model,
             checkpoint=checkpoint_path,
-            device_map="auto",
+            device_map=prefs["device_map"],
             offload_folder=str(offload_dir),
+            dtype=prefs["dtype"],
         )
         self.model.eval()
 
