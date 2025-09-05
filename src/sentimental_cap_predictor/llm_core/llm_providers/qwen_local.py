@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, List
 
 import torch
@@ -13,54 +12,71 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from .base import ChatMessage, LLMProvider
 
 
+def _auto_runtime_prefs() -> dict[str, Any]:
+    """Return runtime preferences for the local Qwen model.
+
+    The function resolves the model checkpoint location, determines the
+    device map, desired dtype and offload directory using environment
+    variables.  Any required directories are created automatically.
+    """
+
+    from pathlib import Path
+    import os
+
+    model_path = os.getenv("QWEN_MODEL_PATH", "Qwen/Qwen2-1.5B-Instruct")
+    device_map = os.getenv("QWEN_DEVICE_MAP", "auto")
+    dtype_env = os.getenv("QWEN_DTYPE")
+    offload_folder = os.getenv("QWEN_OFFLOAD_FOLDER")
+
+    local_model_path = Path(model_path)
+    if local_model_path.exists():
+        checkpoint_path = model_path
+    else:
+        checkpoint_path = snapshot_download(repo_id=local_model_path.as_posix())
+
+    offload_dir = (
+        Path(offload_folder)
+        if offload_folder is not None
+        else Path(checkpoint_path) / "offload"
+    )
+    offload_dir.mkdir(parents=True, exist_ok=True)
+
+    dtype = None
+    if dtype_env is not None and dtype_env.lower() != "auto":
+        dtype = getattr(torch, dtype_env, None)
+
+    return {
+        "model_path": checkpoint_path,
+        "device_map": device_map,
+        "dtype": dtype,
+        "offload_folder": str(offload_dir),
+    }
+
+
 class QwenLocalProvider(LLMProvider):
     """Implementation of :class:`LLMProvider` for a local Qwen model."""
 
     def __init__(
         self,
-        model_path: str,
         temperature: float,
         max_new_tokens: int = 512,
-        offload_folder: str | None = None,
-        device_map: str | dict | None = "auto",
-        dtype: str | torch.dtype | None = None,
     ) -> None:
         """Create a provider backed by a local Qwen model.
 
         Parameters
         ----------
-        model_path:
-            Path to the model weights on disk or a Hugging Face repository
-            name.
         temperature:
             Sampling temperature for text generation.
         max_new_tokens:
             Default ``max_new_tokens`` value used when chatting with the model.
-        offload_folder:
-            Directory used by ``accelerate`` to offload model weights when the
-            full model cannot fit in device memory. If ``None`` a subdirectory
-            named ``"offload"`` inside the resolved checkpoint directory is
-            created and used automatically.
-        device_map:
-            Device placement for the model. Passed directly to
-            :func:`load_checkpoint_and_dispatch`.
-        dtype:
-            Data type used when loading the model weights. Passed directly to
-            :func:`load_checkpoint_and_dispatch`. ``None`` lets
-            :mod:`accelerate` choose a suitable type automatically.
         """
+
+        prefs = _auto_runtime_prefs()
 
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
 
-        local_model_path = Path(model_path)
-        if local_model_path.exists():
-            checkpoint_path = model_path
-        else:
-            checkpoint_path = snapshot_download(
-                repo_id=local_model_path.as_posix(),
-            )
-
+        checkpoint_path = prefs["model_path"]
         self.model_id = checkpoint_path
 
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
@@ -69,33 +85,18 @@ class QwenLocalProvider(LLMProvider):
             model = AutoModelForCausalLM.from_config(config)
         model.tie_weights()
 
-        offload_dir = (
-            Path(offload_folder)
-            if offload_folder is not None
-            else Path(checkpoint_path) / "offload"
-        )
-        offload_dir.mkdir(parents=True, exist_ok=True)
-
-        # Normalize dtype: allow "auto" string, torch.dtype, or None
-        _dtype = None
-        if dtype is not None:
-            if isinstance(dtype, str) and dtype.lower() != "auto":
-                _dtype = getattr(torch, dtype, None)
-            elif not isinstance(dtype, str):
-                _dtype = dtype
-
         self.model = load_checkpoint_and_dispatch(
             model,
             checkpoint=checkpoint_path,
-            device_map=device_map,
-            offload_folder=str(offload_dir),
-            dtype=_dtype,
+            device_map=prefs.get("device_map"),
+            offload_folder=prefs.get("offload_folder"),
+            dtype=prefs.get("dtype"),
         )
         self.model.eval()
 
         print(
-            f"[runtime] model={self.model_id} device_map={device_map} "
-            f"dtype={_dtype} offload={offload_dir}"
+            f"[runtime] model={self.model_id} device_map={prefs.get('device_map')} "
+            f"dtype={prefs.get('dtype')} offload={prefs.get('offload_folder')}"
         )
 
     def chat(self, messages: List[ChatMessage], **kwargs: Any) -> str:
