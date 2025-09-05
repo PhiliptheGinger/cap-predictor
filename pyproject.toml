@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cap-predictor"
 version = "0.1.0"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "pandas>=2.0,<3",
     "numpy>=1.25,<2",
@@ -45,6 +45,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["sentimental_cap_predictor*"]
 
 [tool.isort]
 profile = "black"
