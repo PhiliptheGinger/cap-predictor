@@ -6,6 +6,7 @@ data/
 models/
 *processed_dir_path/
 .env
+src/cap_predictor.egg-info/
 # Allow package data module
 !src/sentimental_cap_predictor/data/
 !src/sentimental_cap_predictor/data/**
