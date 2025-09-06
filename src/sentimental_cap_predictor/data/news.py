@@ -198,6 +198,20 @@ def is_valid_candidate(article: pd.Series, spec: FetchArticleSpec) -> bool:
     return True
 
 
+def is_probably_login_page(text: str) -> bool:
+    """Heuristic check for login/paywall pages.
+
+    Some sites return HTML that contains a sign-in prompt instead of the
+    article body.  These pages typically include phrases like ``sign in`` or
+    ``subscribe``.  When such phrases are detected the caller should treat the
+    content as unreadable.
+    """
+
+    lower = text.lower()
+    login_phrases = ("sign in", "subscribe", "enable javascript")
+    return any(p in lower for p in login_phrases)
+
+
 def try_to_extract(url: str) -> Optional[str]:
     """Attempt to extract article text.
 
@@ -210,13 +224,13 @@ def try_to_extract(url: str) -> Optional[str]:
 
     # First attempt with the default user agent
     text = extract_article_content(url)
-    if text and text.strip():
+    if text and text.strip() and not is_probably_login_page(text):
         return text
 
     # Second attempt using a headless browser user agent which can sometimes
     # bypass simple bot protections.
     text = extract_article_content(url, use_headless=True)
-    if text and text.strip():
+    if text and text.strip() and not is_probably_login_page(text):
         return text
 
     return None
