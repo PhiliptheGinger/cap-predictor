@@ -97,8 +97,10 @@ def fetch_first_gdelt_article(
         article = _fetch_first_gdelt_article(
             query, prefer_content=True, days=days, max_records=limit
         )
-    except requests.RequestException as exc:  # pragma: no cover
-        return f"GDELT request failed: {exc}"
+    except (requests.RequestException, RuntimeError, ValueError) as exc:  # pragma: no cover
+        if isinstance(exc, requests.RequestException):
+            return f"GDELT request failed: {exc}"
+        return "No readable article found"
 
     if article.title or article.url:
         entry = {"title": article.title, "url": article.url}

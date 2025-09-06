@@ -305,6 +305,16 @@ def test_fetch_first_gdelt_article_error(monkeypatch):
     assert text.startswith("GDELT request failed:")
 
 
+def test_fetch_first_gdelt_article_runtime_error(monkeypatch):
+    def fake_fetch(spec, seen_titles=()):  # noqa: ANN001
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cf, "_fetch_article", fake_fetch)
+
+    text = cf.fetch_first_gdelt_article("NVDA")
+    assert text == "No readable article found"
+
+
 def test_handle_command_reports_network_error(monkeypatch):
     def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
         raise requests.RequestException("boom")
