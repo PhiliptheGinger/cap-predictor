@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import requests
 
 from sentimental_cap_predictor.config import GDELT_API_URL
 
 
-def search_gdelt(query: str, max_results: int = 3) -> list[dict]:
+logger = logging.getLogger(__name__)
+
+
+def search_gdelt(
+    query: str, max_results: int = 3, *, raise_errors: bool = False
+) -> list[dict]:
     """Search the GDELT ``doc`` endpoint for ``query``.
 
     Parameters
@@ -35,12 +41,18 @@ def search_gdelt(query: str, max_results: int = 3) -> list[dict]:
     try:
         response = requests.get(GDELT_API_URL, params=params, timeout=30)
         response.raise_for_status()
-    except requests.RequestException:
+    except requests.RequestException as err:
+        logger.warning("GDELT request failed: %s", err)
+        if raise_errors:
+            raise
         return []
 
     try:
         data = response.json()
-    except ValueError:
+    except ValueError as err:
+        logger.warning("GDELT response JSON decode failed: %s", err)
+        if raise_errors:
+            raise
         return []
 
     articles = data.get("articles", [])
