@@ -164,6 +164,33 @@ def test_query_gdelt_for_news_handles_timeout(monkeypatch):
         )
 
 
+def test_query_gdelt_for_news_non_json(monkeypatch):
+    class DummyResponse:
+        text = "Not JSON"
+
+        def json(self):  # pragma: no cover - executed in test
+            raise ValueError("no json")
+
+        def raise_for_status(self):  # pragma: no cover - no-op
+            pass
+
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        return DummyResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        news.query_gdelt_for_news(
+            query="NVDA",
+            start_date="20240101000000",
+            end_date="20240102000000",
+        )
+
+    msg = str(excinfo.value)
+    assert "Failed to parse GDELT response as JSON" in msg
+    assert "Not JSON" in msg
+
+
 def test_fetch_headline_uses_gdelt_source(monkeypatch):
     class DummySource:
         def fetch(self, query):  # noqa: ANN001
