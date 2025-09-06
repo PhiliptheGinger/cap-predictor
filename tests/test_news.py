@@ -191,6 +191,20 @@ def test_query_gdelt_for_news_non_json(monkeypatch):
     assert "Not JSON" in msg
 
 
+def test_try_to_extract_filters_login_page(monkeypatch):
+    calls = []
+
+    def fake_extract(url, use_headless=False):  # noqa: ANN001
+        calls.append(use_headless)
+        return "Please sign in to continue"
+
+    monkeypatch.setattr(news, "extract_article_content", fake_extract)
+
+    text = news.try_to_extract("http://example.com")
+    assert text is None
+    assert calls == [False, True]
+
+
 def test_fetch_headline_uses_gdelt_source(monkeypatch):
     class DummySource:
         def fetch(self, query):  # noqa: ANN001
@@ -289,7 +303,9 @@ def test_fetch_article_applies_filters_and_novelty(monkeypatch):
     monkeypatch.setattr(
         news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
     )
-    monkeypatch.setattr(news, "extract_article_content", lambda url: "text")
+    monkeypatch.setattr(
+        news, "extract_article_content", lambda url, use_headless=False: "text"
+    )
 
     spec = news.FetchArticleSpec(
         query="q",
@@ -312,7 +328,9 @@ def test_fetch_article_title_novelty(monkeypatch):
     monkeypatch.setattr(
         news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
     )
-    monkeypatch.setattr(news, "extract_article_content", lambda url: "")
+    monkeypatch.setattr(
+        news, "extract_article_content", lambda url, use_headless=False: "text"
+    )
 
     spec = news.FetchArticleSpec(query="q")
     article = news.fetch_article(spec, seen_titles=("Seen headline",))
