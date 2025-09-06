@@ -114,10 +114,17 @@ def query_gdelt_for_news(
         "enddatetime": end_date,
         "maxrecords": max_records,
         "format": "json",
-    }
+    }    
     response = requests.get(url, params=params, timeout=30)
     response.raise_for_status()
-    data = response.json()
+    try:
+        data = response.json()
+    except (requests.exceptions.JSONDecodeError, ValueError) as exc:  # pragma: no cover - depends on requests
+        text = getattr(response, "text", "")
+        msg = f"Failed to parse GDELT response as JSON: {exc}"
+        if text:
+            msg += f" Response text: {text}"
+        raise RuntimeError(msg) from exc
     articles = data.get("articles", [])
     return pd.DataFrame(articles)
 
