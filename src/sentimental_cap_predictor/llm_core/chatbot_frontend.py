@@ -145,7 +145,7 @@ def fetch_first_gdelt_article(
 SYSTEM_PROMPT = (
     "You are a command planner for a terminal application.\n"
     "Output must be a single line: either\n"
-    "CMD: <command> to run, or one clarifying question.\n"
+    "CMD: <command> to run, a concise natural-language answer when no command is needed, or one clarifying question.\n"
     "Do not include code fences, explanations, or extra lines.\n"
     "Available tools:\n"
     '  • curl "<url>" (defaults: -sSL)\n'
@@ -452,23 +452,8 @@ def main() -> None:
             history.append({"role": "assistant", "content": question})
             continue
 
-        # Retry once with a reminder about the expected format
-        history.append(
-            {
-                "role": "user",
-                "content": "Output invalid. Remember the CMD contract.",
-            }
-        )
-        reply = provider.chat(history)
-        command, question = extract_cmd(reply)
-        if command:
-            pending_cmd = command
-        elif question:
-            print(question)
-            history.append({"role": "assistant", "content": question})
-        else:
-            print(reply)
-            history.append({"role": "assistant", "content": reply})
+        print(reply)
+        history.append({"role": "assistant", "content": reply})
 
 
 if __name__ == "__main__":

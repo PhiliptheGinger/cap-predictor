@@ -337,16 +337,14 @@ def test_handle_command_runs_shell(monkeypatch):
     assert out == "ok"
 
 
-def test_retry_on_malformed_output(monkeypatch):
-    """Ensure malformed replies trigger a single retry with a reminder."""
+def test_direct_text_reply(monkeypatch, capsys):
+    """The assistant may answer directly without emitting ``CMD:``."""
 
-    outputs = ["unexpected", "CMD: echo hi"]
-    calls: list[str] = []
+    responses = ["CMD: echo hi", "You're welcome."]
 
     class DummyProvider:
         def chat(self, history):  # noqa: ANN001
-            calls.append(history[-1]["content"])
-            return outputs.pop(0)
+            return responses.pop(0)
 
     import sys
     from types import SimpleNamespace
@@ -368,35 +366,41 @@ def test_retry_on_malformed_output(monkeypatch):
             )
         ),
     )
+    import importlib.util
+    from pathlib import Path
+
+    spec_cmd = importlib.util.spec_from_file_location(
+        "sentimental_cap_predictor.cmd_utils",
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "sentimental_cap_predictor"
+        / "cmd_utils.py",
+    )
+    cmd_utils = importlib.util.module_from_spec(spec_cmd)
+    spec_cmd.loader.exec_module(cmd_utils)
     monkeypatch.setitem(
         sys.modules,
         "sentimental_cap_predictor.cmd_utils",
-        SimpleNamespace(
-            extract_cmd=lambda reply: (
-                (reply.split("CMD:", 1)[1].strip(), None)
-                if reply.startswith("CMD:")
-                else (None, None)
-            )
-        ),
+        SimpleNamespace(extract_cmd=cmd_utils.extract_cmd),
     )
 
-    user_inputs = iter(["hi", "quit"])
+    user_inputs = iter(["hi", "thanks", "quit"])
     monkeypatch.setattr("builtins.input", lambda *a, **k: next(user_inputs))
 
     executed = {}
 
     def fake_handle(cmd):  # noqa: ANN001
         executed["cmd"] = cmd
-        return "done"
+        return "ok"
 
     monkeypatch.setattr(cf, "handle_command", fake_handle)
     cf.main()
 
-    assert calls == [
-        "hi",
-        "Output invalid. Remember the CMD contract.",
-    ]
+    out = capsys.readouterr().out
     assert executed["cmd"] == "echo hi"
+    assert "ok" in out
+    assert "You're welcome." in out
+    assert "Output invalid" not in out
 
 
 def test_handle_command_memory_search(monkeypatch, tmp_path):
