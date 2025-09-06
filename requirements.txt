@@ -1,0 +1,4 @@
+trafilatura
+readability-lxml
+lxml
+cssselect
