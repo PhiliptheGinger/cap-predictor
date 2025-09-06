@@ -84,6 +84,7 @@ def _reset_seen(tmp_path, monkeypatch):
     monkeypatch.setattr(cf, "_SEEN_URLS", set())
     monkeypatch.setattr(cf, "_SEEN_TITLES", set())
     monkeypatch.setattr(cf, "_SEEN_LOADED", False)
+    monkeypatch.setattr(cf, "_LAST_ARTICLE_URL", None)
 
 
 def test_fetch_first_gdelt_article(monkeypatch, tmp_path):
@@ -502,3 +503,48 @@ def test_handle_command_news_read(monkeypatch):
     assert captured["chunks"] == 1000
     assert captured["overlap"] == 0
     assert captured["translate"] is DummyTranslateMode.off
+
+
+def test_article_summarize_last(monkeypatch):
+    monkeypatch.setattr(
+        cf,
+        "_fetch_first_gdelt_article",
+        lambda query, *, prefer_content, days=1, max_records=100: ArticleData(
+            title="Headline",
+            url="http://example.com",
+            content="Body",
+        ),
+    )
+
+    cf.handle_command("NVDA")
+
+    captured = {}
+
+    def fake_read_command(
+        *, url, summarize=False, analyze=False, chunks=None, overlap=0, translate="off"
+    ):
+        captured.update(url=url, summarize=summarize)
+        print("summary")
+
+    class DummyTranslateMode:
+        off = "off"
+
+    from types import SimpleNamespace
+
+    dummy_cli = SimpleNamespace(
+        read_command=fake_read_command, TranslateMode=DummyTranslateMode
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.news.cli",
+        dummy_cli,
+    )
+
+    out = cf.handle_command("article.summarize_last")
+    assert out == "summary"
+    assert captured["url"] == "http://example.com"
+    assert captured["summarize"] is True
+
+
+def test_article_summarize_last_requires_article():
+    assert "No article" in cf.handle_command("article.summarize_last")
