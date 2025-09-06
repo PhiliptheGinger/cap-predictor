@@ -3,6 +3,7 @@ import sys
 import types
 from pathlib import Path
 
+import logging
 import requests
 
 # Create lightweight package stubs to avoid heavy imports
@@ -109,9 +110,11 @@ def test_search_gdelt_default_limit(monkeypatch):
     assert len(results) == 3
 
 
-def test_search_gdelt_handles_errors(monkeypatch):
+def test_search_gdelt_handles_errors(monkeypatch, caplog):
     def fake_get(url, params, timeout):  # noqa: ANN001
-        raise requests.RequestException
+        raise requests.RequestException("boom")
 
     monkeypatch.setattr(requests, "get", fake_get)
-    assert search_gdelt("nvda") == []
+    with caplog.at_level(logging.WARNING):
+        assert search_gdelt("nvda") == []
+    assert any("GDELT request failed" in m for m in caplog.messages)
