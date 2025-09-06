@@ -26,6 +26,7 @@ _SEEN_TITLES: set[str] = set()
 _SEEN_META_PATH = Path("data/gdelt_seen.json")
 _SEEN_METADATA: list[dict[str, str]] = []
 _SEEN_LOADED = False
+_LAST_ARTICLE_URL: str | None = None
 
 
 def _load_seen_metadata() -> None:
@@ -151,6 +152,7 @@ SYSTEM_PROMPT = (
     '  • curl "<url>" (defaults: -sSL)\n'
     '  • gdelt search --query "<q>" --limit <n> '
     "(default --limit 10)\n"
+    "  • article.summarize_last (summarize last fetched article)\n"
     "Before responding, self-check that your output abides by these rules."
 )
 
@@ -172,7 +174,13 @@ def handle_command(command: str) -> str:
     if _MEMORY_INDEX is None:
         setup()
 
+    global _LAST_ARTICLE_URL
+
     lower = command.lower()
+    if lower.strip() == "article.summarize_last":
+        if not _LAST_ARTICLE_URL:
+            return "No article available for summarization."
+        return handle_command(f"news.read --url {_LAST_ARTICLE_URL} --summarize")
     if lower.startswith("memory search"):
         from sentimental_cap_predictor.llm_core.memory_indexer import (
             TextMemory,
@@ -317,6 +325,8 @@ def handle_command(command: str) -> str:
             i += 1
         if url is None and len(parts) > 1:
             url = parts[-1]
+        if url:
+            _LAST_ARTICLE_URL = url
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             read_command(
@@ -334,7 +344,10 @@ def handle_command(command: str) -> str:
 
     stripped = command.strip()
     if " " not in stripped and not shutil.which(stripped):
-        return fetch_first_gdelt_article(stripped)
+        result = fetch_first_gdelt_article(stripped)
+        if _SEEN_METADATA:
+            _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
+        return result
 
     if "gdelt" in lower or "news" in lower:
         parts = shlex.split(command)
@@ -378,6 +391,8 @@ def handle_command(command: str) -> str:
         if limit is not None:
             kwargs["limit"] = limit
         result = fetch_first_gdelt_article(query, **kwargs)
+        if _SEEN_METADATA:
+            _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
         if not result:
             return "No news found."
         return result
