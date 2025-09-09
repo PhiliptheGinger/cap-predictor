@@ -552,3 +552,56 @@ def test_article_summarize_last(monkeypatch):
 
 def test_article_summarize_last_requires_article():
     assert "No article" in cf.handle_command("article.summarize_last")
+
+
+def test_route_keywords_fetch(monkeypatch):
+    captured = {}
+
+    def fake_fetch(topic):  # noqa: ANN001
+        captured["topic"] = topic
+        cf._SEEN_METADATA.append({"title": "T", "url": "http://u"})
+        return "text"
+
+    monkeypatch.setattr(cf, "fetch_first_gdelt_article", fake_fetch)
+
+    handler = cf._route_keywords("pull up article about NVDA")
+    assert handler is not None
+    out = handler()
+    assert out == "text"
+    assert captured["topic"] == "NVDA"
+    assert cf._LAST_ARTICLE_URL == "http://u"
+
+
+def test_route_keywords_read_summarize_and_search(monkeypatch):
+    cf._LAST_ARTICLE_URL = "http://a"
+
+    captured = []
+
+    def fake_handle(cmd):  # noqa: ANN001
+        captured.append(cmd)
+        return "ok"
+
+    monkeypatch.setattr(cf, "handle_command", fake_handle)
+
+    handler = cf._route_keywords("read it")
+    assert handler is not None
+    assert handler() == "ok"
+    handler = cf._route_keywords("summarize it")
+    assert handler is not None
+    assert handler() == "ok"
+    handler = cf._route_keywords("search memory for test")
+    assert handler is not None
+    assert handler() == "ok"
+
+    assert captured == [
+        "news.read --url http://a",
+        "article.summarize_last",
+        'memory search "test"',
+    ]
+
+
+def test_route_keywords_last_loaded():
+    cf._SEEN_METADATA = [{"title": "T", "url": "http://u"}]
+    handler = cf._route_keywords("what did you load?")
+    assert handler is not None
+    assert handler() == "T - http://u"

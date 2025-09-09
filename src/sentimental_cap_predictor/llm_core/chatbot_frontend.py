@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+from typing import Callable
 
 import requests
 
@@ -11,6 +13,9 @@ import requests
 # for unit tests and simple command handling. ``colorama`` is a lightweight
 # dependency used to provide coloured prompts for a nicer CLI experience.
 from colorama import Fore, Style, init
+
+
+logger = logging.getLogger(__name__)
 
 from sentimental_cap_predictor.data.news import (
     FetchArticleSpec,
@@ -406,6 +411,62 @@ def handle_command(command: str) -> str:
     return result.stdout.strip() or result.stderr.strip()
 
 
+def _route_keywords(message: str) -> Callable[[], str] | None:
+    """Return a callable handling ``message`` if it matches known patterns."""
+    import re
+
+    m = re.match(r"(?:pull up|fetch|get) article (?:about|on) (.+)", message, re.I)
+    if m:
+        topic = m.group(1).strip()
+
+        def _fetch():
+            result = fetch_first_gdelt_article(topic)
+            global _LAST_ARTICLE_URL
+            if _SEEN_METADATA:
+                _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
+            return result
+
+        return _fetch
+
+    if re.fullmatch(r"read it", message.strip(), re.I):
+        def _read():
+            if not _LAST_ARTICLE_URL:
+                return "No article available for reading."
+            return handle_command(f"news.read --url {_LAST_ARTICLE_URL}")
+
+        return _read
+
+    if re.fullmatch(r"summarize it", message.strip(), re.I):
+        def _summarize():
+            return handle_command("article.summarize_last")
+
+        return _summarize
+
+    if re.fullmatch(r"what did you load\?", message.strip(), re.I):
+        def _last_loaded():
+            if _SEEN_METADATA:
+                last = _SEEN_METADATA[-1]
+                title = last.get("title")
+                url = last.get("url")
+                if title and url:
+                    return f"{title} - {url}"
+                return title or url or "Nothing loaded yet."
+            return "Nothing loaded yet."
+
+        return _last_loaded
+
+    m = re.match(r"search memory for (.+)", message, re.I)
+    if m:
+        query = m.group(1).strip()
+
+        def _search():
+            return handle_command(f'memory search "{query}"')
+
+        return _search
+
+    return None
+
+
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     setup()
@@ -455,6 +516,15 @@ def main() -> None:
             continue
         if user.lower() in {"exit", "quit"}:
             break
+
+        handler = _route_keywords(user)
+        if handler:
+            logger.info("Dispatching routed message: %s", user)
+            output = handler()
+            print(output)
+            history.append({"role": "assistant", "content": output})
+            logger.info("Finished routed message: %s", user)
+            continue
 
         history.append({"role": "user", "content": user})
         reply = provider.chat(history)
