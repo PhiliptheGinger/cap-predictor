@@ -49,10 +49,14 @@ def search_gdelt(query: str, max_records: int = 15):
         "maxrecords": max_records,
         "sort": "datedesc",
     }
-    r = requests.get(
-        GDELT_DOC_API, params=params, headers={"User-Agent": UA}, timeout=30
-    )
-    r.raise_for_status()
+    try:
+        r = requests.get(
+            GDELT_DOC_API, params=params, headers={"User-Agent": UA}, timeout=30
+        )
+        r.raise_for_status()
+    except requests.RequestException as exc:  # pragma: no cover - network failure
+        logger.warning("GDELT API request failed: %s", exc)
+        return []
     data = r.json()
     return data.get("articles", [])
 
@@ -134,10 +138,10 @@ def main():
             html = fetch_html(url)
         except requests.HTTPError as e:
             status = e.response.status_code if e.response else "?"
-            logger.info("HTTP %s for %s", status, domain)
+            logger.warning("HTTP %s for %s", status, domain)
             continue
         except Exception as e:
-            logger.info("Error fetching %s: %s", domain, e)
+            logger.warning("Error fetching %s: %s", domain, e)
             continue
 
         text = extract_main_text(html, url=url)

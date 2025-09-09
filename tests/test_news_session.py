@@ -150,7 +150,7 @@ def test_handle_memory_search(monkeypatch):
     monkeypatch.setattr(
         session,
         "vector_store",
-        SimpleNamespace(query=lambda q: results),
+        SimpleNamespace(query=lambda q: results, available=lambda: True),
     )
     text = session.handle_memory_search("q")
     assert "A — http://a" in text
@@ -158,6 +158,17 @@ def test_handle_memory_search(monkeypatch):
     monkeypatch.setattr(
         session,
         "vector_store",
-        SimpleNamespace(query=lambda q: []),
+        SimpleNamespace(query=lambda q: [], available=lambda: True),
     )
     assert session.handle_memory_search("q") == "No matches found."
+
+
+def test_handle_memory_search_fallback(monkeypatch):
+    monkeypatch.setattr(session, "STATE", session.STATE.__class__())
+    session.STATE.recent_chunks = ["alpha beta", "gamma delta"]
+    monkeypatch.setattr(
+        session,
+        "vector_store",
+        SimpleNamespace(query=lambda q: [], available=lambda: False),
+    )
+    assert "alpha beta" in session.handle_memory_search("alpha")

@@ -2,8 +2,16 @@ from __future__ import annotations
 
 """Session-level helpers for working with fetched news articles."""
 
+import logging
+from typing import List
+
+import requests
+
 from sentimental_cap_predictor.memory import vector_store
 from sentimental_cap_predictor.memory.session_state import STATE
+
+
+logger = logging.getLogger(__name__)
 
 
 def handle_fetch(topic: str) -> str:
@@ -18,7 +26,11 @@ def handle_fetch(topic: str) -> str:
 
     from . import fetch_gdelt
 
-    articles = fetch_gdelt.search_gdelt(topic, max_records=15)
+    try:
+        articles = fetch_gdelt.search_gdelt(topic, max_records=15)
+    except requests.RequestException as exc:  # pragma: no cover - network failure
+        logger.warning("GDELT search failed for %s: %s", topic, exc)
+        articles = []
     for art in articles:
         url = art.get("url")
         if not url:
@@ -28,7 +40,11 @@ def handle_fetch(topic: str) -> str:
         try:
             html = fetch_gdelt.fetch_html(url)
             text = fetch_gdelt.extract_main_text(html, url=url)
-        except Exception:  # pragma: no cover - network failures
+        except requests.RequestException as exc:  # pragma: no cover - network failure
+            logger.warning("Network error fetching %s: %s", url, exc)
+            continue
+        except Exception as exc:  # pragma: no cover - extraction failure
+            logger.warning("Error processing %s: %s", url, exc)
             continue
         if not text:
             continue
@@ -81,18 +97,29 @@ def handle_summarize() -> str:
 
 
 def handle_memory_search(query: str) -> str:
-    """Search previously stored article chunks for ``query``."""
+    """Search stored article chunks for ``query`` with graceful fallback."""
 
     results = vector_store.query(query)
-    if not results:
-        return "No matches found."
-    lines = []
-    for match in results:
-        meta = match.get("metadata", {})
-        title = meta.get("title", "")
-        url = meta.get("url", "")
-        lines.append(f"{title} — {url}".strip())
-    return "\n".join(lines)
+    if results:
+        lines: List[str] = []
+        for match in results:
+            meta = match.get("metadata", {})
+            title = meta.get("title", "")
+            url = meta.get("url", "")
+            lines.append(f"{title} — {url}".strip())
+        return "\n".join(lines)
+
+    if not vector_store.available():
+        logger.warning(
+            "Vector DB unavailable or embedding model missing; using session memory only."
+        )
+        matches = [
+            chunk for chunk in STATE.recent_chunks if query.lower() in chunk.lower()
+        ]
+        if matches:
+            return "\n".join(matches[:5])
+
+    return "No matches found."
 
 
 __all__ = [
