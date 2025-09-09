@@ -39,10 +39,17 @@ def handle_fetch(topic: str) -> str:
             continue
         try:
             html = fetch_gdelt.fetch_html(url)
-            text = fetch_gdelt.extract_main_text(html, url=url)
         except requests.RequestException as exc:  # pragma: no cover - network failure
             logger.warning("Network error fetching %s: %s", url, exc)
             continue
+        except Exception as exc:  # pragma: no cover - unexpected failure
+            logger.warning("Error fetching %s: %s", url, exc)
+            continue
+        if fetch_gdelt._is_empty_page(html):
+            logger.info("Skipping %s: empty page", url)
+            continue
+        try:
+            text = fetch_gdelt.extract_main_text(html, url=url)
         except Exception as exc:  # pragma: no cover - extraction failure
             logger.warning("Error processing %s: %s", url, exc)
             continue
@@ -67,6 +74,8 @@ def handle_fetch(topic: str) -> str:
         )
 
     STATE.clear_article()
+    if articles:
+        return "Couldn't fetch a readable article; try another topic."
     return f"No articles found for '{topic}'."
 
 
