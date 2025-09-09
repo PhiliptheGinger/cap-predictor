@@ -1,9 +1,20 @@
 import os
 import sys
 from pathlib import Path
+import logging
 
-from dotenv import load_dotenv
-from loguru import logger
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    def load_dotenv(*_args, **_kwargs):  # type: ignore[override]
+        """Fallback no-op if python-dotenv is not installed."""
+
+try:  # pragma: no cover - optional dependency
+    from loguru import logger  # type: ignore
+    _HAS_LOGURU = True
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    _HAS_LOGURU = False
+    logger = logging.getLogger("sentimental_cap_predictor")
 
 # Load environment variables from .env file
 load_dotenv()
@@ -71,28 +82,23 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # Toggle per‑ticker logging of pipeline runs
 ENABLE_TICKER_LOGS = os.getenv("ENABLE_TICKER_LOGS", "0") == "1"
 
-# Remove existing log handlers without accessing private attributes
-try:
-    logger.remove()
-except ValueError:
-    # No handlers were configured yet
-    pass
+# Configure logging.  When loguru is available we keep the previous behaviour,
+# otherwise fall back to the standard ``logging`` module.
+if _HAS_LOGURU:
+    try:
+        logger.remove()
+    except ValueError:
+        pass
+    stdout_handler_id = logger.add(sys.stdout, level=LOG_LEVEL)
+    try:
+        from tqdm import tqdm  # type: ignore
 
-# Capture handler ID for the standard output
-stdout_handler_id = logger.add(sys.stdout, level=LOG_LEVEL)
-
-# tqdm integration with loguru
-try:
-    from tqdm import tqdm
-
-    # Replace the standard output handler with one compatible with tqdm
-    logger.remove(stdout_handler_id)
-    tqdm_handler_id = logger.add(
-        lambda msg: tqdm.write(msg, end=""),
-        colorize=True,
-    )
-except ModuleNotFoundError:
-    pass
+        logger.remove(stdout_handler_id)
+        logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True)
+    except ModuleNotFoundError:  # pragma: no cover - optional dependency
+        pass
+else:  # pragma: no cover - simple logging configuration
+    logging.basicConfig(level=LOG_LEVEL)
 
 # Ticker List from .env file
 TICKER_LIST_TECH = os.getenv("TICKER_LIST_TECH", "").split(",")
