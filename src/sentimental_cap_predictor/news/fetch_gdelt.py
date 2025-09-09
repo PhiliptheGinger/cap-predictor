@@ -76,6 +76,9 @@ def search_gdelt(query: str, max_records: int = 15):
         url = art.get("url")
         if not url:
             continue
+        if domain_blocked(url):
+            logger.info("Skipping %s: blocked domain", urlparse(url).netloc)
+            continue
         try:  # pragma: no cover - network failure
             html = fetch_html(url)
         except Exception:
