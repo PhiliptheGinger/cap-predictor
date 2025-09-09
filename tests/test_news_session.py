@@ -107,14 +107,20 @@ def test_handle_fetch_sets_state_and_upserts(monkeypatch):
     monkeypatch.setattr(fg_mod, "_chunk_text", lambda text: [text])
 
     msg = session.handle_fetch("topic1")
-    assert msg == "Loaded: Title topic1 — http://topic1.com"
+    assert (
+        msg
+        == "Loaded: Title topic1 — http://topic1.com. Say \"read it\" or \"summarize it\"."
+    )
     assert session.STATE.last_article["title"] == "Title topic1"
     assert calls  # upsert called
 
     # Fetch another topic to ensure state replacement
     msg2 = session.handle_fetch("topic2")
     assert session.STATE.last_article["title"] == "Title topic2"
-    assert msg2 == "Loaded: Title topic2 — http://topic2.com"
+    assert (
+        msg2
+        == "Loaded: Title topic2 — http://topic2.com. Say \"read it\" or \"summarize it\"."
+    )
 
 
 def test_handle_read_and_summarize(monkeypatch):

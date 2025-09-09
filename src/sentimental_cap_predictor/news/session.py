@@ -62,7 +62,9 @@ def handle_fetch(topic: str) -> str:
         STATE.set_article(result)
         STATE.recent_chunks = fetch_gdelt._chunk_text(text)
         STATE.last_query = topic
-        return f"Loaded: {result['title']} — {url}"
+        return (
+            f"Loaded: {result['title']} — {url}. Say \"read it\" or \"summarize it\"."
+        )
 
     STATE.clear_article()
     return f"No articles found for '{topic}'."
