@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import textwrap
+from urllib.parse import urlparse
 
 import requests
 
 from .extract import extract_main_text, fetch_html
+
+logger = logging.getLogger(__name__)
 
 GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
 UA = (
@@ -28,8 +32,15 @@ PREFERRED_DOMAINS = (
     "cbc.ca",
 )
 
+# Sites that are known to block scraping or are paywalled
+BLOCKED_DOMAINS = (
+    "wsj.com",
+    "bloomberg.com",
+    "ft.com",
+)
 
-def search_gdelt(query: str, max_records: int = 10):
+
+def search_gdelt(query: str, max_records: int = 15):
     params = {
         "query": query,
         "mode": "artlist",
@@ -49,53 +60,66 @@ def domain_ok(url: str) -> bool:
     return any(d in url for d in PREFERRED_DOMAINS)
 
 
+def domain_blocked(url: str) -> bool:
+    return any(d in url for d in BLOCKED_DOMAINS)
+
+
 def summarize(text: str, max_chars: int = 800) -> str:
     text = " ".join(text.split())
     return textwrap.shorten(text, width=max_chars, placeholder="…")
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     ap = argparse.ArgumentParser()
     ap.add_argument("--query", required=True)
-    ap.add_argument("--max", type=int, default=10)
+    ap.add_argument("--max", type=int, default=15)
     args = ap.parse_args()
 
     arts = search_gdelt(args.query, args.max)
     for art in arts:
         url = art.get("url")
         if not url:
+            logger.info("Skipping record with no URL")
             continue
 
-        # prefer friendlier domains if possible
+        domain = urlparse(url).netloc
+        if domain_blocked(url):
+            logger.info("Skipping %s: blocked domain", domain)
+            continue
         if not domain_ok(url):
+            logger.info("Skipping %s: undesired domain", domain)
             continue
 
         try:
             html = fetch_html(url)
-            text = extract_main_text(html, url=url)
-            if not text:
-                # couldn’t extract; skip to next
-                continue
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response else "?"
+            logger.info("HTTP %s for %s", status, domain)
+            continue
+        except Exception as e:
+            logger.info("Error fetching %s: %s", domain, e)
+            continue
 
-            result = {
-                "title": art.get("title", ""),
-                "url": url,
-                "sourceDomain": art.get("domain", ""),
-                "language": art.get("language", ""),
-                "seendate": art.get("seendate", ""),
-                "text": text,
-                "summary": summarize(text),
-            }
-            print(json.dumps(result, ensure_ascii=False))
-            return
-        except requests.HTTPError:
-            # 403/404/etc. Skip and try next record.
+        text = extract_main_text(html, url=url)
+        if not text:
+            logger.info("Skipping %s: no extractable text", domain)
             continue
-        except Exception:
-            continue
+
+        result = {
+            "title": art.get("title", ""),
+            "url": url,
+            "domain": art.get("domain", ""),
+            "language": art.get("language", ""),
+            "seendate": art.get("seendate", ""),
+            "text": text,
+            "summary": summarize(text),
+        }
+        print(json.dumps(result, ensure_ascii=False))
+        return
 
     # If nothing worked, at least return an empty envelope
-    print(json.dumps({"text": "", "summary": ""}))
+    print(json.dumps({}))
 
 
 if __name__ == "__main__":
