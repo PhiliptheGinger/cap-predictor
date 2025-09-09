@@ -12,7 +12,8 @@ class SessionState:
     last_query: str | None = None
 
     def set_article(self, article: dict) -> None:
-        """Set the most recently referenced article."""
+        """Replace the most recently referenced article and reset context."""
+        self.clear_article()
         self.last_article = article
 
     def clear_article(self) -> None:
