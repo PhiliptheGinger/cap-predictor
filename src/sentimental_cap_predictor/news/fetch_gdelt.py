@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from sentimental_cap_predictor.memory import vector_store
 from .extract import extract_main_text, fetch_html
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,44 @@ def summarize(text: str, max_chars: int = 800) -> str:
     return textwrap.shorten(text, width=max_chars, placeholder="…")
 
 
+def _chunk_text(text: str, size: int = 1000, overlap: int = 100) -> list[str]:
+    """Split *text* into character chunks with small overlaps."""
+    if size <= 0:
+        return []
+    chunks: list[str] = []
+    start = 0
+    length = len(text)
+    while start < length:
+        end = min(length, start + size)
+        chunks.append(text[start:end])
+        if end >= length:
+            break
+        start = end - overlap
+    return chunks
+
+
+def _store_chunks(result: dict) -> None:
+    """Store article text chunks in the vector store.
+
+    Any failures are logged but ignored so that the main flow continues.
+    """
+
+    text = result.get("text", "")
+    metadata = {
+        "title": result.get("title", ""),
+        "url": result.get("url", ""),
+        "seendate": result.get("seendate", ""),
+        "domain": result.get("domain", ""),
+    }
+    chunks = _chunk_text(text)
+    for idx, chunk in enumerate(chunks):
+        doc_id = f"{metadata['url']}#{idx}"
+        try:  # pragma: no cover - network/db failures
+            vector_store.upsert(doc_id, chunk, metadata)
+        except Exception as exc:  # pragma: no cover - failures handled
+            logger.warning("Vector store upsert failed: %s", exc)
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     ap = argparse.ArgumentParser()
@@ -115,6 +154,7 @@ def main():
             "text": text,
             "summary": summarize(text),
         }
+        _store_chunks(result)
         print(json.dumps(result, ensure_ascii=False))
         return
 
