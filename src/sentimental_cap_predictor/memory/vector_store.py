@@ -6,7 +6,9 @@ import os
 import tempfile
 from typing import Any, Dict, List
 
-from loguru import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:  # pragma: no cover - optional dependency
     from sentence_transformers import SentenceTransformer
@@ -133,4 +135,10 @@ def query(text: str, k: int = 5) -> List[Dict[str, Any]]:
     ]
 
 
-__all__ = ["ensure_index", "upsert", "query"]
+def available() -> bool:
+    """Return ``True`` if the vector DB and embedding model are usable."""
+
+    return ensure_index() is not None and not _MODEL_FAILED
+
+
+__all__ = ["ensure_index", "upsert", "query", "available"]
