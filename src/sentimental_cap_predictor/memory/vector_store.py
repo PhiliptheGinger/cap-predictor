@@ -22,6 +22,7 @@ _EMBEDDER: SentenceTransformer | None = None
 _MODEL_FAILED = False
 _INDEX: Any | None = None
 _USING_PINECONE = False
+_INIT_FAILED = False
 
 
 def _load_model() -> SentenceTransformer | None:
@@ -55,41 +56,48 @@ def _embed(texts: List[str]) -> List[List[float]]:
 
 def ensure_index(name: str = "cap_articles") -> Any | None:
     """Initialize the backing vector store if needed and return the index."""
-    global _INDEX, _USING_PINECONE
-    if _INDEX is not None:
+    global _INDEX, _USING_PINECONE, _INIT_FAILED
+    if _INDEX is not None or _INIT_FAILED:
         return _INDEX
 
-    api_key = os.getenv("PINECONE_API_KEY")
-    if api_key:
-        try:  # pragma: no cover - optional dependency
-            import pinecone
-        except Exception as exc:  # pragma: no cover
-            logger.warning("Pinecone client unavailable: %s", exc)
-        else:
-            pinecone.init(api_key=api_key)
-            dimension = 384  # embedding size for MiniLM-L6
-            try:
-                existing = pinecone.list_indexes()  # type: ignore[attr-defined]
-                if isinstance(existing, list) and name not in existing:
-                    pinecone.create_index(name, dimension=dimension)
-            except Exception:  # pragma: no cover - older client versions
-                pass
-            _INDEX = pinecone.Index(name)
-            _USING_PINECONE = True
-            return _INDEX
+    try:
+        api_key = os.getenv("PINECONE_API_KEY")
+        if api_key:
+            try:  # pragma: no cover - optional dependency
+                import pinecone
+            except Exception as exc:  # pragma: no cover
+                logger.warning("Pinecone client unavailable: %s", exc)
+            else:
+                pinecone.init(api_key=api_key)
+                dimension = 384  # embedding size for MiniLM-L6
+                try:
+                    existing = pinecone.list_indexes()  # type: ignore[attr-defined]
+                    if isinstance(existing, list) and name not in existing:
+                        pinecone.create_index(name, dimension=dimension)
+                except Exception:  # pragma: no cover - older client versions
+                    pass
+                _INDEX = pinecone.Index(name)
+                _USING_PINECONE = True
+                return _INDEX
 
-    try:  # pragma: no cover - optional dependency
-        import chromadb
-    except Exception as exc:  # pragma: no cover
-        logger.warning("Chroma client unavailable: %s", exc)
+        try:  # pragma: no cover - optional dependency
+            import chromadb
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Chroma client unavailable: %s", exc)
+            _INDEX = None
+            return None
+
+        persist_dir = tempfile.mkdtemp(prefix="chroma_")
+        client = chromadb.PersistentClient(path=persist_dir)
+        _INDEX = client.get_or_create_collection(name)
+        _USING_PINECONE = False
+        return _INDEX
+    except Exception as exc:  # pragma: no cover - network/credential errors
+        if not _INIT_FAILED:
+            logger.warning("Vector store initialization failed: %s", exc)
+        _INIT_FAILED = True
         _INDEX = None
         return None
-
-    persist_dir = tempfile.mkdtemp(prefix="chroma_")
-    client = chromadb.PersistentClient(path=persist_dir)
-    _INDEX = client.get_or_create_collection(name)
-    _USING_PINECONE = False
-    return _INDEX
 
 
 def upsert(doc_id: str, text: str, metadata: Dict[str, Any]) -> None:

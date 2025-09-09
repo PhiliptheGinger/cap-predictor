@@ -41,6 +41,19 @@ BLOCKED_DOMAINS = (
 )
 
 
+_EMPTY_HTML = {
+    "<html></html>",
+    "<html><head></head><body></body></html>",
+    "",
+}
+
+
+def _is_empty_page(html: str) -> bool:
+    """Return ``True`` for trivially empty HTML pages."""
+
+    return "".join(html.split()).lower() in _EMPTY_HTML
+
+
 def search_gdelt(query: str, max_records: int = 15):
     params = {
         "query": query,
@@ -58,7 +71,21 @@ def search_gdelt(query: str, max_records: int = 15):
         logger.warning("GDELT API request failed: %s", exc)
         return []
     data = r.json()
-    return data.get("articles", [])
+    articles = []
+    for art in data.get("articles", []):
+        url = art.get("url")
+        if not url:
+            continue
+        try:  # pragma: no cover - network failure
+            html = fetch_html(url)
+        except Exception:
+            continue
+        if _is_empty_page(html):
+            continue
+        articles.append(art)
+        if len(articles) >= max_records:
+            break
+    return articles
 
 
 def domain_ok(url: str) -> bool:
@@ -142,6 +169,9 @@ def main():
             continue
         except Exception as e:
             logger.warning("Error fetching %s: %s", domain, e)
+            continue
+        if _is_empty_page(html):
+            logger.info("Skipping %s: empty page", domain)
             continue
 
         text = extract_main_text(html, url=url)

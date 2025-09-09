@@ -45,6 +45,7 @@ fetch_gdelt_mod = SimpleNamespace(
     domain_blocked=lambda url: False,
     _store_chunks=lambda result: None,
     _chunk_text=lambda text: [text],
+    _is_empty_page=lambda html: False,
 )
 sys.modules["sentimental_cap_predictor.news.fetch_gdelt"] = fetch_gdelt_mod
 news_pkg.fetch_gdelt = fetch_gdelt_mod
@@ -74,7 +75,7 @@ def test_handle_fetch_sets_state_and_upserts(monkeypatch):
         ]
 
     def fake_fetch_html(url):  # noqa: ANN001
-        return "<html></html>"
+        return "<html><body>content</body></html>"
 
     def fake_extract(html, url=None):  # noqa: ANN001
         return "Body text"
@@ -121,6 +122,32 @@ def test_handle_fetch_sets_state_and_upserts(monkeypatch):
         msg2
         == "Loaded: Title topic2 — http://topic2.com. Say \"read it\" or \"summarize it\"."
     )
+
+
+def test_handle_fetch_unreadable_page(monkeypatch):
+    monkeypatch.setattr(session, "STATE", session.STATE.__class__())
+
+    def fake_search_gdelt(query, max_records=15):  # noqa: ANN001
+        return [
+            {
+                "title": "T",
+                "url": "http://t.com",
+                "domain": "t.com",
+                "language": "en",
+                "seendate": "today",
+            }
+        ]
+
+    fg_mod = sys.modules["sentimental_cap_predictor.news.fetch_gdelt"]
+    monkeypatch.setattr(fg_mod, "search_gdelt", fake_search_gdelt)
+    monkeypatch.setattr(
+        fg_mod, "fetch_html", lambda url: "<html><head></head><body></body></html>"
+    )
+    monkeypatch.setattr(fg_mod, "domain_ok", lambda url: True)
+    monkeypatch.setattr(fg_mod, "domain_blocked", lambda url: False)
+
+    msg = session.handle_fetch("topic")
+    assert msg == "Couldn't fetch a readable article; try another topic."
 
 
 def test_handle_read_and_summarize(monkeypatch):
