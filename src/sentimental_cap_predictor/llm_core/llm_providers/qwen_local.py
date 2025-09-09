@@ -9,6 +9,7 @@ from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 from huggingface_hub import snapshot_download
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
+from ..utils import clean_generate_kwargs
 from .base import ChatMessage, LLMProvider
 
 
@@ -20,8 +21,8 @@ def _auto_runtime_prefs() -> dict[str, Any]:
     variables.  Any required directories are created automatically.
     """
 
-    from pathlib import Path
     import os
+    from pathlib import Path
 
     model_path = os.getenv("QWEN_MODEL_PATH", "Qwen/Qwen2-1.5B-Instruct")
     device_map = os.getenv("QWEN_DEVICE_MAP", "auto")
@@ -32,7 +33,9 @@ def _auto_runtime_prefs() -> dict[str, Any]:
     if local_model_path.exists():
         checkpoint_path = model_path
     else:
-        checkpoint_path = snapshot_download(repo_id=local_model_path.as_posix())
+        checkpoint_path = snapshot_download(
+            repo_id=local_model_path.as_posix(),
+        )
 
     offload_dir = (
         Path(offload_folder)
@@ -95,8 +98,10 @@ class QwenLocalProvider(LLMProvider):
         self.model.eval()
 
         print(
-            f"[runtime] model={self.model_id} device_map={prefs.get('device_map')} "
-            f"dtype={prefs.get('dtype')} offload={prefs.get('offload_folder')}"
+            f"[runtime] model={self.model_id} "
+            f"device_map={prefs.get('device_map')} "
+            f"dtype={prefs.get('dtype')} "
+            f"offload={prefs.get('offload_folder')}"
         )
 
     def chat(self, messages: List[ChatMessage], **kwargs: Any) -> str:
@@ -112,10 +117,12 @@ class QwenLocalProvider(LLMProvider):
             "max_length",
             inputs["input_ids"].shape[-1] + kwargs["max_new_tokens"],
         )
+        generate_kwargs = clean_generate_kwargs(
+            temperature=self.temperature,
+            **kwargs,
+        )
         with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs, temperature=self.temperature, **kwargs
-            )
+            outputs = self.model.generate(**inputs, **generate_kwargs)
         start = inputs["input_ids"].shape[-1]
         generated = outputs[0, start:]
         return self.tokenizer.decode(generated, skip_special_tokens=True)
