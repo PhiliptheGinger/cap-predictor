@@ -2,3 +2,8 @@ trafilatura
 readability-lxml
 lxml
 cssselect
+
+trafilatura
+readability-lxml
+lxml
+cssselect
