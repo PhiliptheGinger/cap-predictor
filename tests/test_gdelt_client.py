@@ -110,6 +110,42 @@ def test_search_gdelt_default_limit(monkeypatch):
     assert len(results) == 3
 
 
+def test_search_gdelt_skips_disallowed_domains(monkeypatch, caplog):
+    payload = {
+        "articles": [
+            {
+                "title": "Bad",
+                "url": "http://wsj.com/a",
+                "source": "WSJ",
+                "seendate": "2024",
+            },
+            {
+                "title": "Good",
+                "url": "http://reuters.com/b",
+                "source": "Reuters",
+                "seendate": "2024",
+            },
+        ]
+    }
+
+    class DummyResponse:
+        def json(self):  # pragma: no cover - trivial
+            return payload
+
+        def raise_for_status(self):  # pragma: no cover - no-op
+            pass
+
+    monkeypatch.setattr(
+        requests, "get", lambda url, params, timeout: DummyResponse()  # noqa: ANN001
+    )
+
+    with caplog.at_level(logging.INFO):
+        results = search_gdelt("test", max_results=2)
+    assert len(results) == 1
+    assert results[0]["url"] == "http://reuters.com/b"
+    assert any("wsj.com" in m for m in caplog.messages)
+
+
 def test_search_gdelt_handles_errors(monkeypatch, caplog):
     def fake_get(url, params, timeout):  # noqa: ANN001
         raise requests.RequestException("boom")

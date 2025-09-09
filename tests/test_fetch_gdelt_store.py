@@ -95,3 +95,39 @@ def test_store_chunks_handles_errors(monkeypatch, caplog):
         fetch_gdelt._store_chunks(result)
     assert any("Vector store upsert failed" in m for m in caplog.messages)
 
+
+def test_search_gdelt_skips_blocked_domains(monkeypatch, caplog):
+    payload = {
+        "articles": [
+            {"url": "http://wsj.com/a"},
+            {"url": "http://reuters.com/b"},
+        ]
+    }
+
+    class DummyResponse:
+        def json(self):  # pragma: no cover - trivial
+            return payload
+
+        def raise_for_status(self):  # pragma: no cover - no-op
+            pass
+
+    monkeypatch.setattr(
+        fetch_gdelt.requests,
+        "get",
+        lambda url, params, headers, timeout: DummyResponse(),  # noqa: ANN001
+    )
+
+    calls: list[str] = []
+
+    def fake_fetch_html(url):  # noqa: ANN001
+        calls.append(url)
+        return "<html>body</html>"
+
+    monkeypatch.setattr(fetch_gdelt, "fetch_html", fake_fetch_html)
+
+    with caplog.at_level(logging.INFO):
+        articles = fetch_gdelt.search_gdelt("q", max_records=2)
+    assert len(articles) == 1
+    assert calls == ["http://reuters.com/b"]
+    assert any("wsj.com" in m for m in caplog.messages)
+

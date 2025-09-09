@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlparse
+
 import requests
 
 from sentimental_cap_predictor.config import GDELT_API_URL
 
 
 logger = logging.getLogger(__name__)
+
+DISALLOWED_DOMAINS = ("wsj.com", "ft.com", "bloomberg.com")
 
 
 def search_gdelt(
@@ -57,11 +61,16 @@ def search_gdelt(
 
     articles = data.get("articles", [])
     results: list[dict] = []
-    for article in articles[:max_results]:
+    for article in articles:
+        url = article.get("url", "")
+        domain = urlparse(url).netloc
+        if any(d in domain for d in DISALLOWED_DOMAINS):
+            logger.info("Skipping %s: disallowed domain", domain)
+            continue
         results.append(
             {
                 "title": article.get("title", ""),
-                "url": article.get("url", ""),
+                "url": url,
                 "source": (
                     article.get("sourceCommonName")
                     or article.get(
@@ -74,4 +83,6 @@ def search_gdelt(
                 ),
             }
         )
+        if len(results) >= max_results:
+            break
     return results
