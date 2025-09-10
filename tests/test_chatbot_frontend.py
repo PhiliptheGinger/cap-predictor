@@ -358,14 +358,27 @@ def test_direct_text_reply(monkeypatch, capsys):
         "sentimental_cap_predictor.llm_core.llm_providers.qwen_local",
         dummy_module,
     )
+    cfg_module = SimpleNamespace(
+        QwenLocalConfig=SimpleNamespace(
+            from_env=lambda: SimpleNamespace(
+                temperature=0.0,
+                max_new_tokens=512,
+                model_dump=lambda: {"temperature": 0.0, "max_new_tokens": 512},
+            )
+        )
+    )
+    llm_core_pkg = SimpleNamespace(provider_config=cfg_module)
+    root_pkg = SimpleNamespace(llm_core=llm_core_pkg)
+    monkeypatch.setitem(sys.modules, "sentimental_cap_predictor", root_pkg)
     monkeypatch.setitem(
         sys.modules,
-        "sentimental_cap_predictor.llm_core.config_llm",
-        SimpleNamespace(
-            get_llm_config=lambda: SimpleNamespace(
-                model_path="", temperature=0.0, max_new_tokens=512
-            )
-        ),
+        "sentimental_cap_predictor.llm_core",
+        llm_core_pkg,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.provider_config",
+        cfg_module,
     )
     import importlib.util
     from pathlib import Path

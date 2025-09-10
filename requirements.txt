@@ -3,3 +3,5 @@ trafilatura
 readability-lxml
 lxml
 cssselect
+pydantic
+colorama

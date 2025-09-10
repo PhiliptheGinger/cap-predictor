@@ -5,7 +5,7 @@ import json
 import re as _re
 from typing import Any, Dict, TYPE_CHECKING
 
-from ..config_llm import get_llm_config
+from ..provider_config import QwenLocalConfig
 
 if TYPE_CHECKING:  # pragma: no cover - for type checkers only
     from ..llm_providers.qwen_local import QwenLocalProvider
@@ -64,13 +64,11 @@ def call_qwen(utterance: str) -> str:
             QwenLocalProvider,
         )
 
-        cfg = get_llm_config()
+        cfg = QwenLocalConfig.from_env()
         # Use deterministic settings for intent classification
         _LOCAL_PROVIDER = QwenLocalProvider(
-            model_path=cfg.model_path,
             temperature=0.0,
             max_new_tokens=cfg.max_new_tokens,
-            offload_folder=getattr(cfg, "offload_folder", None),
         )
 
     messages = [

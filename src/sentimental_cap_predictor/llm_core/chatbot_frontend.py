@@ -471,16 +471,23 @@ def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     setup()
     from sentimental_cap_predictor.cmd_utils import extract_cmd
-    from sentimental_cap_predictor.llm_core.config_llm import get_llm_config
+    from sentimental_cap_predictor.llm_core.provider_config import (
+        QwenLocalConfig,
+    )
     from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
         QwenLocalProvider,
     )
 
-    config = get_llm_config()
-    provider = QwenLocalProvider(
-        temperature=config.temperature,
-        max_new_tokens=config.max_new_tokens,
-    )
+    cfg = QwenLocalConfig.from_env()
+    try:
+        provider = QwenLocalProvider(**cfg.model_dump())
+    except TypeError as e:  # pragma: no cover - defensive
+        import inspect
+        import sentimental_cap_predictor.llm_core.llm_providers.qwen_local as ql
+
+        print("Provider init failed. Here is the expected signature:")
+        print(inspect.signature(ql.QwenLocalProvider.__init__))
+        raise
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
