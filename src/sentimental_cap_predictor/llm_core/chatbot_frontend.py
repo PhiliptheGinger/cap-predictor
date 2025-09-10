@@ -21,6 +21,11 @@ from sentimental_cap_predictor.data.news import (
     FetchArticleSpec,
 )
 from sentimental_cap_predictor.data.news import fetch_article as _fetch_article
+from sentimental_cap_predictor.reasoning.engine import (
+    analogy_explain,
+    reason_about,
+    simulate,
+)
 
 _MEMORY_INDEX: Path | None = None
 _SEEN_URLS: set[str] = set()
@@ -463,6 +468,43 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
             return handle_command(f'memory search "{query}"')
 
         return _search
+
+    m = re.match(r"reason about (.+)", message, re.I)
+    if m:
+        topic = m.group(1).strip()
+
+        def _reason():
+            logger.info("Dispatching reason_about: %s", topic)
+            result = reason_about(topic)
+            logger.info("Finished reason_about: %s", topic)
+            return result
+
+        return _reason
+
+    m = re.match(r"simulate (.+)", message, re.I)
+    if m:
+        scenario = m.group(1).strip()
+
+        def _simulate():
+            logger.info("Dispatching simulate: %s", scenario)
+            result = simulate(scenario)
+            logger.info("Finished simulate: %s", scenario)
+            return result
+
+        return _simulate
+
+    m = re.match(r"explain with analogy (.+?) to (.+)", message, re.I)
+    if m:
+        src = m.group(1).strip()
+        tgt = m.group(2).strip()
+
+        def _analogy():
+            logger.info("Dispatching analogy_explain: %s -> %s", src, tgt)
+            result = analogy_explain(src, tgt)
+            logger.info("Finished analogy_explain: %s -> %s", src, tgt)
+            return result
+
+        return _analogy
 
     return None
 

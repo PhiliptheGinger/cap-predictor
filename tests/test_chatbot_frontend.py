@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import requests
+import logging
 
 
 @dataclass
@@ -618,3 +619,25 @@ def test_route_keywords_last_loaded():
     handler = cf._route_keywords("what did you load?")
     assert handler is not None
     assert handler() == "T - http://u"
+
+
+def test_route_keywords_reason_simulate_analogy(monkeypatch, caplog):
+    monkeypatch.setattr(cf, "reason_about", lambda topic: f"reasoned {topic}")
+    handler = cf._route_keywords("reason about inflation")
+    assert handler is not None
+    with caplog.at_level(logging.INFO):
+        assert handler() == "reasoned inflation"
+
+    monkeypatch.setattr(cf, "simulate", lambda scenario: f"sim {scenario}")
+    handler = cf._route_keywords("simulate market crash")
+    assert handler is not None
+    with caplog.at_level(logging.INFO):
+        assert handler() == "sim market crash"
+
+    monkeypatch.setattr(
+        cf, "analogy_explain", lambda src, tgt: f"{src}->{tgt}"
+    )
+    handler = cf._route_keywords("explain with analogy stocks to gambling")
+    assert handler is not None
+    with caplog.at_level(logging.INFO):
+        assert handler() == "stocks->gambling"
