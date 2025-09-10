@@ -7,7 +7,14 @@ ql = pytest.importorskip(
     "sentimental_cap_predictor.llm_core.llm_providers.qwen_local",
     reason="qwen provider not available",
 )
-from sentimental_cap_predictor.llm_core.provider_config import QwenLocalConfig
+ds = pytest.importorskip(
+    "sentimental_cap_predictor.llm_core.llm_providers.deepseek",
+    reason="deepseek provider not available",
+)
+from sentimental_cap_predictor.llm_core.provider_config import (
+    DeepSeekConfig,
+    QwenLocalConfig,
+)
 
 
 def _patch_qwen(monkeypatch):
@@ -64,3 +71,30 @@ def test_qwen_local_provider_init(monkeypatch):
 def test_qwen_local_provider_unknown_kwargs():
     with pytest.raises(TypeError):
         ql.QwenLocalProvider(temperature=0.1, max_new_tokens=1, foo=1)
+
+
+def _patch_deepseek(monkeypatch):
+    class DummyResp:
+        choices = [types.SimpleNamespace(message={"content": ""})]
+
+    class DummyClient:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(*args, **kwargs):
+                    return DummyResp()
+
+    monkeypatch.setattr(ds, "OpenAI", lambda *a, **k: DummyClient())
+
+
+@pytest.mark.skipif(not hasattr(ds, "DeepSeekProvider"), reason="provider missing")
+def test_deepseek_provider_init(monkeypatch):
+    _patch_deepseek(monkeypatch)
+    cfg = DeepSeekConfig(api_key="x")
+    provider = ds.DeepSeekProvider(**cfg.model_dump())
+    assert provider.max_new_tokens == cfg.max_new_tokens
+
+
+def test_deepseek_provider_unknown_kwargs():
+    with pytest.raises(TypeError):
+        ds.DeepSeekProvider(temperature=0.1, max_new_tokens=1, foo=1)
