@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, List
 
 import torch
@@ -11,6 +12,8 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from ..utils import clean_generate_kwargs
 from .base import ChatMessage, LLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 def _auto_runtime_prefs() -> dict[str, Any]:
@@ -61,8 +64,10 @@ class QwenLocalProvider(LLMProvider):
 
     def __init__(
         self,
+        *,
         temperature: float,
         max_new_tokens: int = 512,
+        **kwargs: Any,
     ) -> None:
         """Create a provider backed by a local Qwen model.
 
@@ -73,6 +78,9 @@ class QwenLocalProvider(LLMProvider):
         max_new_tokens:
             Default ``max_new_tokens`` value used when chatting with the model.
         """
+
+        if kwargs:
+            raise TypeError(f"Unknown args: {sorted(kwargs.keys())}")
 
         prefs = _auto_runtime_prefs()
 
@@ -97,11 +105,12 @@ class QwenLocalProvider(LLMProvider):
         )
         self.model.eval()
 
-        print(
-            f"[runtime] model={self.model_id} "
-            f"device_map={prefs.get('device_map')} "
-            f"dtype={prefs.get('dtype')} "
-            f"offload={prefs.get('offload_folder')}"
+        logger.info(
+            "model=%s device_map=%s dtype=%s offload=%s",
+            self.model_id,
+            prefs.get("device_map"),
+            prefs.get("dtype"),
+            prefs.get("offload_folder"),
         )
 
     def chat(self, messages: List[ChatMessage], **kwargs: Any) -> str:

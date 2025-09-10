@@ -3,6 +3,7 @@ from __future__ import annotations
 """Session-level helpers for working with fetched news articles."""
 
 import logging
+import sys
 from typing import List
 
 import requests
@@ -12,6 +13,13 @@ from sentimental_cap_predictor.memory.session_state import STATE
 
 
 logger = logging.getLogger(__name__)
+
+
+def _get_fetch_gdelt():
+    mod = sys.modules.get("sentimental_cap_predictor.news.fetch_gdelt")
+    if mod is None:  # pragma: no cover - fallback
+        from . import fetch_gdelt as mod  # type: ignore
+    return mod
 
 
 def handle_fetch(topic: str) -> str:
@@ -24,8 +32,7 @@ def handle_fetch(topic: str) -> str:
     returned instead.
     """
 
-    from . import fetch_gdelt
-
+    fetch_gdelt = _get_fetch_gdelt()
     try:
         articles = fetch_gdelt.search_gdelt(topic, max_records=15)
     except requests.RequestException as exc:  # pragma: no cover - network failure
@@ -100,9 +107,8 @@ def handle_summarize() -> str:
     text = article.get("text")
     if not text:
         return "No article text to summarize."
-    from .fetch_gdelt import summarize
-
-    summary = summarize(text)
+    fetch_gdelt = _get_fetch_gdelt()
+    summary = fetch_gdelt.summarize(text)
     article["summary"] = summary
     return summary
 

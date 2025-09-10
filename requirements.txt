@@ -1,9 +1,7 @@
+requests
 trafilatura
 readability-lxml
 lxml
 cssselect
-
-trafilatura
-readability-lxml
-lxml
-cssselect
+pydantic
+colorama

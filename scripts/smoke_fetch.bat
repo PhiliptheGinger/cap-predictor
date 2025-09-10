@@ -1,12 +1,13 @@
 @echo off
 set PYTHONPATH=%~dp0\..\src
 
-python --version
-
-python - <<"PY"
-import sentimental_cap_predictor as scp
-print("package:", scp.__name__)
+python - <<PY %*
+from sentimental_cap_predictor.news.fetch_gdelt import search_gdelt
+import json, sys
+query = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "markets"
+result = search_gdelt(query)
+if result:
+    print(result.get("summary", ""))
+else:
+    print("No article found")
 PY
-
-python -m sentimental_cap_predictor.smoke_cli --help
-python -m sentimental_cap_predictor.smoke_cli "CMD: echo hello"
