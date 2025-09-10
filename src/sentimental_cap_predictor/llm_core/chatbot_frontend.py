@@ -420,20 +420,31 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
     """Return a callable handling ``message`` if it matches known patterns."""
     import re
 
-    m = re.match(r"(?:pull up|fetch|get) article (?:about|on) (.+)", message, re.I)
+    m = re.search(
+        r"(?:pull up|fetch|get) (?:an? )?article(?: (?:about|on) (?P<topic>.+))?",
+        message,
+        re.I,
+    )
     if m:
-        topic = m.group(1).strip()
+        topic = m.group("topic")
+        if topic:
+            topic = topic.strip().rstrip("?.! ")
 
-        def _fetch():
-            result = fetch_first_gdelt_article(topic)
-            global _LAST_ARTICLE_URL
-            if _SEEN_METADATA:
-                _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
-            return result
+            def _fetch():
+                result = fetch_first_gdelt_article(topic)
+                global _LAST_ARTICLE_URL
+                if _SEEN_METADATA:
+                    _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
+                return result
 
-        return _fetch
+            return _fetch
 
-    if re.fullmatch(r"read it", message.strip(), re.I):
+        def _ask_topic() -> str:
+            return "What topic should I search for?"
+
+        return _ask_topic
+
+    if re.search(r"\bread(?: it| (?:that|the) article)\b", message, re.I):
         def _read():
             if not _LAST_ARTICLE_URL:
                 return "No article available for reading."
@@ -441,13 +452,17 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
 
         return _read
 
-    if re.fullmatch(r"summarize it", message.strip(), re.I):
+    if re.search(
+        r"\bsummarize(?: it| (?:that|the) article)\b|tell me what['’]s on this page",
+        message,
+        re.I,
+    ):
         def _summarize():
             return handle_command("article.summarize_last")
 
         return _summarize
 
-    if re.fullmatch(r"what did you load\?", message.strip(), re.I):
+    if re.search(r"what did you load\?", message, re.I):
         def _last_loaded():
             if _SEEN_METADATA:
                 last = _SEEN_METADATA[-1]
@@ -460,7 +475,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
 
         return _last_loaded
 
-    m = re.match(r"search memory for (.+)", message, re.I)
+    m = re.search(r"search memory for (.+)", message, re.I)
     if m:
         query = m.group(1).strip()
 
@@ -469,7 +484,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
 
         return _search
 
-    m = re.match(r"reason about (.+)", message, re.I)
+    m = re.search(r"reason about (.+)", message, re.I)
     if m:
         topic = m.group(1).strip()
 
@@ -481,7 +496,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
 
         return _reason
 
-    m = re.match(r"simulate (.+)", message, re.I)
+    m = re.search(r"simulate (.+)", message, re.I)
     if m:
         scenario = m.group(1).strip()
 
@@ -493,7 +508,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
 
         return _simulate
 
-    m = re.match(r"explain with analogy (.+?) to (.+)", message, re.I)
+    m = re.search(r"explain with analogy (.+?) to (.+)", message, re.I)
     if m:
         src = m.group(1).strip()
         tgt = m.group(2).strip()
