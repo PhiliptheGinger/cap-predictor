@@ -700,3 +700,81 @@ def test_route_keywords_reason_simulate_analogy(monkeypatch, caplog):
     assert handler is not None
     with caplog.at_level(logging.INFO):
         assert handler() == "stocks->gambling"
+
+
+def test_classify_and_route_fetch(monkeypatch):
+    import re
+    import sys
+    import types
+
+    dummy_qwen_intent = types.SimpleNamespace(
+        call_qwen=lambda _: '<json>{"intent":"info.lookup","slots":{"query":"NVDA"}}</json>',
+        _JSON_RE=re.compile(r"<json>\s*(\{.*\})\s*</json>", re.S),
+    )
+    dummy_pkg = types.SimpleNamespace(qwen_intent=dummy_qwen_intent)
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.chatbot_nlu",
+        dummy_pkg,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.chatbot_nlu.qwen_intent",
+        dummy_qwen_intent,
+    )
+    monkeypatch.setattr(cf, "fetch_first_gdelt_article", lambda q: f"article {q}")
+
+    result = cf._classify_and_route("news about NVDA")
+    assert result == "article NVDA"
+
+
+def test_classify_and_route_unrecognized(monkeypatch):
+    import re
+    import sys
+    import types
+
+    dummy_qwen_intent = types.SimpleNamespace(
+        call_qwen=lambda _: '<json>{"intent":"smalltalk.greeting","slots":{}}</json>',
+        _JSON_RE=re.compile(r"<json>\s*(\{.*\})\s*</json>", re.S),
+    )
+    dummy_pkg = types.SimpleNamespace(qwen_intent=dummy_qwen_intent)
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.chatbot_nlu",
+        dummy_pkg,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.chatbot_nlu.qwen_intent",
+        dummy_qwen_intent,
+    )
+
+    result = cf._classify_and_route("hello there")
+    assert result == "Try: pull up an article about X."
+
+
+def test_classify_and_route_failure(monkeypatch):
+    import re
+    import sys
+    import types
+
+    def boom(_: str) -> str:  # noqa: ANN001
+        raise RuntimeError
+
+    dummy_qwen_intent = types.SimpleNamespace(
+        call_qwen=boom,
+        _JSON_RE=re.compile(r"<json>\s*(\{.*\})\s*</json>", re.S),
+    )
+    dummy_pkg = types.SimpleNamespace(qwen_intent=dummy_qwen_intent)
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.chatbot_nlu",
+        dummy_pkg,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "sentimental_cap_predictor.llm_core.chatbot_nlu.qwen_intent",
+        dummy_qwen_intent,
+    )
+
+    assert cf._classify_and_route("anything") is None

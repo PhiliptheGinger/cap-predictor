@@ -543,6 +543,41 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
     return None
 
 
+def _classify_and_route(message: str) -> str | None:
+    """Use intent classification to handle simple requests."""
+
+    try:
+        from sentimental_cap_predictor.llm_core.chatbot_nlu import qwen_intent
+    except Exception:  # pragma: no cover - import failure
+        return None
+
+    try:
+        text = qwen_intent.call_qwen(message)
+    except Exception:  # pragma: no cover - model failure
+        return None
+
+    m = qwen_intent._JSON_RE.search(text or "")  # type: ignore[attr-defined]
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
+
+    intent = data.get("intent")
+    slots = data.get("slots") or {}
+    if intent == "info.lookup":
+        query = slots.get("query")
+        if not query:
+            keywords = slots.get("keywords")
+            if isinstance(keywords, list) and keywords:
+                query = keywords[0]
+        if query:
+            return fetch_first_gdelt_article(query)
+
+    return "Try: pull up an article about X."
+
+
 def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     setup()
@@ -608,6 +643,11 @@ def main() -> None:
             print(output)
             history.append({"role": "assistant", "content": output})
             logger.info("Finished routed message: %s", user)
+            continue
+        result = _classify_and_route(user)
+        if result:
+            print(result)
+            history.append({"role": "assistant", "content": result})
             continue
 
         history.append({"role": "user", "content": user})
