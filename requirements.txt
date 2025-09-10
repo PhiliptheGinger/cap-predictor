@@ -1,8 +1,4 @@
-trafilatura
-readability-lxml
-lxml
-cssselect
-
+requests
 trafilatura
 readability-lxml
 lxml
