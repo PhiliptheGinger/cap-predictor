@@ -1,3 +1,4 @@
+# flake8: noqa
 """Simple interactive frontend for Qwen chat model using CMD protocol."""
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import requests
 # for unit tests and simple command handling. ``colorama`` is a lightweight
 # dependency used to provide coloured prompts for a nicer CLI experience.
 from colorama import Fore, Style, init
-
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ _SEEN_META_PATH = Path("data/gdelt_seen.json")
 _SEEN_METADATA: list[dict[str, str]] = []
 _SEEN_LOADED = False
 _LAST_ARTICLE_URL: str | None = None
+_ALLOWED_CURL_DOMAINS = {"api.gdeltproject.org"}
 
 
 def _load_seen_metadata() -> None:
@@ -108,7 +109,11 @@ def fetch_first_gdelt_article(
         article = _fetch_first_gdelt_article(
             query, prefer_content=True, days=days, max_records=limit
         )
-    except (requests.RequestException, RuntimeError, ValueError) as exc:  # pragma: no cover
+    except (
+        requests.RequestException,
+        RuntimeError,
+        ValueError,
+    ) as exc:  # pragma: no cover
         if isinstance(exc, requests.RequestException):
             return f"GDELT request failed: {exc}"
         return "No readable article found"
@@ -180,6 +185,7 @@ def handle_command(command: str) -> str:
     import re
     import shlex
     import subprocess
+    import urllib.parse
 
     if _MEMORY_INDEX is None:
         setup()
@@ -407,6 +413,16 @@ def handle_command(command: str) -> str:
             return "No news found."
         return result
 
+    tokens = shlex.split(command)
+    if tokens and tokens[0] == "curl":
+        urls = [
+            t for t in tokens[1:] if t.startswith("http://") or t.startswith("https://")
+        ]
+        for url in urls:
+            domain = urllib.parse.urlparse(url).hostname or ""
+            if domain == "example.com" or domain not in _ALLOWED_CURL_DOMAINS:
+                return f"Access to {domain} is not permitted."
+
     result = subprocess.run(
         command,
         shell=True,
@@ -445,6 +461,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
         return _ask_topic
 
     if re.search(r"\bread(?: it| (?:that|the) article)\b", message, re.I):
+
         def _read():
             if not _LAST_ARTICLE_URL:
                 return "No article available for reading."
@@ -457,12 +474,14 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
         message,
         re.I,
     ):
+
         def _summarize():
             return handle_command("article.summarize_last")
 
         return _summarize
 
     if re.search(r"what did you load\?", message, re.I):
+
         def _last_loaded():
             if _SEEN_METADATA:
                 last = _SEEN_METADATA[-1]
@@ -528,11 +547,11 @@ def main() -> None:
     """Run a REPL-style chat session with the local Qwen model."""
     setup()
     from sentimental_cap_predictor.cmd_utils import extract_cmd
-    from sentimental_cap_predictor.llm_core.provider_config import (
-        QwenLocalConfig,
-    )
     from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
         QwenLocalProvider,
+    )
+    from sentimental_cap_predictor.llm_core.provider_config import (
+        QwenLocalConfig,
     )
 
     cfg = QwenLocalConfig.from_env()
@@ -540,6 +559,7 @@ def main() -> None:
         provider = QwenLocalProvider(**cfg.model_dump())
     except TypeError as e:  # pragma: no cover - defensive
         import inspect
+
         import sentimental_cap_predictor.llm_core.llm_providers.qwen_local as ql
 
         print("Provider init failed. Here is the expected signature:")
