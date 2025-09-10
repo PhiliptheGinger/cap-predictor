@@ -1,6 +1,7 @@
 # flake8: noqa
 import importlib.util
 import json
+import logging
 import subprocess
 import sys
 import types
@@ -9,7 +10,6 @@ from pathlib import Path
 
 import pytest
 import requests
-import logging
 
 
 @dataclass
@@ -337,6 +337,16 @@ def test_handle_command_runs_shell(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: DummyCompleted())
     out = cf.handle_command("echo hi")
     assert out == "ok"
+
+
+def test_handle_command_blocks_unapproved_domain(monkeypatch):
+    def _fail(*a, **k):  # noqa: ANN001
+        raise AssertionError("subprocess.run should not be called")
+
+    monkeypatch.setattr(subprocess, "run", _fail)
+    out = cf.handle_command("curl https://example.com")
+    assert "not permitted" in out.lower()
+    assert "<html" not in out.lower()
 
 
 def test_direct_text_reply(monkeypatch, capsys):
@@ -685,9 +695,7 @@ def test_route_keywords_reason_simulate_analogy(monkeypatch, caplog):
     with caplog.at_level(logging.INFO):
         assert handler() == "sim market crash"
 
-    monkeypatch.setattr(
-        cf, "analogy_explain", lambda src, tgt: f"{src}->{tgt}"
-    )
+    monkeypatch.setattr(cf, "analogy_explain", lambda src, tgt: f"{src}->{tgt}")
     handler = cf._route_keywords("could you explain with analogy stocks to gambling")
     assert handler is not None
     with caplog.at_level(logging.INFO):
