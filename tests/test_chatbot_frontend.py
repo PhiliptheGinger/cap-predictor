@@ -586,6 +586,29 @@ def test_route_keywords_fetch(monkeypatch):
     assert cf._LAST_ARTICLE_URL == "http://u"
 
 
+def test_route_keywords_fetch_variants(monkeypatch):
+    cf._SEEN_METADATA = []
+    cf._LAST_ARTICLE_URL = None
+    captured = {}
+
+    def fake_fetch(topic):  # noqa: ANN001
+        captured["topic"] = topic
+        cf._SEEN_METADATA.append({"title": "T", "url": "http://u"})
+        return "text"
+
+    monkeypatch.setattr(cf, "fetch_first_gdelt_article", fake_fetch)
+
+    handler = cf._route_keywords("hey, fetch article about NVDA")
+    assert handler is not None
+    assert handler() == "text"
+    assert captured["topic"] == "NVDA"
+    assert cf._LAST_ARTICLE_URL == "http://u"
+
+    handler = cf._route_keywords("fetch article about")
+    assert handler is not None
+    assert handler() == "What topic should I search for?"
+
+
 def test_route_keywords_read_summarize_and_search(monkeypatch):
     cf._LAST_ARTICLE_URL = "http://a"
 
@@ -603,7 +626,7 @@ def test_route_keywords_read_summarize_and_search(monkeypatch):
     handler = cf._route_keywords("summarize it")
     assert handler is not None
     assert handler() == "ok"
-    handler = cf._route_keywords("search memory for test")
+    handler = cf._route_keywords("hey, search memory for test")
     assert handler is not None
     assert handler() == "ok"
 
@@ -614,22 +637,50 @@ def test_route_keywords_read_summarize_and_search(monkeypatch):
     ]
 
 
+def test_route_keywords_read_summarize_variants(monkeypatch):
+    cf._LAST_ARTICLE_URL = "http://a"
+
+    captured = []
+
+    def fake_handle(cmd):  # noqa: ANN001
+        captured.append(cmd)
+        return "ok"
+
+    monkeypatch.setattr(cf, "handle_command", fake_handle)
+
+    handler = cf._route_keywords("please read that article")
+    assert handler is not None
+    assert handler() == "ok"
+    handler = cf._route_keywords("could you summarize that article?")
+    assert handler is not None
+    assert handler() == "ok"
+    handler = cf._route_keywords("tell me what's on this page")
+    assert handler is not None
+    assert handler() == "ok"
+
+    assert captured == [
+        "news.read --url http://a",
+        "article.summarize_last",
+        "article.summarize_last",
+    ]
+
+
 def test_route_keywords_last_loaded():
     cf._SEEN_METADATA = [{"title": "T", "url": "http://u"}]
-    handler = cf._route_keywords("what did you load?")
+    handler = cf._route_keywords("hey, what did you load?")
     assert handler is not None
     assert handler() == "T - http://u"
 
 
 def test_route_keywords_reason_simulate_analogy(monkeypatch, caplog):
     monkeypatch.setattr(cf, "reason_about", lambda topic: f"reasoned {topic}")
-    handler = cf._route_keywords("reason about inflation")
+    handler = cf._route_keywords("hey, reason about inflation")
     assert handler is not None
     with caplog.at_level(logging.INFO):
         assert handler() == "reasoned inflation"
 
     monkeypatch.setattr(cf, "simulate", lambda scenario: f"sim {scenario}")
-    handler = cf._route_keywords("simulate market crash")
+    handler = cf._route_keywords("please simulate market crash")
     assert handler is not None
     with caplog.at_level(logging.INFO):
         assert handler() == "sim market crash"
@@ -637,7 +688,7 @@ def test_route_keywords_reason_simulate_analogy(monkeypatch, caplog):
     monkeypatch.setattr(
         cf, "analogy_explain", lambda src, tgt: f"{src}->{tgt}"
     )
-    handler = cf._route_keywords("explain with analogy stocks to gambling")
+    handler = cf._route_keywords("could you explain with analogy stocks to gambling")
     assert handler is not None
     with caplog.at_level(logging.INFO):
         assert handler() == "stocks->gambling"
