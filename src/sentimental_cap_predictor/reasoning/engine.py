@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from ..memory import vector_store
-from .analogy import best_metaphor
+from .analogy import best_metaphor, map_roles
 from .simulator import step as sim_step
 
 
@@ -31,10 +31,18 @@ def reason_about(
     """
 
     hits = memory_hits
+    queried = False
     if hits is None:
-        hits = vector_store.query(text) if vector_store.available() else []
+        if vector_store.available():
+            hits = vector_store.query(text)
+            queried = True
+        else:
+            hits = []
 
     facts: List[str] = []
+    if queried and not hits:
+        facts.append("- No relevant memories found.")
+
     for hit in hits or []:
         meta = hit.get("metadata", {}) or {}
         snippet = meta.get("text")
@@ -59,32 +67,51 @@ def reason_about(
 def analogy_explain(src: str, tgt: str) -> str:
     """Provide a short analogy comparing ``src`` and ``tgt`` with caveats."""
 
-    label, rationale = best_metaphor(tgt)
+    src_name = src if isinstance(src, str) else str(src.get("name", "source"))
+    tgt_name = tgt if isinstance(tgt, str) else str(tgt.get("name", "target"))
+
+    mapping_text = ""
+    if isinstance(src, dict) and isinstance(tgt, dict):
+        role_mapping = map_roles(src, tgt)
+        if role_mapping:
+            pairs = ", ".join(f"{s}->{t}" for s, t in role_mapping.items())
+            mapping_text = f" Shared roles: {pairs}."
+        else:
+            mapping_text = " The two domains have no analogous roles."
+
+    label, rationale = best_metaphor(tgt_name)
     if label:
         para1 = (
-            f"{tgt.capitalize()} can be likened to a {label}. {rationale} "
-            f"This mirrors aspects of {src}."
+            f"{tgt_name.capitalize()} can be likened to a {label}. {rationale} "
+            f"This mirrors aspects of {src_name}."
         )
     else:
         para1 = (
-            f"There is no ready-made metaphor for {tgt}. "
-            f"Still, comparing it to {src} can offer intuition."
+            f"There is no ready-made metaphor for {tgt_name}. "
+            f"Still, comparing it to {src_name} can offer intuition."
         )
 
     para2 = (
-        f"However, {tgt} and {src} are not identical, "
+        f"However, {tgt_name} and {src_name} are not identical, "
         "so the analogy should be taken as a loose comparison "
         "rather than a strict equivalence."
     )
-    return f"{para1}\n\n{para2}"
+    return f"{para1}{mapping_text}\n\n{para2}"
 
 
 def simulate(scenario: str) -> str:
     """Parse qualitative ``scenario`` and narrate one step of the simulator."""
 
     text = scenario.lower()
-    trend = "down" if "down" in text else "up"
-    force = "strong" if "strong" in text else "weak"
+    valid_trends = {"up", "down"}
+    valid_forces = {"strong", "weak"}
+
+    trend = next((t for t in valid_trends if t in text), None)
+    force = next((f for f in valid_forces if f in text), None)
+
+    if trend is None or force is None:
+        return "Generic outcome: no specific trend or force recognized."
+
     state: Dict[str, str] = {"trend": trend, "force": force}
     try:
         next_state, narration = sim_step(state)
