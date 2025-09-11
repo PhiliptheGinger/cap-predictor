@@ -56,3 +56,20 @@ Available built-in tools include:
 
 Additional tools can register themselves with the agent loop by calling
 `register_tool` at import time.
+
+## Demo scripts
+
+The `scripts` directory includes small examples demonstrating the loop:
+
+- `scripts/demo_research_url.py` – fetches and summarizes a web page.
+- `scripts/demo_python_function.py` – writes a Python function and runs it.
+- `scripts/demo_search_read_memory_code.py` – chains search, reading, memory storage, and code execution.
+
+Run them with `python <script>`.
+
+## Risks and mitigations
+
+Agent mode executes model-specified commands and has inherent risks:
+
+- **Prompt injection**: malicious text may coerce the model into unsafe actions. Keep `CONFIRM_CMDS` enabled and limit available tools.
+- **Runaway loops**: poorly behaved prompts could cause endless command cycles. The agent enforces `max_steps` and timeouts to stop runaway behavior.
