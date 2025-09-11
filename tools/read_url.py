@@ -90,7 +90,11 @@ def read_url(url: str) -> Dict[str, Any]:
             if title:
                 meta["title"] = title.strip()
         except Exception:
-            pass
+            import re
+
+            m = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+            if m:
+                meta["title"] = m.group(1).strip()
 
     return {"text": text, "meta": meta}
 

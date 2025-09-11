@@ -92,7 +92,7 @@ def _parse_args() -> argparse.Namespace:
         "--enable-read-url",
         action="store_true",
         default=os.getenv("ENABLE_READ_URL") not in {None, "", "0"},
-        help="Register read_url tool",
+        help="Register read.url tool",
     )
     parser.add_argument(
         "--enable-memory",

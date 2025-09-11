@@ -8,7 +8,8 @@ from sentimental_cap_predictor.monitoring import RunLogger
 def test_agent_loop_writes_run_log(tmp_path, monkeypatch):
     rl = RunLogger(base_dir=tmp_path)
 
-    loop = AgentLoop(lambda _: 'CMD: {"name": "dummy"}', max_steps=1)
+    responses = ['CMD: {"tool": "dummy"}', "done"]
+    loop = AgentLoop(lambda _: responses.pop(0), max_steps=2)
     loop._run_logger = rl
 
     monkeypatch.setattr(AgentLoop, "_dispatch", lambda self, cmd: "ok")

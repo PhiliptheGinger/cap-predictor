@@ -23,9 +23,9 @@ def test_search_read_transcript(monkeypatch):
     )
 
     outputs = [
-        'First CMD: {"name": "search.web", "input": {"query": "foo"}}',  # noqa: E501
+        'First CMD: {"tool": "search.web", "input": {"query": "foo"}}',  # noqa: E501
         (
-            'Second CMD: {"name": "read.url", "input": {"url": "http://example.com"}}'
+            'Second CMD: {"tool": "read.url", "input": {"url": "http://example.com"}}'
         ),  # noqa: E501
         "Final",
     ]
@@ -94,10 +94,10 @@ def test_file_write_python_run_transcript(monkeypatch):
 
     outputs = [
         (
-            'First CMD: {"name": "file.write", "input": {"path": '
+            'First CMD: {"tool": "file.write", "input": {"path": '
             '"script.py", "content": "print(1)"}}'
         ),
-        'Second CMD: {"name": "python.run", "input": {"path": "script.py"}}',
+        'Second CMD: {"tool": "python.run", "input": {"path": "script.py"}}',
         "Done",
     ]
 
