@@ -79,13 +79,19 @@ def extract_main(html: str, url: str | None = None) -> str:
     try:
         from bs4 import BeautifulSoup
         from readability import Document
-
-        doc = Document(html)
-        summary_html = doc.summary()
-        soup = BeautifulSoup(summary_html, "html.parser")
-        return soup.get_text("\n")
-    except Exception as exc:  # pragma: no cover - missing deps
-        logger.warning("Failed to extract main text: %s", exc)
+    except ImportError as exc:  # pragma: no cover - optional deps
+        if getattr(exc, "name", "") == "readability":
+            logger.info("Install readability-lxml to improve article parsing")
+        else:
+            logger.warning("Failed to extract main text: %s", exc)
+    else:
+        try:
+            doc = Document(html)
+            summary_html = doc.summary()
+            soup = BeautifulSoup(summary_html, "html.parser")
+            return soup.get_text("\n")
+        except Exception as exc:  # pragma: no cover - parser errors
+            logger.warning("Failed to extract main text: %s", exc)
 
     # Final fallback: parse HTML with BeautifulSoup to remove script and style
     # elements.  If BeautifulSoup is not available, revert to a simple regex
