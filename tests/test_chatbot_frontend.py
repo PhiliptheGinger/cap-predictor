@@ -575,7 +575,7 @@ def test_article_summarize_last(monkeypatch):
 
 
 def test_article_summarize_last_requires_article():
-    assert "No article" in cf.handle_command("article.summarize_last")
+    assert "No article stored" in cf.handle_command("article.summarize_last")
 
 
 def test_route_keywords_fetch(monkeypatch):
@@ -583,7 +583,7 @@ def test_route_keywords_fetch(monkeypatch):
 
     def fake_fetch(topic):  # noqa: ANN001
         captured["topic"] = topic
-        cf._SEEN_METADATA.append({"title": "T", "url": "http://u"})
+        cf._LAST_ARTICLE_URL = "http://u"
         return "text"
 
     monkeypatch.setattr(cf, "fetch_first_gdelt_article", fake_fetch)
@@ -597,13 +597,12 @@ def test_route_keywords_fetch(monkeypatch):
 
 
 def test_route_keywords_fetch_variants(monkeypatch):
-    cf._SEEN_METADATA = []
     cf._LAST_ARTICLE_URL = None
     captured = {}
 
     def fake_fetch(topic):  # noqa: ANN001
         captured["topic"] = topic
-        cf._SEEN_METADATA.append({"title": "T", "url": "http://u"})
+        cf._LAST_ARTICLE_URL = "http://u"
         return "text"
 
     monkeypatch.setattr(cf, "fetch_first_gdelt_article", fake_fetch)

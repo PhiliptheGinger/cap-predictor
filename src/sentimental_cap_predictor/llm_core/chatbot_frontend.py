@@ -202,6 +202,7 @@ def fetch_first_gdelt_article(
     falls back to the headline and URL if content extraction fails.
     """
 
+    global _LAST_ARTICLE_URL
     if _MEMORY_INDEX is None:
         setup()
     _load_seen_metadata()
@@ -215,10 +216,12 @@ def fetch_first_gdelt_article(
         RuntimeError,
         ValueError,
     ) as exc:  # pragma: no cover
+        _LAST_ARTICLE_URL = None
         if isinstance(exc, requests.RequestException):
             return f"GDELT request failed: {exc}"
         return "No readable article found"
 
+    _LAST_ARTICLE_URL = article.url or None
     if article.title or article.url:
         entry = {"title": article.title, "url": article.url}
         if entry not in _SEEN_METADATA:
@@ -296,7 +299,7 @@ def handle_command(command: str) -> str:
     lower = command.lower()
     if lower.strip() == "article.summarize_last":
         if not _LAST_ARTICLE_URL:
-            return "No article available for summarization."
+            return "No article stored to summarize. Fetch one first."
         return handle_command(f"news.read --url {_LAST_ARTICLE_URL} --summarize")
     if lower.startswith("memory search"):
         from sentimental_cap_predictor.llm_core.memory_indexer import (
@@ -462,9 +465,7 @@ def handle_command(command: str) -> str:
     stripped = command.strip()
     if " " not in stripped and not shutil.which(stripped):
         result = fetch_first_gdelt_article(stripped)
-        if _SEEN_METADATA:
-            _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
-        return result
+        return result or "No news found."
 
     if "gdelt" in lower or "news" in lower:
         parts = shlex.split(command)
@@ -508,8 +509,6 @@ def handle_command(command: str) -> str:
         if limit is not None:
             kwargs["limit"] = limit
         result = fetch_first_gdelt_article(query, **kwargs)
-        if _SEEN_METADATA:
-            _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
         if not result:
             return "No news found."
         return result
@@ -548,11 +547,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
             topic = topic.strip().rstrip("?.! ")
 
             def _fetch():
-                result = fetch_first_gdelt_article(topic)
-                global _LAST_ARTICLE_URL
-                if _SEEN_METADATA:
-                    _LAST_ARTICLE_URL = _SEEN_METADATA[-1].get("url")
-                return result
+                return fetch_first_gdelt_article(topic)
 
             return _fetch
 
