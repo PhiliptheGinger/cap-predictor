@@ -172,6 +172,38 @@ SYSTEM_PROMPT = (
 )
 
 
+def _search_memory(query: str, limit: int = 5) -> str:
+    """Return newline-separated memory references relevant to ``query``."""
+
+    if _MEMORY_INDEX is None:
+        setup()
+    index_path = _MEMORY_INDEX
+    if not index_path.exists():
+        return ""
+    from sentimental_cap_predictor.llm_core.memory_indexer import TextMemory
+
+    memory = TextMemory.load(index_path)
+    meta_path = index_path.with_suffix(".json")
+    if not meta_path.exists():
+        return ""
+    try:
+        metadata = json.loads(meta_path.read_text())
+    except json.JSONDecodeError:
+        return ""
+
+    embedding = memory.embed([query])
+    distances, indices = memory.index.search(embedding, min(limit, len(metadata)))
+    results: list[str] = []
+    for idx in indices[0]:
+        if idx < len(metadata):
+            doc = metadata[idx]
+            title = doc.get("title")
+            url = doc.get("url")
+            if title and url:
+                results.append(f"{title} - {url}")
+    return "\n".join(results)
+
+
 def handle_command(command: str) -> str:
     """Execute a shell ``command`` or route GDELT/news requests.
 
@@ -578,9 +610,12 @@ def _classify_and_route(message: str) -> str | None:
     return "Try: pull up an article about X."
 
 
-def main() -> None:
+def main(argv: list[str] | None = None, *, agent: bool | None = None) -> None:
     """Run a REPL-style chat session with the local Qwen model."""
+
     setup()
+    import argparse
+
     from sentimental_cap_predictor.cmd_utils import extract_cmd
     from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
         QwenLocalProvider,
@@ -588,6 +623,11 @@ def main() -> None:
     from sentimental_cap_predictor.llm_core.provider_config import (
         QwenLocalConfig,
     )
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--agent", action="store_true", help="Enable AgentLoop")
+    args = parser.parse_args(argv or [])
+    use_agent = args.agent if agent is None else agent
 
     cfg = QwenLocalConfig.from_env()
     try:
@@ -600,69 +640,113 @@ def main() -> None:
         print("Provider init failed. Here is the expected signature:")
         print(inspect.signature(ql.QwenLocalProvider.__init__))
         raise
+
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
 
-    # ``pending_cmd`` stores a command produced by the model that has not yet
-    # been executed.  This avoids ``UnboundLocalError`` when the loop checks
-    # the variable before the model has suggested any command.
-    pending_cmd: str | None = None
+    if use_agent:
+        from sentimental_cap_predictor.llm_core.agent.loop import AgentLoop
 
-    def run_command(cmd: str) -> str:
-        """Execute ``cmd`` via :func:`handle_command` and show the output."""
+        memory_context = ""
 
-        output = handle_command(cmd)
-        print(output)
-        return output
+        def _llm(prompt: str) -> str:
+            messages = history.copy()
+            if memory_context:
+                messages.append(
+                    {"role": "system", "content": f"Relevant memory:\n{memory_context}"}
+                )
+            messages.append({"role": "user", "content": prompt})
+            return provider.chat(messages)
 
-    while True:
-        # Execute any command left over from the previous iteration before
-        # prompting the user again.
-        if pending_cmd:
-            output = run_command(pending_cmd)
-            history.append({"role": "assistant", "content": output})
-            pending_cmd = None
-            continue
+        agent_loop = AgentLoop(_llm)
 
-        try:
-            user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
+        while True:
+            try:
+                user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
 
-        if not user:
-            continue
-        if user.lower() in {"exit", "quit"}:
-            break
+            if not user:
+                continue
+            if user.lower() in {"exit", "quit"}:
+                break
 
-        handler = _route_keywords(user)
-        if handler:
-            logger.info("Dispatching routed message: %s", user)
-            output = handler()
+            handler = _route_keywords(user)
+            if handler:
+                logger.info("Dispatching routed message: %s", user)
+                output = handler()
+                print(output)
+                history.append({"role": "assistant", "content": output})
+                logger.info("Finished routed message: %s", user)
+                continue
+            result = _classify_and_route(user)
+            if result:
+                print(result)
+                history.append({"role": "assistant", "content": result})
+                continue
+
+            memory_context = _search_memory(user)
+            reply = agent_loop.run(user)
+            print(reply)
+            history.append({"role": "user", "content": user})
+            history.append({"role": "assistant", "content": reply})
+    else:
+        pending_cmd: str | None = None
+
+        def run_command(cmd: str) -> str:
+            """Execute ``cmd`` via :func:`handle_command` and show the output."""
+
+            output = handle_command(cmd)
             print(output)
-            history.append({"role": "assistant", "content": output})
-            logger.info("Finished routed message: %s", user)
-            continue
-        result = _classify_and_route(user)
-        if result:
-            print(result)
-            history.append({"role": "assistant", "content": result})
-            continue
+            return output
 
-        history.append({"role": "user", "content": user})
-        reply = provider.chat(history)
-        command, question = extract_cmd(reply)
-        if command:
-            pending_cmd = command
-            continue
-        if question:
-            print(question)
-            history.append({"role": "assistant", "content": question})
-            continue
+        while True:
+            if pending_cmd:
+                output = run_command(pending_cmd)
+                history.append({"role": "assistant", "content": output})
+                pending_cmd = None
+                continue
 
-        print(reply)
-        history.append({"role": "assistant", "content": reply})
+            try:
+                user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+
+            if not user:
+                continue
+            if user.lower() in {"exit", "quit"}:
+                break
+
+            handler = _route_keywords(user)
+            if handler:
+                logger.info("Dispatching routed message: %s", user)
+                output = handler()
+                print(output)
+                history.append({"role": "assistant", "content": output})
+                logger.info("Finished routed message: %s", user)
+                continue
+            result = _classify_and_route(user)
+            if result:
+                print(result)
+                history.append({"role": "assistant", "content": result})
+                continue
+
+            history.append({"role": "user", "content": user})
+            reply = provider.chat(history)
+            command, question = extract_cmd(reply)
+            if command:
+                pending_cmd = command
+                continue
+            if question:
+                print(question)
+                history.append({"role": "assistant", "content": question})
+                continue
+
+            print(reply)
+            history.append({"role": "assistant", "content": reply})
 
 
 if __name__ == "__main__":
