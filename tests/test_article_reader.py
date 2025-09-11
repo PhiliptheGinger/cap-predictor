@@ -69,3 +69,24 @@ def test_extract_main_fallback_to_raw_text(monkeypatch):
     text = extract_main(html)
     assert "Hello" in text and "World" in text
     assert "<" not in text
+
+
+def test_extract_main_fallback_removes_script_and_style(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name in {"trafilatura", "readability"}:
+            raise ImportError
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    html = (
+        "<html><head><style>body {color:red;}</style><script>var x=1;</script></head>"
+        "<body><p>Content</p></body></html>"
+    )
+    text = extract_main(html)
+    assert "Content" in text
+    assert "var x" not in text
+    assert "color:red" not in text
