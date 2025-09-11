@@ -96,3 +96,35 @@ def read_url(url: str) -> Dict[str, Any]:
 
 
 __all__ = ["read_url"]
+
+
+# Optional agent tool registration
+try:  # pragma: no cover - registration is optional at runtime
+    from pydantic import BaseModel
+
+    from sentimental_cap_predictor.llm_core.agent.tool_registry import (
+        ToolSpec,
+        register_tool,
+    )
+
+    class ReadUrlInput(BaseModel):
+        url: str
+
+    class ReadUrlOutput(BaseModel):
+        text: str
+        meta: Dict[str, Any]
+
+    def _read_url_handler(payload: ReadUrlInput) -> ReadUrlOutput:
+        result = read_url(payload.url)
+        return ReadUrlOutput(**result)
+
+    register_tool(
+        ToolSpec(
+            name="read.url",
+            input_model=ReadUrlInput,
+            output_model=ReadUrlOutput,
+            handler=_read_url_handler,
+        )
+    )
+except Exception:  # pragma: no cover - silently ignore registration issues
+    pass
