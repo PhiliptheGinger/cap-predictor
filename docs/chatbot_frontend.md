@@ -4,6 +4,7 @@ This module provides a minimal REPL interface to local or remote chat models.
 It reads configuration from environment variables (loaded with `python-dotenv`)
 and communicates with an external runner through a simple `CMD:` protocol.  An
 experimental *agent mode* can register additional tools for the model to call.
+By default the frontend runs the legacy Qwen conversation loop; pass `--agent` or set `AGENT_MODE=1` to enable agent mode.
 
 ## Environment variables
 
