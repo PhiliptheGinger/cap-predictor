@@ -26,8 +26,8 @@ AgentLoop = loop_mod.AgentLoop
 from tools import file_io, python_exec  # noqa: F401 - ensure tool registration
 
 RESPONSES = [
-    'CMD: {"name": "file.write", "input": {"path": "demo.py", "content": "def add(a,b):\n    return a+b\nprint(add(2,3))"}}',
-    'CMD: {"name": "python.run", "input": {"path": "demo.py"}}',
+    'CMD: {"tool": "file.write", "input": {"path": "demo.py", "content": "def add(a,b):\n    return a+b\nprint(add(2,3))"}}',
+    'CMD: {"tool": "python.run", "input": {"path": "demo.py"}}',
     "Finished running the function.",
 ]
 

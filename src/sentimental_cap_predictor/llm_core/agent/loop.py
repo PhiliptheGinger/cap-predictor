@@ -76,7 +76,7 @@ class AgentLoop:
             model_output = self._llm(model_input)
 
             cmd = self._extract_cmd(model_output)
-            tool_name = cmd.get("name") if isinstance(cmd, dict) else None
+            tool_name = cmd.get("tool") if isinstance(cmd, dict) else None
             error = cmd.get("error") if isinstance(cmd, dict) and "error" in cmd else None
 
             if cmd is None:
@@ -171,21 +171,21 @@ class AgentLoop:
     def _dispatch(cmd: dict) -> str:
         if "error" in cmd:
             return cmd["error"]
-        name = cmd.get("name")
-        if not name:
+        tool = cmd.get("tool")
+        if not tool:
             return "Missing tool name"
         try:
-            spec = get_tool(name)
+            spec = get_tool(tool)
         except KeyError:
-            return f"Unknown tool '{name}'"
+            return f"Unknown tool '{tool}'"
 
         input_data = cmd.get("input", {})
-        logger.info("CMD %s input=%s", name, input_data)
+        logger.info("CMD %s input=%s", tool, input_data)
         input_model = spec.input_model.model_validate(input_data)
         result = spec.handler(input_model)
         if not isinstance(result, spec.output_model):
             result = spec.output_model.model_validate(result)
-        logger.info("RESULT %s output=%s", name, result.model_dump())
+        logger.info("RESULT %s output=%s", tool, result.model_dump())
         return result.model_dump_json()
 
 

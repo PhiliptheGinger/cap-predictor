@@ -73,7 +73,7 @@ def _read(payload: ReadInput) -> ReadOutput:
 try:
     register_tool(
         ToolSpec(
-            name="read_url",
+            name="read.url",
             input_model=ReadInput,
             output_model=ReadOutput,
             handler=_read,
@@ -111,10 +111,10 @@ except ValueError:
 
 
 RESPONSES = [
-    'CMD: {"name": "search.web", "input": {"query": "demo"}}',
-    'CMD: {"name": "read_url", "input": {"url": "http://example.com"}}',
-    'CMD: {"name": "memory.upsert", "input": {"id": "ex", "text": "Example Domain text", "metadata": {"url": "http://example.com"}}}',
-    'CMD: {"name": "python.run", "input": {"code": "print(6*7)"}}',
+    'CMD: {"tool": "search.web", "input": {"query": "demo"}}',
+    'CMD: {"tool": "read.url", "input": {"url": "http://example.com"}}',
+    'CMD: {"tool": "memory.upsert", "input": {"id": "ex", "text": "Example Domain text", "metadata": {"url": "http://example.com"}}}',
+    'CMD: {"tool": "python.run", "input": {"code": "print(6*7)"}}',
     "Stored info and computed result 42.",
 ]
 

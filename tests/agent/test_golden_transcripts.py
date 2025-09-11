@@ -9,7 +9,7 @@ from sentimental_cap_predictor.llm_core.agent.tool_registry import (
     register_tool,
 )
 from sentimental_cap_predictor.llm_core.agent.tools import web_search
-from tools import file_io, python_exec
+from tools import file_io, python_exec, read_url
 
 
 def test_search_read_transcript(monkeypatch):
@@ -18,30 +18,15 @@ def test_search_read_transcript(monkeypatch):
 
     monkeypatch.setattr(web_search, "search_web", fake_search)
 
-    class ReadUrlInput(BaseModel):
-        url: str
-
-    class ReadUrlOutput(BaseModel):
-        text: str
-
-    def _read_handler(payload: ReadUrlInput) -> ReadUrlOutput:
-        return ReadUrlOutput(text="article text")
-
-    try:
-        register_tool(
-            ToolSpec(
-                name="read_url",
-                input_model=ReadUrlInput,
-                output_model=ReadUrlOutput,
-                handler=_read_handler,
-            )
-        )
-    except ValueError:
-        pass
+    monkeypatch.setattr(
+        read_url, "read_url", lambda url: {"text": "article text", "meta": {}}
+    )
 
     outputs = [
-        'First CMD: {"name": "search.web", "input": {"query": "foo"}}',  # noqa: E501
-        ('Second CMD: {"name": "read_url", "input": {"url": "http://example.com"}}'),  # noqa: E501
+        'First CMD: {"tool": "search.web", "input": {"query": "foo"}}',  # noqa: E501
+        (
+            'Second CMD: {"tool": "read.url", "input": {"url": "http://example.com"}}'
+        ),  # noqa: E501
         "Final",
     ]
 
@@ -59,7 +44,7 @@ def test_search_read_transcript(monkeypatch):
         {"results": [{"title": "A", "snippet": "B", "url": "http://example.com"}]},  # noqa: E501
         separators=(",", ":"),
     )
-    read_obs = json.dumps({"text": "article text"}, separators=(",", ":"))
+    read_obs = json.dumps({"text": "article text", "meta": {}}, separators=(",", ":"))
     assert prompts == [
         "Task",
         f"Task\nObservation: {search_obs}",
@@ -109,10 +94,10 @@ def test_file_write_python_run_transcript(monkeypatch):
 
     outputs = [
         (
-            'First CMD: {"name": "file.write", "input": {"path": '
+            'First CMD: {"tool": "file.write", "input": {"path": '
             '"script.py", "content": "print(1)"}}'
         ),
-        'Second CMD: {"name": "python.run", "input": {"path": "script.py"}}',
+        'Second CMD: {"tool": "python.run", "input": {"path": "script.py"}}',
         "Done",
     ]
 

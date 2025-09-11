@@ -22,7 +22,7 @@ def test_read_url_success(monkeypatch):
     result = read_url.read_url("http://example.com")
     assert "Hello" in result["text"]
     assert result["meta"]["url"] == "http://example.com"
-    assert result["meta"]["title"] == "Hi"
+    assert result["meta"].get("title") == "Hi"
 
 
 def test_read_url_validation_error(monkeypatch):

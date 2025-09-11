@@ -43,7 +43,7 @@ def _read_url(payload: ReadUrlInput) -> ReadUrlOutput:
 try:  # pragma: no cover - registration is optional
     register_tool(
         ToolSpec(
-            name="read_url",
+            name="read.url",
             input_model=ReadUrlInput,
             output_model=ReadUrlOutput,
             handler=_read_url,
@@ -54,7 +54,7 @@ except ValueError:
 
 
 RESPONSES = [
-    'CMD: {"name": "read_url", "input": {"url": "http://example.com"}}',
+    'CMD: {"tool": "read.url", "input": {"url": "http://example.com"}}',
     "The page describes the Example Domain, a site for demonstrations.",
 ]
 
