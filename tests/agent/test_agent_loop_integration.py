@@ -13,7 +13,7 @@ def test_agent_loop_dispatch(monkeypatch):
     monkeypatch.setattr(web_search, "search_web", fake_search)
 
     outputs = [
-        'Step CMD: {"name": "search.web", "input": {"query": "news"}}',
+        'Step CMD: {"tool": "search.web", "input": {"query": "news"}}',
         "Final answer",
     ]
 

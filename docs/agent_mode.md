@@ -14,7 +14,7 @@ CONFIRM_CMDS=1        # optional safety prompt
 ENABLE_WEB_SEARCH=1   # DuckDuckGo web search
 ENABLE_PYTHON_RUN=1   # sandboxed python.run tool
 ENABLE_FILE_WRITE=1   # file.write tool
-ENABLE_READ_URL=1     # read_url tool
+ENABLE_READ_URL=1     # read.url tool
 ENABLE_MEMORY=1       # memory.upsert and memory.query
 ```
 
@@ -51,7 +51,7 @@ Available built-in tools include:
 - `search.web` – DuckDuckGo search
 - `python.run` – execute Python code in a sandbox
 - `file.write` – write files under `agent_work/`
-- `read_url` – fetch and extract text from a URL
+- `read.url` – fetch and extract text from a URL
 - `memory.upsert` / `memory.query` – interact with the vector memory store
 
 Additional tools can register themselves with the agent loop by calling
