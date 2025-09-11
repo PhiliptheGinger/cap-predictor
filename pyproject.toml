@@ -31,6 +31,7 @@ dependencies = [
     "lxml-html-clean>=0.4,<1",
     "protobuf<5",
     "tensorflow==2.15.0",
+    "duckduckgo-search>=5,<6",
 ]
 
 [project.optional-dependencies]

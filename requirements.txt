@@ -5,3 +5,4 @@ lxml
 cssselect
 pydantic
 colorama
+duckduckgo-search
