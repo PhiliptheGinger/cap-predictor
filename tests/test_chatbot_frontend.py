@@ -86,6 +86,7 @@ def _reset_seen(tmp_path, monkeypatch):
     monkeypatch.setattr(cf, "_SEEN_TITLES", set())
     monkeypatch.setattr(cf, "_SEEN_LOADED", False)
     monkeypatch.setattr(cf, "_LAST_ARTICLE_URL", None)
+    monkeypatch.setattr(cf, "_PENDING_TOPIC", False)
 
 
 def test_fetch_first_gdelt_article(monkeypatch, tmp_path):
@@ -616,6 +617,25 @@ def test_route_keywords_fetch_variants(monkeypatch):
     handler = cf._route_keywords("fetch article about")
     assert handler is not None
     assert handler() == "What topic should I search for?"
+
+
+def test_route_keywords_fetch_pending_topic(monkeypatch):
+    captured = {}
+
+    def fake_fetch(topic):  # noqa: ANN001
+        captured["topic"] = topic
+        return "text"
+
+    monkeypatch.setattr(cf, "fetch_first_gdelt_article", fake_fetch)
+
+    handler = cf._route_keywords("fetch article about")
+    assert handler is not None
+    assert handler() == "What topic should I search for?"
+
+    handler = cf._route_keywords("economy")
+    assert handler is not None
+    assert handler() == "text"
+    assert captured["topic"] == "economy"
 
 
 def test_route_keywords_fetch_with_filler(monkeypatch):

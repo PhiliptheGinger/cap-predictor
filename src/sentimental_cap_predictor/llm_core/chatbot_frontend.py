@@ -46,6 +46,7 @@ _SEEN_METADATA: list[dict[str, str]] = []
 _SEEN_LOADED = False
 _LAST_ARTICLE_URL: str | None = None
 _ALLOWED_CURL_DOMAINS = {"api.gdeltproject.org"}
+_PENDING_TOPIC = False
 
 
 def _parse_args() -> argparse.Namespace:
@@ -536,6 +537,17 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
     """Return a callable handling ``message`` if it matches known patterns."""
     import re
 
+    global _PENDING_TOPIC
+
+    if _PENDING_TOPIC:
+        topic = message.strip().rstrip("?.! ")
+        _PENDING_TOPIC = False
+
+        def _fetch_pending() -> str:
+            return fetch_first_gdelt_article(topic)
+
+        return _fetch_pending
+
     m = re.search(
         r"(?:pull up|fetch|get) (?:an? )?article(?:.*?(?:about|on) (?P<topic>.+))?",
         message,
@@ -550,6 +562,8 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
                 return fetch_first_gdelt_article(topic)
 
             return _fetch
+
+        _PENDING_TOPIC = True
 
         def _ask_topic() -> str:
             return "What topic should I search for?"
