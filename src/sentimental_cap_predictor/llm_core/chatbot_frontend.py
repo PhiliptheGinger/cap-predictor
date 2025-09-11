@@ -537,7 +537,7 @@ def _route_keywords(message: str) -> Callable[[], str] | None:
     import re
 
     m = re.search(
-        r"(?:pull up|fetch|get) (?:an? )?article(?: (?:about|on) (?P<topic>.+))?",
+        r"(?:pull up|fetch|get) (?:an? )?article(?:.*?(?:about|on) (?P<topic>.+))?",
         message,
         re.I,
     )
