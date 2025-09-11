@@ -5,3 +5,4 @@
 - [Data Bundle Format](data_bundle.md)
 - [Scheduling](scheduling.md)
 - [Research Hooks](research.md)
+- [Agent Mode](agent_mode.md)

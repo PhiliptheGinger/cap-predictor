@@ -1,8 +1,9 @@
 # Chatbot Frontend
 
-This module provides a minimal REPL interface to a **local** Qwen chat model.
+This module provides a minimal REPL interface to local or remote chat models.
 It reads configuration from environment variables (loaded with `python-dotenv`)
-and communicates with an external runner through a simple `CMD:` protocol.
+and communicates with an external runner through a simple `CMD:` protocol.  An
+experimental *agent mode* can register additional tools for the model to call.
 
 ## Environment variables
 
@@ -11,9 +12,19 @@ defaults when they are unset:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `QWEN_MODEL_PATH` | `Qwen/Qwen2-1.5B-Instruct` | Local path or HF repository for the weights |
+| `QWEN_MODEL_PATH` | `Qwen/Qwen2-1.5B-Instruct` | Local path or HF repository for Qwen weights |
 | `QWEN_OFFLOAD_FOLDER` | `(unset)` | Directory for weights offloaded from device memory |
 | `LLM_TEMPERATURE` | `0.7` | Sampling temperature |
+| `LLM_PROVIDER` | `qwen_local` | LLM backend, either `qwen_local` or `deepseek` |
+| `DEEPSEEK_MODEL_PATH` | `(unset)` | Local checkpoint for DeepSeek models |
+| `DEEPSEEK_API_KEY` | `(unset)` | API key for DeepSeek's hosted service |
+| `AGENT_MODE` | `0` | Set to `1` to enable experimental agent loop |
+| `CONFIRM_CMDS` | `0` | Require confirmation before executing tool commands |
+| `ENABLE_WEB_SEARCH` | `0` | Register DuckDuckGo search tool |
+| `ENABLE_PYTHON_RUN` | `0` | Register sandboxed Python execution tool |
+| `ENABLE_FILE_WRITE` | `0` | Allow writing files via agent tool |
+| `ENABLE_READ_URL` | `0` | Register URL reading tool |
+| `ENABLE_MEMORY` | `0` | Register vector memory tools |
 
 Variables can be placed in a `.env` file which is loaded automatically.
 
@@ -48,8 +59,10 @@ offloaded from the main device.
 ## Run
 
 ```bash
-python -m sentimental_cap_predictor.llm_core.chatbot_frontend
+python -m sentimental_cap_predictor.llm_core.chatbot_frontend --provider deepseek --agent --enable-web-search
 ```
+
+Use `--help` to see all available flags.
 
 ## CMD protocol
 
