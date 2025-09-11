@@ -618,6 +618,22 @@ def test_route_keywords_fetch_variants(monkeypatch):
     assert handler() == "What topic should I search for?"
 
 
+def test_route_keywords_fetch_with_filler(monkeypatch):
+    cf._LAST_ARTICLE_URL = None
+    captured = {}
+
+    def fake_fetch(topic):  # noqa: ANN001
+        captured["topic"] = topic
+        return "text"
+
+    monkeypatch.setattr(cf, "fetch_first_gdelt_article", fake_fetch)
+
+    handler = cf._route_keywords("pull up an article for me about Charlie Kirk")
+    assert handler is not None
+    assert handler() == "text"
+    assert captured["topic"] == "Charlie Kirk"
+
+
 def test_route_keywords_read_summarize_and_search(monkeypatch):
     cf._LAST_ARTICLE_URL = "http://a"
 
