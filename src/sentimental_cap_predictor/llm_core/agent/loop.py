@@ -7,6 +7,15 @@ from typing import Callable, List
 
 from .tool_registry import get_tool
 
+QUESTION_KEYWORDS = (
+    "who",
+    "what",
+    "where",
+    "when",
+    "why",
+    "how",
+)
+
 logger = logging.getLogger("audit")
 
 
@@ -18,10 +27,12 @@ class AgentLoop:
         llm: Callable[[str], str],
         max_steps: int = 5,
         timeout: float = 30.0,
+        max_prompt_tokens: int = 4096,
     ) -> None:
         self._llm = llm
         self._max_steps = max_steps
         self._timeout = timeout
+        self._max_prompt_tokens = max_prompt_tokens
 
     def run(self, prompt: str) -> str:
         """Execute the agent loop starting from ``prompt``.
@@ -46,11 +57,15 @@ class AgentLoop:
 
         observations: List[str] = []
         start = time.time()
+
+        prompt = self._maybe_augment_prompt(prompt)
+
         for _ in range(self._max_steps):
             if time.time() - start > self._timeout:
                 raise TimeoutError("Agent loop timed out")
 
             model_input = self._build_prompt(prompt, observations)
+            model_input = self._truncate_tokens(model_input)
             model_output = self._llm(model_input)
 
             cmd = self._extract_cmd(model_output)
@@ -68,6 +83,43 @@ class AgentLoop:
             return prompt
         obs_text = "\n".join(f"Observation: {o}" for o in observations)
         return f"{prompt}\n{obs_text}"
+
+    def _maybe_augment_prompt(self, prompt: str) -> str:
+        """Attach relevant memory snippets to ``prompt`` when appropriate."""
+
+        if not self._looks_like_question(prompt):
+            return prompt
+        try:  # pragma: no cover - memory is optional
+            from tools.memory import memory_query
+        except Exception:
+            return prompt
+        try:
+            hits = memory_query(prompt)
+        except Exception:
+            return prompt
+        lines: List[str] = []
+        for idx, hit in enumerate(hits, start=1):
+            meta = hit.get("metadata", {})
+            text = meta.get("text")
+            source = meta.get("source") or meta.get("url") or hit.get("id")
+            if not text:
+                continue
+            lines.append(f"[{idx}] {text} (source: {source})")
+        if not lines:
+            return prompt
+        snippet = "\n".join(lines)
+        return f"{prompt}\n\nSources:\n{snippet}"
+
+    @staticmethod
+    def _looks_like_question(text: str) -> bool:
+        lower = text.lower()
+        return any(word in lower for word in QUESTION_KEYWORDS)
+
+    def _truncate_tokens(self, text: str) -> str:
+        tokens = text.split()
+        if len(tokens) <= self._max_prompt_tokens:
+            return text
+        return " ".join(tokens[: self._max_prompt_tokens])
 
     @staticmethod
     def _extract_cmd(text: str) -> dict | None:
