@@ -87,8 +87,18 @@ def extract_main(html: str, url: str | None = None) -> str:
     except Exception as exc:  # pragma: no cover - missing deps
         logger.warning("Failed to extract main text: %s", exc)
 
-    # Final fallback: strip HTML tags to return raw text
-    return re.sub(r"<[^>]+>", " ", html)
+    # Final fallback: parse HTML with BeautifulSoup to remove script and style
+    # elements.  If BeautifulSoup is not available, revert to a simple regex
+    # based stripping of tags.
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        for element in soup(["script", "style"]):
+            element.decompose()
+        return soup.get_text()
+    except Exception:
+        return re.sub(r"<[^>]+>", " ", html)
 
 
 def strip_ads(text: str) -> str:
