@@ -1,10 +1,17 @@
 # flake8: noqa
-"""Simple interactive frontend for Qwen chat model using CMD protocol."""
+"""Interactive chat frontend supporting multiple LLM backends and agent mode.
+
+The script can run either a basic REPL or an experimental agent loop capable of
+executing registered tools.  Configuration is read from environment variables or
+corresponding command line flags; run with ``--help`` for details.
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Callable
 
@@ -21,6 +28,7 @@ from sentimental_cap_predictor.data.news import (
     FetchArticleSpec,
 )
 from sentimental_cap_predictor.data.news import fetch_article as _fetch_article
+from sentimental_cap_predictor.llm_core.provider_config import LLMProviderEnum
 from sentimental_cap_predictor.reasoning.engine import (
     analogy_explain,
     reason_about,
@@ -38,6 +46,99 @@ _SEEN_METADATA: list[dict[str, str]] = []
 _SEEN_LOADED = False
 _LAST_ARTICLE_URL: str | None = None
 _ALLOWED_CURL_DOMAINS = {"api.gdeltproject.org"}
+
+
+def _parse_args() -> argparse.Namespace:
+    """Return parsed command line arguments."""
+
+    parser = argparse.ArgumentParser(description="Interactive chat frontend")
+    parser.add_argument(
+        "--provider",
+        choices=[p.value for p in LLMProviderEnum],
+        default=os.getenv("LLM_PROVIDER", LLMProviderEnum.qwen_local.value),
+        help="LLM backend provider (or set LLM_PROVIDER)",
+    )
+    parser.add_argument(
+        "--agent",
+        action="store_true",
+        default=os.getenv("AGENT_MODE") not in {None, "", "0"},
+        help="Enable agent mode with tool execution (AGENT_MODE=1)",
+    )
+    parser.add_argument(
+        "--confirm-cmds",
+        action="store_true",
+        default=os.getenv("CONFIRM_CMDS") not in {None, "", "0"},
+        help="Require confirmation before running tools (CONFIRM_CMDS=1)",
+    )
+    parser.add_argument(
+        "--enable-web-search",
+        action="store_true",
+        default=os.getenv("ENABLE_WEB_SEARCH") not in {None, "", "0"},
+        help="Register web search tool",
+    )
+    parser.add_argument(
+        "--enable-python",
+        action="store_true",
+        default=os.getenv("ENABLE_PYTHON_RUN") not in {None, "", "0"},
+        help="Register python.run tool",
+    )
+    parser.add_argument(
+        "--enable-file-write",
+        action="store_true",
+        default=os.getenv("ENABLE_FILE_WRITE") not in {None, "", "0"},
+        help="Register file.write tool",
+    )
+    parser.add_argument(
+        "--enable-read-url",
+        action="store_true",
+        default=os.getenv("ENABLE_READ_URL") not in {None, "", "0"},
+        help="Register read_url tool",
+    )
+    parser.add_argument(
+        "--enable-memory",
+        action="store_true",
+        default=os.getenv("ENABLE_MEMORY") not in {None, "", "0"},
+        help="Register memory tools",
+    )
+    return parser.parse_args()
+
+
+def _get_provider(name: str):
+    """Instantiate the requested LLM provider."""
+
+    if name == LLMProviderEnum.deepseek.value:
+        from sentimental_cap_predictor.llm_core.llm_providers.deepseek import (
+            DeepSeekProvider,
+        )
+        from sentimental_cap_predictor.llm_core.provider_config import (
+            DeepSeekConfig,
+        )
+
+        cfg = DeepSeekConfig.from_env()
+        return DeepSeekProvider(**cfg.model_dump())
+
+    from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
+        QwenLocalProvider,
+    )
+    from sentimental_cap_predictor.llm_core.provider_config import QwenLocalConfig
+
+    cfg = QwenLocalConfig.from_env()
+    return QwenLocalProvider(**cfg.model_dump())
+
+
+def _load_agent_tools(args: argparse.Namespace) -> None:
+    """Import optional agent tools based on command line flags."""
+
+    if args.enable_python:
+        import tools.python_exec  # noqa: F401
+    if args.enable_file_write:
+        import tools.file_io  # noqa: F401
+    if args.enable_read_url:
+        import tools.read_url  # noqa: F401
+    if args.enable_memory:
+        import tools.memory  # noqa: F401
+    if args.enable_web_search:
+        from sentimental_cap_predictor.llm_core.agent import tools as _  # noqa: F401
 
 
 def _load_seen_metadata() -> None:
@@ -579,46 +680,57 @@ def _classify_and_route(message: str) -> str | None:
 
 
 def main() -> None:
-    """Run a REPL-style chat session with the local Qwen model."""
+    """Run a REPL-style chat session or agent loop depending on flags."""
+
+    args = _parse_args()
     setup()
-    from sentimental_cap_predictor.cmd_utils import extract_cmd
-    from sentimental_cap_predictor.llm_core.llm_providers.qwen_local import (
-        QwenLocalProvider,
-    )
-    from sentimental_cap_predictor.llm_core.provider_config import (
-        QwenLocalConfig,
-    )
 
-    cfg = QwenLocalConfig.from_env()
     try:
-        provider = QwenLocalProvider(**cfg.model_dump())
-    except TypeError as e:  # pragma: no cover - defensive
-        import inspect
+        provider = _get_provider(args.provider)
+    except TypeError as exc:  # pragma: no cover - defensive
+        print(f"Provider init failed: {exc}")
+        return
 
-        import sentimental_cap_predictor.llm_core.llm_providers.qwen_local as ql
+    if args.confirm_cmds:
+        os.environ.setdefault("CONFIRM_CMDS", "1")
 
-        print("Provider init failed. Here is the expected signature:")
-        print(inspect.signature(ql.QwenLocalProvider.__init__))
-        raise
+    if args.agent:
+        _load_agent_tools(args)
+        from sentimental_cap_predictor.llm_core.agent import AgentLoop
+
+        loop = AgentLoop(
+            lambda prompt: provider.chat([{"role": "user", "content": prompt}])
+        )
+        while True:
+            try:
+                user = input(f"{Fore.CYAN}user>{Style.RESET_ALL} ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+            if not user:
+                continue
+            if user.lower() in {"exit", "quit"}:
+                break
+            try:
+                reply = loop.run(user)
+            except Exception as exc:  # pragma: no cover - runtime errors
+                reply = f"Error: {exc}"
+            print(reply)
+        return
+
+    from sentimental_cap_predictor.cmd_utils import extract_cmd
+
     history: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
-
-    # ``pending_cmd`` stores a command produced by the model that has not yet
-    # been executed.  This avoids ``UnboundLocalError`` when the loop checks
-    # the variable before the model has suggested any command.
     pending_cmd: str | None = None
 
     def run_command(cmd: str) -> str:
-        """Execute ``cmd`` via :func:`handle_command` and show the output."""
-
         output = handle_command(cmd)
         print(output)
         return output
 
     while True:
-        # Execute any command left over from the previous iteration before
-        # prompting the user again.
         if pending_cmd:
             output = run_command(pending_cmd)
             history.append({"role": "assistant", "content": output})
