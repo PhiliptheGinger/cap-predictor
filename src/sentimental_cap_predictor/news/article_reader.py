@@ -13,12 +13,20 @@ import re
 from typing import Any, Dict, List
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
 
-def fetch_html(url: str, timeout: int = 10) -> str:
-    """Retrieve raw HTML from ``url`` with a timeout.
+def fetch_html(
+    url: str,
+    timeout: int = 10,
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    user_agent: str | None = None,
+) -> str:
+    """Retrieve raw HTML from ``url`` with retry and timeout handling.
 
     Parameters
     ----------
@@ -26,6 +34,14 @@ def fetch_html(url: str, timeout: int = 10) -> str:
         Web address to fetch.
     timeout:
         Timeout in seconds for the request.  Defaults to ``10``.
+    retries:
+        Number of retry attempts for transient failures.  Defaults to ``3``.
+    backoff_factor:
+        Factor used for exponential backoff between retry attempts.
+        Defaults to ``0.5``.
+    user_agent:
+        Optional ``User-Agent`` header to send with the request. If not
+        provided a generic user agent is used.
 
     Returns
     -------
@@ -33,13 +49,28 @@ def fetch_html(url: str, timeout: int = 10) -> str:
         Raw HTML content.  Empty string on failure.
     """
 
+    session = requests.Session()
+    retry = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
+    headers = {"User-Agent": user_agent or "sentimental-cap-predictor/1.0"}
+
     try:
-        response = requests.get(url, timeout=timeout)
+        response = session.get(url, timeout=timeout, headers=headers)
         response.raise_for_status()
         return response.text
     except Exception as exc:  # pragma: no cover - network errors
         logger.warning("Failed to fetch %s: %s", url, exc)
         return ""
+    finally:
+        session.close()
 
 
 def extract_main(html: str, url: str | None = None) -> str:
