@@ -1,14 +1,43 @@
-"""Execute Python code in a sandboxed ``agent_work`` subprocess."""
+"""Execute Python code in a sandboxed ``agent_work`` subprocess.
+
+The sandbox relies on running the code in a separate process via
+``subprocess``. When the ``firejail`` command is available it is used to
+further isolate the execution by restricting filesystem access to the
+``agent_work`` directory. Network usage is disabled by monkey patching the
+standard :mod:`socket` module inside the executed script.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
+import logging
+import os
+import shutil
 import subprocess
 import sys
-from typing import List, Optional, Dict
+from pathlib import Path
+from typing import Dict, List, Optional
+
+MAX_TIMEOUT = 60
+"""Maximum allowed execution time for :func:`python_run`."""
+
+logger = logging.getLogger("audit")
 
 
-def python_run(*, code: Optional[str] = None, path: Optional[str] = None, timeout: int = 10) -> Dict[str, object]:
+def _confirm(action: str) -> None:
+    """Prompt the user for confirmation when ``CONFIRM_CMDS`` is set."""
+
+    if os.getenv("CONFIRM_CMDS"):
+        reply = input(f"Confirm {action}? [y/N] ")
+        if reply.strip().lower() not in {"y", "yes"}:
+            raise PermissionError(f"Command not confirmed: {action}")
+
+
+def python_run(
+    *,
+    code: Optional[str] = None,
+    path: Optional[str] = None,
+    timeout: int = 10,
+) -> Dict[str, object]:
     """Execute the provided Python ``code`` or file at ``path``.
 
     Exactly one of ``code`` or ``path`` must be supplied. The code runs in a
@@ -35,6 +64,8 @@ def python_run(*, code: Optional[str] = None, path: Optional[str] = None, timeou
 
     if (code is None) == (path is None):
         raise ValueError("Provide exactly one of 'code' or 'path'")
+    if timeout > MAX_TIMEOUT:
+        raise ValueError("timeout exceeds maximum allowed value")
 
     base = Path("agent_work").resolve()
     base.mkdir(parents=True, exist_ok=True)
@@ -52,8 +83,11 @@ def python_run(*, code: Optional[str] = None, path: Optional[str] = None, timeou
 
     preamble = (
         "import socket\n"
-        "def _deny(*args, **kwargs):\n    raise RuntimeError('Network access disabled')\n"
-        "for attr in ('socket', 'create_connection', 'create_server', 'getaddrinfo'):\n"
+        "def _deny(*args, **kwargs):\n"
+        "    raise RuntimeError('Network access disabled')\n"
+        "for attr in (\n"
+        "    'socket', 'create_connection', 'create_server', 'getaddrinfo'\n"
+        "):\n"
         "    setattr(socket, attr, _deny)\n"
     )
     script = preamble + "\n" + target_code
@@ -61,19 +95,38 @@ def python_run(*, code: Optional[str] = None, path: Optional[str] = None, timeou
     script_file = base / "__temp_exec.py"
     script_file.write_text(script)
 
-    before_files = {p.relative_to(base) for p in base.rglob('*') if p.is_file()}
+    before_files = {p.relative_to(base) for p in base.rglob("*") if p.is_file()}  # noqa: E501
 
+    _confirm("python.run")
+    cmd = [sys.executable, str(script_file)]
+    if shutil.which("firejail"):
+        cmd = ["firejail", "--quiet", f"--private={base}"] + cmd
+    logger.info(
+        "CMD python.run source=%s timeout=%d",
+        path or "<inline>",
+        timeout,
+    )
     proc = subprocess.run(
-        [sys.executable, str(script_file)],
+        cmd,
         cwd=base,
         capture_output=True,
         text=True,
         timeout=timeout,
     )
 
-    after_files = {p.relative_to(base) for p in base.rglob('*') if p.is_file()}
+    after_files = {p.relative_to(base) for p in base.rglob("*") if p.is_file()}  # noqa: E501
     script_file.unlink(missing_ok=True)
-    new_files = [str(p) for p in sorted(after_files - before_files) if "__pycache__" not in p.parts]
+    new_files = [
+        str(p)
+        for p in sorted(after_files - before_files)
+        if "__pycache__" not in p.parts
+    ]
+    logger.info(
+        "RESULT python.run stdout=%d stderr=%d new_files=%s",
+        len(proc.stdout),
+        len(proc.stderr),
+        new_files,
+    )
 
     return {"stdout": proc.stdout, "stderr": proc.stderr, "paths": new_files}
 

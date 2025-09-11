@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Callable, List
 
 from .tool_registry import get_tool
+
+logger = logging.getLogger("audit")
 
 
 class AgentLoop:
@@ -89,10 +92,12 @@ class AgentLoop:
             return f"Unknown tool '{name}'"
 
         input_data = cmd.get("input", {})
+        logger.info("CMD %s input=%s", name, input_data)
         input_model = spec.input_model.model_validate(input_data)
         result = spec.handler(input_model)
         if not isinstance(result, spec.output_model):
             result = spec.output_model.model_validate(result)
+        logger.info("RESULT %s output=%s", name, result.model_dump())
         return result.model_dump_json()
 
 
