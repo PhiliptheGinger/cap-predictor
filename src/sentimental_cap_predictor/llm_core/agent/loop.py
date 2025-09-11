@@ -4,6 +4,9 @@ import json
 import logging
 import time
 from typing import Callable, List
+from hashlib import sha256
+
+from ...monitoring import RunLogger
 
 from .tool_registry import get_tool
 
@@ -28,11 +31,13 @@ class AgentLoop:
         max_steps: int = 5,
         timeout: float = 30.0,
         max_prompt_tokens: int = 4096,
+        run_logger: RunLogger | None = None,
     ) -> None:
         self._llm = llm
         self._max_steps = max_steps
         self._timeout = timeout
         self._max_prompt_tokens = max_prompt_tokens
+        self._run_logger = run_logger or RunLogger()
 
     def run(self, prompt: str) -> str:
         """Execute the agent loop starting from ``prompt``.
@@ -59,20 +64,51 @@ class AgentLoop:
         start = time.time()
 
         prompt = self._maybe_augment_prompt(prompt)
+        prompt_hash = sha256(prompt.encode("utf-8")).hexdigest()
 
         for _ in range(self._max_steps):
             if time.time() - start > self._timeout:
                 raise TimeoutError("Agent loop timed out")
 
+            step_start = time.time()
             model_input = self._build_prompt(prompt, observations)
             model_input = self._truncate_tokens(model_input)
             model_output = self._llm(model_input)
 
             cmd = self._extract_cmd(model_output)
+            tool_name = cmd.get("name") if isinstance(cmd, dict) else None
+            error = cmd.get("error") if isinstance(cmd, dict) and "error" in cmd else None
+
             if cmd is None:
+                duration = time.time() - step_start
+                tokens_in = len(model_input.split())
+                tokens_out = len(model_output.split())
+                self._run_logger.log(
+                    prompt_hash=prompt_hash,
+                    tool_name=tool_name,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    duration=duration,
+                    error=error,
+                )
                 return model_output.strip()
 
-            observation = self._dispatch(cmd)
+            try:
+                observation = self._dispatch(cmd)
+            except Exception as exc:  # pragma: no cover - tool failures
+                error = str(exc)
+                observation = error
+            duration = time.time() - step_start
+            tokens_in = len(model_input.split())
+            tokens_out = len(model_output.split())
+            self._run_logger.log(
+                prompt_hash=prompt_hash,
+                tool_name=tool_name,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                duration=duration,
+                error=error,
+            )
             observations.append(observation)
 
         raise RuntimeError("Agent loop exceeded maximum steps")
