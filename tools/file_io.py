@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 MAX_WRITE_BYTES = 1_000_000
 """Maximum size of ``content`` allowed for :func:`file_write` in bytes."""
+
+logger = logging.getLogger("audit")
+
+
+def _confirm(action: str) -> None:
+    """Prompt the user for confirmation when ``CONFIRM_CMDS`` is set."""
+
+    if os.getenv("CONFIRM_CMDS"):
+        reply = input(f"Confirm {action}? [y/N] ")
+        if reply.strip().lower() not in {"y", "yes"}:
+            raise PermissionError(f"Command not confirmed: {action}")
 
 
 def file_write(path: str, content: str) -> str:
@@ -47,10 +59,14 @@ def file_write(path: str, content: str) -> str:
         raise ValueError("content exceeds maximum allowed size")
 
     if target.exists():
-        logging.warning("Overwriting existing file at %s", target)
+        logger.warning("Overwriting existing file at %s", target)
+
+    _confirm(f"file.write to {target}")
+    logger.info("CMD file.write path=%s size=%d", target, size)
 
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
+    logger.info("RESULT file.write path=%s", target)
     return str(target)
 
 
