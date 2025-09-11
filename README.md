@@ -25,6 +25,11 @@ flowchart TD
    ```bash
    pip install -e .[dev]
    ```
+   Optional but recommended for improved article parsing:
+
+   ```bash
+   pip install readability-lxml
+   ```
 3. **Collect data**
    ```bash
    python -m sentimental_cap_predictor.dataset TICKER --period 1Y
