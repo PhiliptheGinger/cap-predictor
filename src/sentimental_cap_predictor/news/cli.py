@@ -65,7 +65,27 @@ def read_command(
 ) -> None:
     """Read an article and optionally process it."""
     html = fetch_html(url)
-    text = strip_ads(extract_main(html, url=url))
+    if not html:
+        message = (
+            "Failed to fetch article from "
+            + url
+            + ". "
+            + "Please retry or check network access."
+        )
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
+    extracted = extract_main(html, url=url)
+    if not extracted.strip():
+        message = (
+            "Failed to extract article text from "
+            f"{url}. "
+            "Please retry or check network access."
+        )
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
+    text = strip_ads(extracted)
     original_text = text
 
     analysis = None
