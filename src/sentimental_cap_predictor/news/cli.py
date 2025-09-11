@@ -46,7 +46,12 @@ def fetch_gdelt_command(
 def read_command(
     url: str = typer.Option(..., "--url", "-u", help="Article URL to fetch."),
     summarize: bool = typer.Option(
-        False, "--summarize", help="Return a short summary."
+        False,
+        "--summarize",
+        help=(
+            "Return a short summary. Non-English text is translated to English "
+            "if translation mode is 'auto' or 'en'."
+        ),
     ),
     analyze: bool = typer.Option(
         False, "--analyze", help="Return basic text analysis."
@@ -60,10 +65,19 @@ def read_command(
     translate: TranslateMode = typer.Option(
         TranslateMode.off,
         "--translate",
-        help="Translation mode: off, auto or en.",
+        help=(
+            "Translation mode: off, auto or en. Summaries use English text, "
+            "translating when mode is 'auto' or 'en'."
+        ),
     ),
 ) -> None:
-    """Read an article and optionally process it."""
+    """Read an article and optionally process it.
+
+    The article language is detected with :func:`analyze_text`. If translation
+    mode is set to ``auto`` or ``en`` and the article is not in English, the text
+    is translated to English before summarization so that summaries are always
+    generated from English input.
+    """
     html = fetch_html(url)
     if not html:
         message = (
@@ -89,12 +103,10 @@ def read_command(
     original_text = text
 
     analysis = None
-    if analyze or translate == TranslateMode.auto:
+    if analyze or summarize or translate in (TranslateMode.auto, TranslateMode.en):
         analysis = analyze_text(text)
 
-    if translate == TranslateMode.en:
-        text = translate_text(text, "en")
-    elif translate == TranslateMode.auto and analysis:
+    if translate in (TranslateMode.auto, TranslateMode.en) and analysis:
         if analysis.get("lang") != "en":
             text = translate_text(text, "en")
 
