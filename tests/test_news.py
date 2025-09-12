@@ -400,3 +400,13 @@ def test_fetch_article_skips_non_english(monkeypatch):
     article = news.fetch_article(spec)
     assert article.url == "http://en.com"
     assert extracted == ["http://en.com"]
+
+
+@pytest.mark.parametrize(
+    "spec_lang, article_lang",
+    [("english", "en"), ("en", "english")],
+)
+def test_is_valid_candidate_accepts_language_variants(spec_lang, article_lang):
+    article = pd.Series({"title": "Headline", "url": "http://example.com", "language": article_lang})
+    spec = news.FetchArticleSpec(query="q", language=spec_lang)
+    assert news.is_valid_candidate(article, spec)
