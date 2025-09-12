@@ -3,6 +3,7 @@
 from .gdelt_client import ArticleStub, GdeltClient, search_gdelt
 from .fetcher import HtmlFetcher
 from .extractor import ArticleExtractor, ExtractedArticle
+from . import store
 
 __all__ = [
     "ArticleStub",
@@ -11,4 +12,5 @@ __all__ = [
     "HtmlFetcher",
     "ArticleExtractor",
     "ExtractedArticle",
+    "store",
 ]
