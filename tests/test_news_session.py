@@ -41,6 +41,8 @@ fetch_gdelt_mod = SimpleNamespace(
     fetch_html=lambda url: "",
     extract_main_text=lambda html, url=None: "",
     summarize=lambda text: "",
+    score_sentiment=lambda text: 0.0,
+    score_relevance=lambda text, query: 0.0,
     domain_ok=lambda url: True,
     domain_blocked=lambda url: False,
     _store_chunks=lambda result: None,
@@ -83,6 +85,12 @@ def test_handle_fetch_sets_state_and_upserts(monkeypatch):
     def fake_summarize(text):  # noqa: ANN001
         return "Summary"
 
+    def fake_sentiment(text):  # noqa: ANN001
+        return 0.5
+
+    def fake_relevance(text, topic):  # noqa: ANN001
+        return 0.8
+
     def fake_upsert(doc_id, text, metadata):  # noqa: ANN001
         calls.append((doc_id, text, metadata))
 
@@ -98,6 +106,8 @@ def test_handle_fetch_sets_state_and_upserts(monkeypatch):
     monkeypatch.setattr(fg_mod, "fetch_html", fake_fetch_html)
     monkeypatch.setattr(fg_mod, "extract_main_text", fake_extract)
     monkeypatch.setattr(fg_mod, "summarize", fake_summarize)
+    monkeypatch.setattr(fg_mod, "score_sentiment", fake_sentiment)
+    monkeypatch.setattr(fg_mod, "score_relevance", fake_relevance)
     monkeypatch.setattr(fg_mod, "domain_ok", lambda url: True)
     monkeypatch.setattr(fg_mod, "domain_blocked", lambda url: False)
     monkeypatch.setattr(
@@ -114,6 +124,8 @@ def test_handle_fetch_sets_state_and_upserts(monkeypatch):
     )
     assert session.STATE.last_article["title"] == "Title topic1"
     assert calls  # upsert called
+    assert session.STATE.last_article["sentiment"] == 0.5
+    assert session.STATE.last_article["relevance"] == 0.8
 
     # Fetch another topic to ensure state replacement
     msg2 = session.handle_fetch("topic2")

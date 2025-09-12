@@ -68,6 +68,9 @@ def handle_fetch(topic: str) -> str:
         if not text:
             store.log_error(url, "extract", "no text")
             continue
+        summary = fetch_gdelt.summarize(text)
+        sentiment = fetch_gdelt.score_sentiment(text)
+        relevance = fetch_gdelt.score_relevance(text, topic)
         result = {
             "title": art.get("title", ""),
             "url": url,
@@ -75,13 +78,15 @@ def handle_fetch(topic: str) -> str:
             "language": art.get("language", ""),
             "seendate": art.get("seendate", ""),
             "text": text,
-            "summary": fetch_gdelt.summarize(text),
+            "summary": summary,
+            "sentiment": sentiment,
+            "relevance": relevance,
         }
         # Persist to vector and relational stores and update session state
         fetch_gdelt._store_chunks(result)
         try:
             store.upsert_article(result)
-            store.upsert_content(url, text, result["summary"])
+            store.upsert_content(url, text, summary, sentiment, relevance)
         except Exception:  # pragma: no cover - persistence should not break flow
             logger.debug("DB upsert failed", exc_info=True)
         STATE.set_article(result)

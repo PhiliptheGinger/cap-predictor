@@ -47,7 +47,9 @@ def _connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS contents (
             url TEXT PRIMARY KEY REFERENCES articles(url),
             text TEXT,
-            summary TEXT
+            summary TEXT,
+            sentiment REAL,
+            relevance REAL
         )
         """
     )
@@ -91,20 +93,29 @@ def upsert_article(data: Dict[str, Any]) -> None:
         )
 
 
-def upsert_content(url: str, text: str, summary: str | None = None) -> None:
+def upsert_content(
+    url: str,
+    text: str,
+    summary: str | None = None,
+    sentiment: float | None = None,
+    relevance: float | None = None,
+) -> None:
     """Insert or update article content for ``url``."""
+
     if not url:
         return
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO contents (url, text, summary)
-            VALUES (?, ?, ?)
+            INSERT INTO contents (url, text, summary, sentiment, relevance)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(url) DO UPDATE SET
                 text=excluded.text,
-                summary=excluded.summary
+                summary=excluded.summary,
+                sentiment=excluded.sentiment,
+                relevance=excluded.relevance
             """,
-            (url, text, summary or ""),
+            (url, text, summary or "", sentiment, relevance),
         )
 
 
