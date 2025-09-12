@@ -201,10 +201,15 @@ def is_valid_candidate(article: pd.Series, spec: FetchArticleSpec) -> bool:
     title = str(article.get("title") or article.get("headline") or "")
     url = str(article.get("url") or "")
     article_language = str(article.get("language") or "").lower()
+    spec_language = str(spec.language or "").lower()
+
+    # Treat ISO codes and full language names as equivalent by comparing the
+    # first two characters of each.  This allows values like ``"en"`` and
+    # ``"english"`` to match while still rejecting mismatched languages.
+    article_lang_code = article_language[:2]
+    spec_lang_code = spec_language[:2]
     language_mismatch = (
-        spec.language
-        and article_language
-        and (article_language != spec.language.lower())
+        spec_language and article_lang_code and (article_lang_code != spec_lang_code)
     )
     if language_mismatch:
         return False
