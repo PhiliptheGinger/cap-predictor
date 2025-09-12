@@ -93,12 +93,13 @@ Utilities from the news CLI can be accessed through `CMD:` directives:
 
 ```bash
 CMD: news.fetch_gdelt --query "<terms>" --max 1
-CMD: news.read --url "<article_url>" --summarize --analyze --chunks 1000
+CMD: news.read --url "<article_url>" --summarize --analyze --chunks 1000 --json
 ```
 
 The first command returns matching GDELT articles as JSON. The second retrieves
 an article, summarises it, performs a basic analysis and optionally chunks the
-text for further processing.
+text for further processing. When `--summarize` is used on its own, the
+response is the summary text; add `--json` to get a JSON object instead.
 
 ## Connector intents
 
