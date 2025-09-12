@@ -209,9 +209,14 @@ def fetch_first_gdelt_article(
     _load_seen_metadata()
 
     try:
-        article = _fetch_first_gdelt_article(
-            query, prefer_content=True, days=days, max_records=limit
-        )
+        try:
+            article = _fetch_first_gdelt_article(
+                query, prefer_content=True, days=days, max_records=limit
+            )
+        except RuntimeError:
+            article = _fetch_first_gdelt_article(
+                query, prefer_content=False, days=days, max_records=limit
+            )
     except (
         requests.RequestException,
         RuntimeError,
