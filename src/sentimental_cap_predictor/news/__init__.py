@@ -1,9 +1,10 @@
 """Utilities for interacting with news APIs."""
 
-from .gdelt_client import ArticleStub, GdeltClient, search_gdelt
-from .fetcher import HtmlFetcher
-from .extractor import ArticleExtractor, ExtractedArticle
 from . import store
+from .extractor import ArticleExtractor, ExtractedArticle
+from .fetcher import HtmlFetcher
+from .gdelt_client import ArticleStub, GdeltClient, search_gdelt
+from .scoring import score_news
 
 __all__ = [
     "ArticleStub",
@@ -13,4 +14,5 @@ __all__ = [
     "ArticleExtractor",
     "ExtractedArticle",
     "store",
+    "score_news",
 ]
