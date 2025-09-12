@@ -340,6 +340,23 @@ def test_fetch_first_gdelt_article_error(monkeypatch):
     assert text.startswith("GDELT request failed:")
 
 
+def test_fetch_first_gdelt_article_runtime_retry(monkeypatch):
+    calls: list[bool] = []
+
+    def fake_fetch(query, *, prefer_content, days=1, max_records=100):  # noqa: ANN001
+        calls.append(prefer_content)
+        if prefer_content:
+            raise RuntimeError("boom")
+        return ArticleData(title="Headline", url="http://example.com", content="")
+
+    monkeypatch.setattr(cf, "_fetch_first_gdelt_article", fake_fetch)
+
+    text = cf.fetch_first_gdelt_article("NVDA")
+    assert text == "Headline - http://example.com"
+    assert cf._LAST_ARTICLE_URL == "http://example.com"
+    assert calls == [True, False]
+
+
 def test_fetch_first_gdelt_article_runtime_error(monkeypatch):
     def fake_fetch(spec, seen_titles=()):  # noqa: ANN001
         raise RuntimeError("boom")
