@@ -105,8 +105,12 @@ Basic news helpers are available through the chatbot's command interface:
 
 ```bash
 CMD: news.fetch_gdelt --query "<terms>" --max 1
-CMD: news.read --url "<article_url>" --summarize --analyze --chunks 1000
+CMD: news.read --url "<article_url>" --summarize --analyze --chunks 1000 --json
 ```
+
+When `--summarize` is supplied without other processing flags, `news.read`
+prints only the summary text. Add `--json` to receive the response as a JSON
+object instead.
 
 ## GitHub Repository Data
 
