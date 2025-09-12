@@ -50,7 +50,7 @@ def read_command(
         "--summarize",
         help=(
             "Return a short summary. Non-English text is translated to English "
-            "if translation mode is 'auto' or 'en'."
+            "so summaries are always produced in English."
         ),
     ),
     analyze: bool = typer.Option(
@@ -66,17 +66,19 @@ def read_command(
         TranslateMode.off,
         "--translate",
         help=(
-            "Translation mode: off, auto or en. Summaries use English text, "
-            "translating when mode is 'auto' or 'en'."
+            "Translation mode: off, auto or en. Summaries are always produced "
+            "in English; the article text is translated when mode is 'auto' "
+            "or 'en'."
         ),
     ),
 ) -> None:
     """Read an article and optionally process it.
 
-    The article language is detected with :func:`analyze_text`. If translation
-    mode is set to ``auto`` or ``en`` and the article is not in English, the text
-    is translated to English before summarization so that summaries are always
-    generated from English input.
+    The article language is detected with :func:`analyze_text`. Summaries are
+    always generated from English input. If translation mode is set to
+    ``auto`` or ``en`` and the article is not in English, the article text
+    is translated to English before further processing; otherwise only the
+    summary uses translated English text.
     """
     html = fetch_html(url)
     if not html:
@@ -110,6 +112,15 @@ def read_command(
         if analysis.get("lang") != "en":
             text = translate_text(text, "en")
 
+    summary_text = text
+    if (
+        summarize
+        and translate == TranslateMode.off
+        and analysis
+        and analysis.get("lang") != "en"
+    ):
+        summary_text = translate_text(text, "en")
+
     should_process = any(
         [
             summarize,
@@ -123,7 +134,7 @@ def read_command(
         if translate != TranslateMode.off and text != original_text:
             result["original_text"] = original_text
         if summarize:
-            result["summary"] = summarize_text(text)
+            result["summary"] = summarize_text(summary_text)
         if analyze:
             result["analysis"] = analysis
         if chunks is not None:
