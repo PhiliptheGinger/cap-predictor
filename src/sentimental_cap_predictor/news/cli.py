@@ -11,12 +11,12 @@ The CLI provides three primary commands:
     Query the GDELT API and return a list of article stubs as JSON.
 
 ``ingest``
-    Fetch and extract articles for a query and store them in a local JSONL
-    file.  Each line contains a JSON object with the article's metadata and
-    extracted text.
+    Fetch and extract articles for a query and persist them using the storage
+    module.
 
-``list``
-    Print the stored articles from the JSONL file.
+``score``
+    Compute scores for stored articles using the scoring utilities and output
+    the results as JSON.
 
 Two additional commands – ``fetch-gdelt`` and ``read`` – are kept for backwards
 compatibility with the existing chatbot tests.  They are thin wrappers around
@@ -27,8 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 from enum import Enum
 
 import typer
@@ -36,6 +35,8 @@ import typer
 from .extractor import ArticleExtractor, ExtractedArticle
 from .fetcher import HtmlFetcher
 from .gdelt_client import GdeltClient
+from . import store
+from .scoring import score_news
 
 
 app = typer.Typer(help="Utilities for working with news articles")
@@ -72,28 +73,6 @@ def _stub_to_dict(stub) -> dict[str, object]:  # pragma: no cover - tiny helper
     }
 
 
-def _write_jsonl(path: Path, records: Iterable[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        for rec in records:
-            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-
-def _load_jsonl(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    items: list[dict] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            items.append(json.loads(line))
-        except json.JSONDecodeError:  # pragma: no cover - malformed file
-            continue
-    return items
-
-
 # ---------------------------------------------------------------------------
 # Core commands
 
@@ -114,51 +93,55 @@ def search_command(
 def ingest_command(
     query: str = typer.Option(..., "--query", "-q", help="Search query"),
     max_results: int = typer.Option(3, "--max", "-m", help="Maximum results"),
-    store: Path = typer.Option(
-        Path("data/news.jsonl"),
-        "--store",
-        "-s",
-        help="File for storing extracted articles",
-    ),
 ) -> None:
-    """Fetch and store articles for ``query`` to ``store`` as JSONL."""
+    """Fetch articles for ``query`` and store them via :mod:`news.store`."""
 
     client = GdeltClient()
     extractor = ArticleExtractor()
 
-    records: list[dict] = []
+    count = 0
     for stub in client.search(query, max_records=max_results):
+        meta = _stub_to_dict(stub)
+        store.upsert_article(meta)
         html = fetch_html(stub.url)
         if not html:
+            store.log_error(stub.url, "fetch", "no html")
             continue
         art: Optional[ExtractedArticle] = extractor.extract(html, url=stub.url)
         if not art or not art.text:
+            store.log_error(stub.url, "extract", "no text")
             continue
-        rec = _stub_to_dict(stub)
-        rec["text"] = art.text
-        if art.title and not rec["title"]:
-            rec["title"] = art.title
-        rec["byline"] = art.byline
-        rec["date"] = art.date
-        records.append(rec)
+        store.upsert_content(stub.url, art.text)
+        count += 1
 
-    _write_jsonl(store, records)
-    typer.echo(str(len(records)))
+    typer.echo(str(count))
 
 
-@app.command("list")
-def list_command(
-    store: Path = typer.Option(
-        Path("data/news.jsonl"),
-        "--store",
-        "-s",
-        help="File previously used with ingest",
-    ),
-) -> None:
-    """Print stored article records as JSON."""
+@app.command("score")
+def score_command() -> None:
+    """Score stored articles and print JSON records."""
 
-    items = _load_jsonl(store)
-    typer.echo(json.dumps(items))
+    import pandas as pd
+
+    with store._connect() as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT a.url,
+                   a.seendate AS timestamp,
+                   LENGTH(c.text) AS length,
+                   COALESCE(c.relevance, 0) AS credibility
+            FROM articles a
+            JOIN contents c ON a.url = c.url
+            """,
+            conn,
+        )
+
+    if df.empty:
+        typer.echo("[]")
+        return
+
+    scored = score_news(df)
+    typer.echo(scored.to_json(orient="records"))
 
 
 # ---------------------------------------------------------------------------
