@@ -103,6 +103,10 @@ response is the summary text; add `--json` to get a JSON object instead.
 
 Domain allow/block lists for GDELT results can be supplied through the
 `NEWS_ALLOWED_DOMAINS` and `NEWS_BLOCKED_DOMAINS` environment variables.
+To fetch pages that reject plain HTTP clients, enable a Playwright-powered
+fallback by setting `NEWS_USE_PLAYWRIGHT=1` and installing the `playwright`
+package along with its browsers. This adds overhead so it is disabled by
+default.
 
 ## Connector intents
 
