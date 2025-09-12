@@ -101,6 +101,9 @@ an article, summarises it, performs a basic analysis and optionally chunks the
 text for further processing. When `--summarize` is used on its own, the
 response is the summary text; add `--json` to get a JSON object instead.
 
+Domain allow/block lists for GDELT results can be supplied through the
+`NEWS_ALLOWED_DOMAINS` and `NEWS_BLOCKED_DOMAINS` environment variables.
+
 ## Connector intents
 
 The chatbot understands simple phrases to pull data from a few external

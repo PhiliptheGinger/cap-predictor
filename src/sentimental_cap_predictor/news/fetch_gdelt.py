@@ -1,45 +1,31 @@
+"""Helpers for fetching and storing news articles from GDELT.
+
+This module wraps :class:`~sentimental_cap_predictor.news.gdelt_client.GdeltClient`
+for querying the GDELT API and uses :class:`~sentimental_cap_predictor.news.fetcher.HtmlFetcher`
+and :class:`~sentimental_cap_predictor.news.extractor.ArticleExtractor` for
+retrieving and processing article content.  Domain allow/block lists are read
+from the ``NEWS_ALLOWED_DOMAINS`` and ``NEWS_BLOCKED_DOMAINS`` environment
+variables (comma separated) so that policies can be configured without
+modifying the code.
+"""
+
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
+import os
 import textwrap
 from urllib.parse import urlparse
 
-import requests
-
 from sentimental_cap_predictor.memory import vector_store
-from .extract import extract_main_text, fetch_html
+from .gdelt_client import GdeltClient
+from .fetcher import HtmlFetcher
+from .extractor import ArticleExtractor
+
 
 logger = logging.getLogger(__name__)
-
-GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
-UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/118.0.0.0 Safari/537.36"
-)
-
-# Sites that are generally scraper-friendly
-PREFERRED_DOMAINS = (
-    "apnews.com",
-    "reuters.com",
-    "bbc.com",
-    "cnn.com",
-    "nytimes.com",  # still mixed; keep but expect paywalls/403
-    "theguardian.com",
-    "npr.org",
-    "abcnews.go.com",
-    "cbc.ca",
-)
-
-# Sites that are known to block scraping or are paywalled
-BLOCKED_DOMAINS = (
-    "wsj.com",
-    "bloomberg.com",
-    "ft.com",
-)
-
 
 _EMPTY_HTML = {
     "<html></html>",
@@ -54,30 +40,68 @@ def _is_empty_page(html: str) -> bool:
     return "".join(html.split()).lower() in _EMPTY_HTML
 
 
-def search_gdelt(query: str, max_records: int = 15):
-    params = {
-        "query": query,
-        "mode": "artlist",
-        "format": "json",
-        "maxrecords": max_records,
-        "sort": "datedesc",
-    }
+def _env_list(name: str) -> tuple[str, ...]:
+    value = os.getenv(name, "")
+    return tuple(filter(None, (p.strip() for p in value.split(","))))
+
+
+def domain_blocked(url: str) -> bool:
+    domain = urlparse(url).netloc
+    blocked = _env_list("NEWS_BLOCKED_DOMAINS")
+    return any(d in domain for d in blocked)
+
+
+def domain_ok(url: str) -> bool:
+    allowed = _env_list("NEWS_ALLOWED_DOMAINS")
+    if not allowed:
+        return True
+    domain = urlparse(url).netloc
+    return any(d in domain for d in allowed)
+
+
+async def _fetch_html_async(url: str) -> str:
+    fetcher = HtmlFetcher()
     try:
-        r = requests.get(
-            GDELT_DOC_API, params=params, headers={"User-Agent": UA}, timeout=30
-        )
-        r.raise_for_status()
-    except requests.RequestException as exc:  # pragma: no cover - network failure
+        html = await fetcher.get(url)
+    finally:
+        await fetcher.aclose()
+    return html or ""
+
+
+def fetch_html(url: str) -> str:
+    """Synchronously fetch ``url`` using :class:`HtmlFetcher`."""
+
+    return asyncio.run(_fetch_html_async(url))
+
+
+def extract_main_text(html: str, url: str | None = None) -> str:
+    extractor = ArticleExtractor()
+    art = extractor.extract(html, url=url)
+    return art.text if art else ""
+
+
+def search_gdelt(query: str, max_records: int = 15) -> list[dict]:
+    """Return article dictionaries for ``query``.
+
+    Results are filtered according to the configured domain policy and pages
+    that fail to fetch or are empty are skipped.
+    """
+
+    client = GdeltClient()
+    try:
+        stubs = client.search(query, max_records=max_records)
+    except Exception as exc:  # pragma: no cover - network failure
         logger.warning("GDELT API request failed: %s", exc)
         return []
-    data = r.json()
-    articles = []
-    for art in data.get("articles", []):
-        url = art.get("url")
-        if not url:
-            continue
+
+    articles: list[dict] = []
+    for stub in stubs:
+        url = stub.url
         if domain_blocked(url):
-            logger.info("Skipping %s: blocked domain", urlparse(url).netloc)
+            logger.info("Skipping %s: blocked domain", stub.domain)
+            continue
+        if not domain_ok(url):
+            logger.info("Skipping %s: undesired domain", stub.domain)
             continue
         try:  # pragma: no cover - network failure
             html = fetch_html(url)
@@ -85,18 +109,18 @@ def search_gdelt(query: str, max_records: int = 15):
             continue
         if _is_empty_page(html):
             continue
-        articles.append(art)
+        articles.append(
+            {
+                "title": getattr(stub, "title", "") or "",
+                "url": url,
+                "domain": stub.domain,
+                "language": "",
+                "seendate": stub.seendate.isoformat() if stub.seendate else "",
+            }
+        )
         if len(articles) >= max_records:
             break
     return articles
-
-
-def domain_ok(url: str) -> bool:
-    return any(d in url for d in PREFERRED_DOMAINS)
-
-
-def domain_blocked(url: str) -> bool:
-    return any(d in url for d in BLOCKED_DOMAINS)
 
 
 def summarize(text: str, max_chars: int = 800) -> str:
@@ -106,6 +130,7 @@ def summarize(text: str, max_chars: int = 800) -> str:
 
 def _chunk_text(text: str, size: int = 1000, overlap: int = 100) -> list[str]:
     """Split *text* into character chunks with small overlaps."""
+
     if size <= 0:
         return []
     chunks: list[str] = []
@@ -142,7 +167,7 @@ def _store_chunks(result: dict) -> None:
             logger.warning("Vector store upsert failed: %s", exc)
 
 
-def main():
+def main() -> None:  # pragma: no cover - CLI convenience
     logging.basicConfig(level=logging.INFO)
     ap = argparse.ArgumentParser()
     ap.add_argument("--query", required=True)
@@ -156,30 +181,18 @@ def main():
             logger.info("Skipping record with no URL")
             continue
 
-        domain = urlparse(url).netloc
-        if domain_blocked(url):
-            logger.info("Skipping %s: blocked domain", domain)
-            continue
-        if not domain_ok(url):
-            logger.info("Skipping %s: undesired domain", domain)
-            continue
-
         try:
             html = fetch_html(url)
-        except requests.HTTPError as e:
-            status = e.response.status_code if e.response else "?"
-            logger.warning("HTTP %s for %s", status, domain)
-            continue
-        except Exception as e:
-            logger.warning("Error fetching %s: %s", domain, e)
+        except Exception as exc:
+            logger.warning("Error fetching %s: %s", url, exc)
             continue
         if _is_empty_page(html):
-            logger.info("Skipping %s: empty page", domain)
+            logger.info("Skipping %s: empty page", url)
             continue
 
         text = extract_main_text(html, url=url)
         if not text:
-            logger.info("Skipping %s: no extractable text", domain)
+            logger.info("Skipping %s: no extractable text", url)
             continue
 
         result = {
@@ -199,5 +212,6 @@ def main():
     print(json.dumps({}))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
     main()
+
