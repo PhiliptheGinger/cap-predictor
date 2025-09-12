@@ -1,10 +1,10 @@
 import asyncio
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 import httpx
-import types
 
 # Create lightweight package structure to satisfy relative imports
 root = Path(__file__).resolve().parents[1]
@@ -72,4 +72,26 @@ def test_fetcher_failure(monkeypatch):
     assert html is None
     assert called["args"][0] == "http://e"
     assert called["args"][1] == "fetch"
+    run(fetcher.aclose())
+
+
+def test_playwright_fallback(monkeypatch):
+    class DummyResponse:
+        status_code = 403
+        text = "blocked"
+
+    async def fake_get(self, url, follow_redirects=True):  # noqa: ANN001
+        return DummyResponse()
+
+    async def fake_pw(url, timeout_s):  # noqa: ANN001
+        return "browser"
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(fetcher_mod, "async_playwright", object())
+    monkeypatch.setattr(fetcher_mod, "_fetch_with_playwright", fake_pw)
+    monkeypatch.setenv("NEWS_USE_PLAYWRIGHT", "1")
+
+    fetcher = HtmlFetcher()
+    html = run(fetcher.get("http://blocked"))
+    assert html == "browser"
     run(fetcher.aclose())

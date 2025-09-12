@@ -115,6 +115,11 @@ object instead.
 GDELT domain filters can be configured via the `NEWS_ALLOWED_DOMAINS` and
 `NEWS_BLOCKED_DOMAINS` environment variables (comma-separated lists).
 
+Some sites reject standard HTTP clients. Set `NEWS_USE_PLAYWRIGHT=1` to enable a
+browser-based fallback fetcher powered by Playwright. This requires the
+`playwright` package and a browser install (`playwright install`) and may
+consume significant resources.
+
 ## GitHub Repository Data
 
 Utilities that pull information from the GitHub API can optionally use a
