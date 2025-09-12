@@ -73,6 +73,11 @@ SEASONAL_ORDER = tuple(
 PREDICTION_DAYS = int(os.getenv("PREDICTION_DAYS", 14))
 TRAIN_SIZE_RATIO = float(os.getenv("TRAIN_SIZE_RATIO", 0.8))
 
+# Default model for sentiment analysis
+SENTIMENT_MODEL = os.getenv(
+    "SENTIMENT_MODEL", "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
+)
+
 # Data path
 DATA_PATH = os.getenv("DATA_PATH", "./data/your_data.csv")
 

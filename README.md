@@ -44,6 +44,11 @@ flowchart TD
    ```bash
    python -m sentimental_cap_predictor.modeling.sentiment_analysis <NEWS_PATH>
    ```
+   The news reader uses the
+   `distilbert/distilbert-base-uncased-finetuned-sst-2-english` model by
+   default for sentiment analysis. Override this choice by setting the
+   `SENTIMENT_MODEL` environment variable to another Hugging Face repository
+   id.
 
 ## Typer CLI Usage
 Each module exposes a Typer application:

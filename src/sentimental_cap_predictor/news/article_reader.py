@@ -4,6 +4,11 @@ This module provides helper functions for downloading web pages, extracting
 main article text, stripping advertisement sections, basic text analysis and
 chunking.  Heavy dependencies are optional and gracefully degraded when not
 available.
+
+Sentiment analysis relies on a lightweight Transformers model,
+``distilbert/distilbert-base-uncased-finetuned-sst-2-english`` by default. The
+model can be overridden by setting the ``SENTIMENT_MODEL`` environment
+variable.
 """
 
 from __future__ import annotations
@@ -11,6 +16,8 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any, Dict, List
+
+from ..config import SENTIMENT_MODEL
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -153,12 +160,14 @@ def strip_ads(text: str) -> str:
     return "\n".join(lines)
 
 
-def analyze(text: str) -> Dict[str, Any]:
+def analyze(text: str, *, include_sentiment: bool = False) -> Dict[str, Any]:
     """Perform lightweight analysis on ``text``.
 
-    The function attempts language detection, sentiment estimation and entity
-    extraction.  Optional libraries are used when available and the function
-    gracefully degrades when dependencies are missing.
+    The function attempts language detection and entity extraction. Sentiment
+    estimation is executed only when ``include_sentiment`` is ``True`` and uses
+    the model specified by :data:`SENTIMENT_MODEL`.
+    Optional libraries are used when available and the function gracefully
+    degrades when dependencies are missing.
     """
 
     tokens = text.split()
@@ -169,17 +178,6 @@ def analyze(text: str) -> Dict[str, Any]:
         from langdetect import detect
 
         lang = detect(text)
-    except Exception:
-        pass
-
-    # Sentiment analysis using transformers pipeline if available
-    sentiment: Dict[str, Any] = {"label": "unknown", "score": 0.0}
-    try:  # pragma: no cover - heavy dependency
-        from transformers import pipeline
-
-        sa = pipeline("sentiment-analysis")
-        result = sa(text[:512])[0]
-        sentiment = {"label": result["label"], "score": float(result["score"])}
     except Exception:
         pass
 
@@ -198,13 +196,28 @@ def analyze(text: str) -> Dict[str, Any]:
     except Exception:
         entities = re.findall(r"\b[A-Z][a-zA-Z]+\b", text)
 
-    analysis = {
+    analysis: Dict[str, Any] = {
         "lang": lang,
-        "sentiment": sentiment,
         "entities": entities,
         "word_count": len(tokens),
         "tokens": tokens,
     }
+
+    if include_sentiment:
+        sentiment: Dict[str, Any] = {"label": "unknown", "score": 0.0}
+        try:  # pragma: no cover - heavy dependency
+            from transformers import pipeline
+
+            sa = pipeline("sentiment-analysis", model=SENTIMENT_MODEL)
+            result = sa(text[:512])[0]
+            sentiment = {
+                "label": result["label"],
+                "score": float(result["score"]),
+            }
+        except Exception:
+            pass
+        analysis["sentiment"] = sentiment
+
     return analysis
 
 
