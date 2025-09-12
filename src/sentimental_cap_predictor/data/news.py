@@ -99,7 +99,12 @@ class ArticleData:
 
 
 def query_gdelt_for_news(
-    query: str, start_date: str, end_date: str, *, max_records: int = 100
+    query: str,
+    start_date: str,
+    end_date: str,
+    *,
+    max_records: int = 100,
+    language: str | None = None,
 ) -> pd.DataFrame:
     """Query the GDELT API for articles matching ``query`` within a window."""
 
@@ -108,13 +113,13 @@ def query_gdelt_for_news(
         "https://api.gdeltproject.org/api/v2/doc/doc",
     )
     params = {
-        "query": query,
+        "query": f"{query} lang:{language}" if language else query,
         "mode": "artlist",
         "startdatetime": start_date,
         "enddatetime": end_date,
         "maxrecords": max_records,
         "format": "json",
-    }    
+    }
     response = requests.get(url, params=params, timeout=30)
     response.raise_for_status()
     try:
@@ -178,6 +183,7 @@ class FetchArticleSpec:
     avoid_domains: tuple[str, ...] = ("seekingalpha.com",)
     require_text_accessible: bool = False
     novelty_against_urls: tuple[str, ...] = ()
+    language: str | None = "english"
 
 
 def is_valid_candidate(article: pd.Series, spec: FetchArticleSpec) -> bool:
@@ -286,6 +292,7 @@ def fetch_article(
         start.strftime("%Y%m%d%H%M%S"),
         end.strftime("%Y%m%d%H%M%S"),
         max_records=spec.max_records,
+        language=spec.language,
     )
     if df.empty:
         raise RuntimeError("No articles returned for query")

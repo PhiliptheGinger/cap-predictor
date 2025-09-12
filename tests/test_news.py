@@ -150,6 +150,31 @@ def test_query_gdelt_for_news_uses_timeout(monkeypatch):
     assert isinstance(df, pd.DataFrame)
 
 
+def test_query_gdelt_for_news_appends_language(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        def json(self):  # pragma: no cover - trivial
+            return {"articles": []}
+
+        def raise_for_status(self):  # pragma: no cover - no-op
+            pass
+
+    def fake_get(url, params, timeout):  # noqa: ANN001
+        captured["query"] = params["query"]
+        return DummyResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    news.query_gdelt_for_news(
+        query="NVDA",
+        start_date="20240101000000",
+        end_date="20240102000000",
+        language="english",
+    )
+    assert captured["query"] == "NVDA lang:english"
+
+
 def test_query_gdelt_for_news_handles_timeout(monkeypatch):
     def fake_get(url, params, timeout):  # noqa: ANN001
         raise requests.Timeout()
@@ -229,7 +254,9 @@ def test_fetch_article_prefers_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
     monkeypatch.setattr(
-        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+        news,
+        "query_gdelt_for_news",
+        lambda q, s, e, *, max_records=100, language=None: df,
     )
     monkeypatch.setattr(
         news,
@@ -246,7 +273,9 @@ def test_fetch_article_raises_on_missing_content(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
 
     monkeypatch.setattr(
-        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+        news,
+        "query_gdelt_for_news",
+        lambda q, s, e, *, max_records=100, language=None: df,
     )
     monkeypatch.setattr(
         news,
@@ -263,10 +292,11 @@ def test_fetch_article_custom_window_and_limit(monkeypatch):
     df = pd.DataFrame([{"title": "Headline", "url": "http://example.com"}])
     captured: dict[str, str | int] = {}
 
-    def fake_query(q, s, e, *, max_records):  # noqa: ANN001
+    def fake_query(q, s, e, *, max_records, language=None):  # noqa: ANN001
         captured["start"] = s
         captured["end"] = e
         captured["max"] = max_records
+        captured["language"] = language
         return df
 
     monkeypatch.setattr(news, "query_gdelt_for_news", fake_query)
@@ -289,6 +319,7 @@ def test_fetch_article_custom_window_and_limit(monkeypatch):
     assert captured["start"] == "20240107120000"
     assert captured["end"] == "20240110120000"
     assert captured["max"] == 5
+    assert captured["language"] == "english"
 
 
 def test_fetch_article_applies_filters_and_novelty(monkeypatch):
@@ -301,7 +332,9 @@ def test_fetch_article_applies_filters_and_novelty(monkeypatch):
     )
 
     monkeypatch.setattr(
-        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+        news,
+        "query_gdelt_for_news",
+        lambda q, s, e, *, max_records=100, language=None: df,
     )
     monkeypatch.setattr(
         news, "extract_article_content", lambda url, use_headless=False: "text"
@@ -326,7 +359,9 @@ def test_fetch_article_title_novelty(monkeypatch):
     )
 
     monkeypatch.setattr(
-        news, "query_gdelt_for_news", lambda q, s, e, *, max_records=100: df
+        news,
+        "query_gdelt_for_news",
+        lambda q, s, e, *, max_records=100, language=None: df,
     )
     monkeypatch.setattr(
         news, "extract_article_content", lambda url, use_headless=False: "text"

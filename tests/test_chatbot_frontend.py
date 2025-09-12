@@ -33,6 +33,7 @@ class FetchArticleSpec:
     avoid_domains: tuple[str, ...] = ("seekingalpha.com",)
     require_text_accessible: bool = False
     novelty_against_urls: tuple[str, ...] = ()
+    language: str | None = "english"
 
 
 dummy_news.fetch_article = lambda spec, seen_titles=(): ArticleData()
@@ -40,6 +41,10 @@ dummy_news.FetchArticleSpec = FetchArticleSpec
 dummy_data = types.ModuleType("sentimental_cap_predictor.data")
 dummy_data.__path__ = []  # mark as package
 dummy_data.news = dummy_news
+dummy_pkg = types.ModuleType("sentimental_cap_predictor")
+dummy_pkg.__path__ = []
+dummy_pkg.data = dummy_data
+sys.modules.setdefault("sentimental_cap_predictor", dummy_pkg)
 sys.modules.setdefault("sentimental_cap_predictor.data", dummy_data)
 sys.modules.setdefault("sentimental_cap_predictor.data.news", dummy_news)
 sys.modules.setdefault("sentimental_cap_predictor.data.news", dummy_news)
@@ -63,6 +68,33 @@ sys.modules.setdefault(
     "sentimental_cap_predictor.llm_core.memory_indexer",
     dummy_memory,
 )
+
+dummy_llm_core = types.ModuleType("sentimental_cap_predictor.llm_core")
+dummy_llm_core.__path__ = []
+dummy_llm_core.memory_indexer = dummy_memory
+sys.modules.setdefault("sentimental_cap_predictor.llm_core", dummy_llm_core)
+
+from enum import Enum
+
+
+class LLMProviderEnum(str, Enum):
+    qwen_local = "qwen_local"
+    deepseek = "deepseek"
+
+
+dummy_provider = types.ModuleType(
+    "sentimental_cap_predictor.llm_core.provider_config"
+)
+dummy_provider.LLMProviderEnum = LLMProviderEnum
+sys.modules.setdefault(
+    "sentimental_cap_predictor.llm_core.provider_config", dummy_provider
+)
+
+dummy_engine = types.ModuleType("sentimental_cap_predictor.reasoning.engine")
+dummy_engine.analogy_explain = lambda *a, **k: None
+dummy_engine.reason_about = lambda *a, **k: None
+dummy_engine.simulate = lambda *a, **k: None
+sys.modules.setdefault("sentimental_cap_predictor.reasoning.engine", dummy_engine)
 
 # Import the module directly to avoid triggering package-level side effects
 spec = importlib.util.spec_from_file_location(
@@ -420,6 +452,7 @@ def test_direct_text_reply(monkeypatch, capsys):
         return "ok"
 
     monkeypatch.setattr(cf, "handle_command", fake_handle)
+    monkeypatch.setattr(sys, "argv", ["prog"])
     cf.main()
 
     out = capsys.readouterr().out

@@ -24,6 +24,7 @@ def _load_frontend():
     @dataclass
     class FetchArticleSpec:
         query: str = ""
+        language: str | None = "english"
     dummy_news.FetchArticleSpec = FetchArticleSpec
     dummy_news.fetch_first_gdelt_article = lambda *a, **k: None
     dummy_news.fetch_article = lambda *a, **k: None
