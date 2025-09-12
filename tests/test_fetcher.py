@@ -4,15 +4,21 @@ import sys
 from pathlib import Path
 
 import httpx
+import types
 
-# Load fetcher module
+# Create lightweight package structure to satisfy relative imports
+root = Path(__file__).resolve().parents[1]
+pkg = types.ModuleType("sentimental_cap_predictor")
+news_pkg = types.ModuleType("sentimental_cap_predictor.news")
+news_pkg.__path__ = [str(root / "src" / "sentimental_cap_predictor" / "news")]
+sys.modules.setdefault("sentimental_cap_predictor", pkg)
+sys.modules.setdefault("sentimental_cap_predictor.news", news_pkg)
+pkg.news = news_pkg
+
+# Load fetcher module from source file
 spec = importlib.util.spec_from_file_location(
     "sentimental_cap_predictor.news.fetcher",
-    Path(__file__).resolve().parents[1]
-    / "src"
-    / "sentimental_cap_predictor"
-    / "news"
-    / "fetcher.py",
+    root / "src" / "sentimental_cap_predictor" / "news" / "fetcher.py",
 )
 fetcher_mod = importlib.util.module_from_spec(spec)
 sys.modules["sentimental_cap_predictor.news.fetcher"] = fetcher_mod
@@ -45,9 +51,25 @@ def test_fetcher_failure(monkeypatch):
     async def fake_get(self, url, follow_redirects=True):  # noqa: ANN001
         raise httpx.ProxyError("boom")
 
+    async def fake_sleep(delay):  # noqa: ANN001
+        return None
+
+    def fake_random():  # noqa: ANN001
+        return 0.0
+
+    called: dict[str, tuple[str, str, str]] = {}
+
+    def fake_log_error(url, stage, message):  # noqa: ANN001
+        called["args"] = (url, stage, message)
+
     monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(fetcher_mod, "log_error", fake_log_error)
+    monkeypatch.setattr(fetcher_mod.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(fetcher_mod.random, "random", fake_random)
 
     fetcher = HtmlFetcher()
     html = run(fetcher.get("http://e", max_retries=2))
     assert html is None
+    assert called["args"][0] == "http://e"
+    assert called["args"][1] == "fetch"
     run(fetcher.aclose())
