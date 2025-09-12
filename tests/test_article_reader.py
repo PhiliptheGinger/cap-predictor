@@ -1,5 +1,7 @@
 from importlib import util
 from pathlib import Path
+import sys
+import types
 
 # Load module directly to avoid importing heavy package dependencies
 module_path = (
@@ -12,7 +14,27 @@ module_path = (
 spec = util.spec_from_file_location("article_reader", module_path)
 assert spec and spec.loader
 article_reader = util.module_from_spec(spec)
+article_reader.__package__ = "sentimental_cap_predictor.news"
+
+dummy_pkg = types.ModuleType("sentimental_cap_predictor")
+dummy_news_pkg = types.ModuleType("sentimental_cap_predictor.news")
+dummy_config = types.ModuleType("sentimental_cap_predictor.config")
+dummy_config.SENTIMENT_MODEL = "dummy"
+dummy_config.GDELT_API_URL = "https://example.com"
+dummy_pkg.news = dummy_news_pkg
+dummy_pkg.config = dummy_config
+
+dummy_news_pkg.__path__ = [
+    str(Path(__file__).resolve().parent.parent / "src" / "sentimental_cap_predictor" / "news")
+]
+
+sys.modules.setdefault("sentimental_cap_predictor", dummy_pkg)
+sys.modules.setdefault("sentimental_cap_predictor.news", dummy_news_pkg)
+sys.modules.setdefault("sentimental_cap_predictor.config", dummy_config)
+
 spec.loader.exec_module(article_reader)
+sys.modules.pop("sentimental_cap_predictor", None)
+sys.modules.pop("sentimental_cap_predictor.news", None)
 
 strip_ads = article_reader.strip_ads
 chunk = article_reader.chunk
@@ -39,7 +61,7 @@ def test_chunk_respects_max_tokens_and_overlap():
     assert all(len(c.split()) <= 4 for c in chunks)
 
 
-def test_translate_returns_disabled_when_library_missing(monkeypatch):
+def test_translate_returns_none_when_library_missing(monkeypatch):
     import builtins
 
     real_import = builtins.__import__
@@ -51,7 +73,7 @@ def test_translate_returns_disabled_when_library_missing(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     result = translate("hello", "es")
-    assert result == "Translation disabled"
+    assert result is None
 
 
 def test_extract_main_fallback_to_raw_text(monkeypatch):
