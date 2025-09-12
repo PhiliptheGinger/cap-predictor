@@ -10,6 +10,7 @@ import requests
 
 from sentimental_cap_predictor.memory import vector_store
 from sentimental_cap_predictor.memory.session_state import STATE
+from . import store
 
 
 logger = logging.getLogger(__name__)
@@ -48,19 +49,24 @@ def handle_fetch(topic: str) -> str:
             html = fetch_gdelt.fetch_html(url)
         except requests.RequestException as exc:  # pragma: no cover - network failure
             logger.warning("Network error fetching %s: %s", url, exc)
+            store.log_error(url, "fetch", str(exc))
             continue
         except Exception as exc:  # pragma: no cover - unexpected failure
             logger.warning("Error fetching %s: %s", url, exc)
+            store.log_error(url, "fetch", str(exc))
             continue
         if fetch_gdelt._is_empty_page(html):
             logger.info("Skipping %s: empty page", url)
+            store.log_error(url, "fetch", "empty page")
             continue
         try:
             text = fetch_gdelt.extract_main_text(html, url=url)
         except Exception as exc:  # pragma: no cover - extraction failure
             logger.warning("Error processing %s: %s", url, exc)
+            store.log_error(url, "extract", str(exc))
             continue
         if not text:
+            store.log_error(url, "extract", "no text")
             continue
         result = {
             "title": art.get("title", ""),
@@ -71,8 +77,13 @@ def handle_fetch(topic: str) -> str:
             "text": text,
             "summary": fetch_gdelt.summarize(text),
         }
-        # Persist to vector store and update session state
+        # Persist to vector and relational stores and update session state
         fetch_gdelt._store_chunks(result)
+        try:
+            store.upsert_article(result)
+            store.upsert_content(url, text, result["summary"])
+        except Exception:  # pragma: no cover - persistence should not break flow
+            logger.debug("DB upsert failed", exc_info=True)
         STATE.set_article(result)
         STATE.recent_chunks = fetch_gdelt._chunk_text(text)
         STATE.last_query = topic
