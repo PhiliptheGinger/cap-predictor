@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import textwrap
 from urllib.parse import urlparse
 
@@ -123,9 +124,59 @@ def search_gdelt(query: str, max_records: int = 15) -> list[dict]:
     return articles
 
 
+_SUMMARY_PIPELINE = None
+_SENTIMENT_PIPELINE = None
+
+
 def summarize(text: str, max_chars: int = 800) -> str:
-    text = " ".join(text.split())
-    return textwrap.shorten(text, width=max_chars, placeholder="…")
+    """Return a short summary of *text* using a lightweight model.
+
+    Falls back to simple truncation if a summarization pipeline cannot be
+    initialised. Summaries are truncated to ``max_chars`` characters.
+    """
+
+    global _SUMMARY_PIPELINE
+    cleaned = " ".join(text.split())
+    try:  # pragma: no cover - model loading can fail offline
+        from transformers import pipeline
+
+        if _SUMMARY_PIPELINE is None:
+            _SUMMARY_PIPELINE = pipeline(
+                "summarization", model="sshleifer/distilbart-cnn-12-6"
+            )
+        summary = _SUMMARY_PIPELINE(cleaned)[0]["summary_text"]
+        return textwrap.shorten(summary, width=max_chars, placeholder="…")
+    except Exception:
+        return textwrap.shorten(cleaned, width=max_chars, placeholder="…")
+
+
+def score_sentiment(text: str) -> float:
+    """Return sentiment score in the range [-1, 1] for *text*."""
+
+    global _SENTIMENT_PIPELINE
+    try:  # pragma: no cover - model loading can fail offline
+        from transformers import pipeline
+
+        if _SENTIMENT_PIPELINE is None:
+            _SENTIMENT_PIPELINE = pipeline("sentiment-analysis")
+        result = _SENTIMENT_PIPELINE(text[:512])[0]
+        score = result["score"]
+        return score if result["label"].startswith("POS") else -score
+    except Exception:
+        return 0.0
+
+
+def score_relevance(text: str, query: str) -> float:
+    """Return a simple relevance score for *text* with respect to *query*.
+
+    The score is the fraction of query words appearing in the article text.
+    """
+
+    text_words = set(re.findall(r"\w+", text.lower()))
+    query_words = set(re.findall(r"\w+", query.lower()))
+    if not query_words:
+        return 0.0
+    return len(text_words & query_words) / len(query_words)
 
 
 def _chunk_text(text: str, size: int = 1000, overlap: int = 100) -> list[str]:
