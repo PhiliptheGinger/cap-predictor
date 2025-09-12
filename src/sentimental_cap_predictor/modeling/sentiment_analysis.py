@@ -1,4 +1,7 @@
+"""Utilities for performing sentiment analysis on news articles."""
+
 # flake8: noqa
+import os
 import sys
 from pathlib import Path
 
@@ -7,28 +10,43 @@ import typer
 from colorama import Fore, Style
 from loguru import logger
 from tqdm import tqdm
-from transformers import DistilBertTokenizer, pipeline
+from transformers import AutoTokenizer, pipeline
 
-# Initialize the sentiment analysis pipeline globally for efficiency
-sentiment_pipeline = pipeline(
-    "sentiment-analysis",
-    model="distilbert-base-uncased-finetuned-sst-2-english",
-    framework="pt",
-)
-tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+# Lazily initialized sentiment analysis resources
+sentiment_pipeline = None
+tokenizer = None
+pipeline_model_name: str | None = None
 
 app = typer.Typer()
 
 
-def truncate_content(content, max_length=512):
-    """Truncate content to fit within the DistilBERT token limit."""
+def _ensure_pipeline(model_name: str) -> None:
+    """Initialize the sentiment model and tokenizer if they are not ready."""
+    global sentiment_pipeline, tokenizer, pipeline_model_name
+    if sentiment_pipeline is None or model_name != pipeline_model_name:
+        sentiment_pipeline = pipeline(
+            "sentiment-analysis", model=model_name, framework="pt"
+        )
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        pipeline_model_name = model_name
+
+
+def truncate_content(content: str, max_length: int = 512) -> str:
+    """Truncate content to fit within the model's token limit."""
     tokens = tokenizer.encode(content, truncation=True, max_length=max_length)
     truncated_content = tokenizer.decode(tokens, skip_special_tokens=True)
     return truncated_content
 
 
-def perform_sentiment_analysis(news_df: pd.DataFrame) -> pd.DataFrame:
+def perform_sentiment_analysis(
+    news_df: pd.DataFrame, model_name: str | None = None
+) -> pd.DataFrame:
     """Perform sentiment analysis on the news articles."""
+    model_name = model_name or os.getenv(
+        "SENTIMENT_MODEL", "distilbert-base-uncased-finetuned-sst-2-english"
+    )
+    _ensure_pipeline(model_name)
+
     logger.info(
         f"{Fore.YELLOW}Starting sentiment analysis on {len(news_df)} articles."
         f"{Style.RESET_ALL}"
@@ -153,8 +171,7 @@ def aggregate_sentiment_by_date(analyzed_df: pd.DataFrame) -> pd.DataFrame:
         analyzed_df.groupby("date").agg(
             bias_factor=(
                 "weighted_confidence",
-                lambda x: x.sum()
-                / analyzed_df.loc[x.index, "confidence"].sum(),
+                lambda x: x.sum() / analyzed_df.loc[x.index, "confidence"].sum(),
             ),
             mean_confidence=("confidence", "mean"),
         )
