@@ -25,6 +25,7 @@ dummy_pkg.news = dummy_news_pkg
 
 dummy_config = types.ModuleType("sentimental_cap_predictor.config")
 dummy_config.GDELT_API_URL = "https://example.com"
+dummy_config.SENTIMENT_MODEL = "dummy-model"
 sys.modules.setdefault("sentimental_cap_predictor.config", dummy_config)
 dummy_pkg.config = dummy_config
 
@@ -158,6 +159,70 @@ def test_read_cli_summarize_non_english(monkeypatch):
         catch_exceptions=False,
     )
     assert result.exit_code == 0
+    assert result.stdout.strip() == "translated"
+
+
+def test_read_cli_translation_failure(monkeypatch):
+    runner = CliRunner()
+
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.fetch_html",
+        lambda url: "<html></html>",
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.extract_main",
+        lambda html, url=None: "cuerpo",
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.analyze_text",
+        lambda text: {"lang": "es", "word_count": 1},
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.translate_text",
+        lambda text, target_lang: None,
+    )
+
+    result = runner.invoke(
+        app,
+        ["read", "--url", "http://example.com", "--translate", "en"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
     data = json.loads(result.stdout.strip())
     assert data["text"] == "cuerpo"
-    assert data["summary"] == "translated"
+    assert "original_text" not in data
+    assert "translation" in result.stderr.lower()
+
+
+def test_read_cli_summary_translation_failure(monkeypatch):
+    runner = CliRunner()
+
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.fetch_html",
+        lambda url: "<html></html>",
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.extract_main",
+        lambda html, url=None: "cuerpo",
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.analyze_text",
+        lambda text: {"lang": "es", "word_count": 1},
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.summarize_text",
+        lambda text: text,
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.translate_text",
+        lambda text, target_lang: "Translation disabled",
+    )
+
+    result = runner.invoke(
+        app,
+        ["read", "--url", "http://example.com", "--summarize"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "cuerpo"
+    assert "translation" in result.stderr.lower()
