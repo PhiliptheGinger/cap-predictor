@@ -134,7 +134,7 @@ def test_search_cli(monkeypatch):
     assert data[0]["url"] == "http://e"
 
 
-def test_ingest_and_list_cli(monkeypatch, tmp_path):
+def test_ingest_cli(monkeypatch):
     runner = CliRunner()
 
     from sentimental_cap_predictor.news.gdelt_client import ArticleStub
@@ -158,26 +158,64 @@ def test_ingest_and_list_cli(monkeypatch, tmp_path):
         cli.ArticleExtractor, "extract", lambda self, html, url=None: DummyArt()
     )
 
-    store = tmp_path / "arts.jsonl"
+    stored = {"articles": [], "contents": []}
+    monkeypatch.setattr(
+        cli.store,
+        "upsert_article",
+        lambda data: stored["articles"].append(data),
+    )
+    monkeypatch.setattr(
+        cli.store,
+        "upsert_content",
+        lambda url, text, summary=None, sentiment=None, relevance=None: stored[
+            "contents"
+        ].append((url, text)),
+    )
+
     result = runner.invoke(
         app,
-        ["ingest", "--query", "NVDA", "--store", str(store)],
+        ["ingest", "--query", "NVDA"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
-    assert store.exists()
-    lines = store.read_text().strip().splitlines()
-    assert len(lines) == 1
-    rec = json.loads(lines[0])
-    assert rec["text"] == "body"
+    assert stored["articles"][0]["url"] == "http://e"
+    assert stored["contents"][0][1] == "body"
 
-    # list command
-    result = runner.invoke(
-        app,
-        ["list", "--store", str(store)],
-        catch_exceptions=False,
+
+def test_score_cli(monkeypatch, tmp_path):
+    runner = CliRunner()
+    import sqlite3
+
+    db_path = tmp_path / "news.sqlite"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE articles (url TEXT PRIMARY KEY, seendate TEXT)")
+    conn.execute(
+        "CREATE TABLE contents (url TEXT PRIMARY KEY, text TEXT, relevance REAL)"
     )
+    conn.execute("INSERT INTO articles (url, seendate) VALUES ('u', '2024-01-01')")
+    conn.execute(
+        "INSERT INTO contents (url, text, relevance) VALUES ('u', 'hello', 0.5)"
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr(cli.store, "DB_PATH", db_path)
+
+    called: dict = {}
+
+    def fake_score_news(df, **kwargs):  # noqa: ANN001
+        called["df"] = df
+        df = df.copy()
+        df["score"] = [1.0]
+        df["ewma_score"] = [1.0]
+        return df
+
+    monkeypatch.setattr(cli, "score_news", fake_score_news)
+
+    result = runner.invoke(app, ["score"], catch_exceptions=False)
     assert result.exit_code == 0
     data = json.loads(result.stdout.strip())
-    assert data[0]["title"] == "T"
+    assert data[0]["score"] == 1.0
+    assert "df" in called
+    assert int(called["df"]["length"].iloc[0]) == len("hello")
 
