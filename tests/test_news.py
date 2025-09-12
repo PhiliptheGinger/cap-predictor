@@ -370,3 +370,33 @@ def test_fetch_article_title_novelty(monkeypatch):
     spec = news.FetchArticleSpec(query="q")
     article = news.fetch_article(spec, seen_titles=("Seen headline",))
     assert article.url == "http://new.com/b"
+
+
+def test_fetch_article_skips_non_english(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {"title": "Titulo", "url": "http://es.com", "language": "spanish"},
+            {
+                "title": "Headline",
+                "url": "http://en.com",
+                "language": "english",
+            },
+        ]
+    )
+
+    def fake_query(q, s, e, *, max_records=100, language=None):  # noqa: ANN001
+        return df
+
+    extracted: list[str] = []
+
+    def fake_extract(url, use_headless=False):  # noqa: ANN001, D401
+        extracted.append(url)
+        return "body"
+
+    monkeypatch.setattr(news, "query_gdelt_for_news", fake_query)
+    monkeypatch.setattr(news, "extract_article_content", fake_extract)
+
+    spec = news.FetchArticleSpec(query="q")
+    article = news.fetch_article(spec)
+    assert article.url == "http://en.com"
+    assert extracted == ["http://en.com"]

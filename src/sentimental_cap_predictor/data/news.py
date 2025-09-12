@@ -124,7 +124,10 @@ def query_gdelt_for_news(
     response.raise_for_status()
     try:
         data = response.json()
-    except (requests.exceptions.JSONDecodeError, ValueError) as exc:  # pragma: no cover - depends on requests
+    except (
+        requests.exceptions.JSONDecodeError,
+        ValueError,
+    ) as exc:  # pragma: no cover - depends on requests
         text = getattr(response, "text", "")
         msg = f"Failed to parse GDELT response as JSON: {exc}"
         if text:
@@ -171,7 +174,12 @@ def extract_article_content(
 
 @dataclass
 class FetchArticleSpec:
-    """Specification for fetching and validating an article."""
+    """Specification for fetching and validating an article.
+
+    The ``language`` field filters articles both in the initial GDELT query
+    and again during candidate validation, providing a safeguard against
+    mislabeled results that slip through the API filter.
+    """
 
     query: str
     days: int = 1
@@ -187,10 +195,19 @@ class FetchArticleSpec:
 
 
 def is_valid_candidate(article: pd.Series, spec: FetchArticleSpec) -> bool:
-    """Return ``True`` if ``article`` satisfies keyword and domain filters."""
+    """Return ``True`` if ``article`` satisfies keyword, domain and language
+    filters."""
 
     title = str(article.get("title") or article.get("headline") or "")
     url = str(article.get("url") or "")
+    article_language = str(article.get("language") or "").lower()
+    language_mismatch = (
+        spec.language
+        and article_language
+        and (article_language != spec.language.lower())
+    )
+    if language_mismatch:
+        return False
     if spec.must_contain_any:
         lower = title.lower()
         if not any(k.lower() in lower for k in spec.must_contain_any):
