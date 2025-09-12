@@ -161,3 +161,36 @@ def test_read_cli_summarize_non_english(monkeypatch):
     data = json.loads(result.stdout.strip())
     assert data["text"] == "cuerpo"
     assert data["summary"] == "translated"
+
+
+def test_read_cli_translation_missing(monkeypatch):
+    runner = CliRunner()
+
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.fetch_html",
+        lambda url: "<html></html>",
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.extract_main",
+        lambda html, url=None: "cuerpo",
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.analyze_text",
+        lambda text: {"lang": "es"},
+    )
+    monkeypatch.setattr(
+        "sentimental_cap_predictor.news.cli.translate_text",
+        lambda text, target_lang: None,
+    )
+
+    result = runner.invoke(
+        app,
+        ["read", "--url", "http://example.com", "--translate", "en"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    assert "Translation unavailable" in lines[0]
+    data = json.loads(lines[-1])
+    assert data["text"] == "cuerpo"
+    assert "original_text" not in data

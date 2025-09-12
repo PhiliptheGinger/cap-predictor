@@ -267,17 +267,17 @@ def summarize(text: str, max_sentences: int = 3) -> str:
     return " ".join(sentences[:max_sentences])
 
 
-def translate(text: str, target_lang: str) -> str:
+def translate(text: str, target_lang: str) -> str | None:
     """Attempt to translate ``text`` into ``target_lang``.
 
-    If a translation library is not available this function returns the string
-    ``"Translation disabled"``.
+    If a translation library is not available or translation fails, ``None`` is
+    returned.
     """
 
     try:  # pragma: no cover - optional dependency
         from googletrans import Translator
     except Exception:
-        return "Translation disabled"
+        return None
 
     try:  # pragma: no cover - translation may fail at runtime
         translator = Translator()
@@ -285,4 +285,4 @@ def translate(text: str, target_lang: str) -> str:
         return result.text
     except Exception as exc:
         logger.warning("Translation failed: %s", exc)
-        return "Translation disabled"
+        return None

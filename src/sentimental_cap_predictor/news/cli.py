@@ -117,7 +117,11 @@ def read_command(
 
     if translate in (TranslateMode.auto, TranslateMode.en) and analysis:
         if analysis.get("lang") != "en":
-            text = translate_text(text, "en")
+            translated = translate_text(text, "en")
+            if translated is None:
+                typer.echo("Translation unavailable; using original text.")
+            else:
+                text = translated
 
     summary_text = text
     if (
@@ -126,7 +130,12 @@ def read_command(
         and analysis
         and analysis.get("lang") != "en"
     ):
-        summary_text = translate_text(text, "en")
+        summary_translation = translate_text(text, "en")
+        if summary_translation is None:
+            typer.echo("Translation unavailable; using original text.")
+            summary_text = text
+        else:
+            summary_text = summary_translation
     summary_only = (
         summarize
         and not analyze
