@@ -19,12 +19,44 @@ pkg.news = news_pkg
 pkg.memory = memory_pkg
 
 
-# Stub extract module required by fetch_gdelt
-extract_stub = types.ModuleType("sentimental_cap_predictor.news.extract")
-extract_stub.fetch_html = lambda url, timeout=20: ""  # noqa: E731
-extract_stub.extract_main_text = lambda html, url=None: ""  # noqa: E731
-sys.modules["sentimental_cap_predictor.news.extract"] = extract_stub
-news_pkg.extract = extract_stub
+# Minimal stubs for modules imported by fetch_gdelt
+gdelt_stub = types.ModuleType("sentimental_cap_predictor.news.gdelt_client")
+
+class DummyClient:
+    def search(self, query, max_records=15):  # noqa: ANN001
+        return []
+
+
+gdelt_stub.GdeltClient = DummyClient
+gdelt_stub.ArticleStub = types.SimpleNamespace
+sys.modules["sentimental_cap_predictor.news.gdelt_client"] = gdelt_stub
+news_pkg.gdelt_client = gdelt_stub
+
+fetcher_stub = types.ModuleType("sentimental_cap_predictor.news.fetcher")
+
+class DummyFetcher:
+    async def get(self, url, max_retries=3):  # noqa: ANN001
+        return ""
+
+    async def aclose(self):  # pragma: no cover - no-op
+        pass
+
+
+fetcher_stub.HtmlFetcher = DummyFetcher
+sys.modules["sentimental_cap_predictor.news.fetcher"] = fetcher_stub
+news_pkg.fetcher = fetcher_stub
+
+extractor_stub = types.ModuleType("sentimental_cap_predictor.news.extractor")
+
+class DummyExtractor:
+    def extract(self, html, url=None):  # noqa: ANN001
+        return types.SimpleNamespace(text="")
+
+
+extractor_stub.ArticleExtractor = DummyExtractor
+extractor_stub.ExtractedArticle = types.SimpleNamespace
+sys.modules["sentimental_cap_predictor.news.extractor"] = extractor_stub
+news_pkg.extractor = extractor_stub
 
 
 # Load vector_store module
@@ -97,25 +129,16 @@ def test_store_chunks_handles_errors(monkeypatch, caplog):
 
 
 def test_search_gdelt_skips_blocked_domains(monkeypatch, caplog):
-    payload = {
-        "articles": [
-            {"url": "http://wsj.com/a"},
-            {"url": "http://reuters.com/b"},
+    def fake_search(self, query, max_records=15):  # noqa: ANN001
+        return [
+            types.SimpleNamespace(url="http://wsj.com/a", domain="wsj.com", title="A", seendate=None),
+            types.SimpleNamespace(
+                url="http://reuters.com/b", domain="reuters.com", title="B", seendate=None
+            ),
         ]
-    }
 
-    class DummyResponse:
-        def json(self):  # pragma: no cover - trivial
-            return payload
 
-        def raise_for_status(self):  # pragma: no cover - no-op
-            pass
-
-    monkeypatch.setattr(
-        fetch_gdelt.requests,
-        "get",
-        lambda url, params, headers, timeout: DummyResponse(),  # noqa: ANN001
-    )
+    monkeypatch.setattr(fetch_gdelt.GdeltClient, "search", fake_search)
 
     calls: list[str] = []
 
@@ -124,6 +147,7 @@ def test_search_gdelt_skips_blocked_domains(monkeypatch, caplog):
         return "<html>body</html>"
 
     monkeypatch.setattr(fetch_gdelt, "fetch_html", fake_fetch_html)
+    monkeypatch.setenv("NEWS_BLOCKED_DOMAINS", "wsj.com")
 
     with caplog.at_level(logging.INFO):
         articles = fetch_gdelt.search_gdelt("q", max_records=2)

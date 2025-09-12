@@ -25,6 +25,7 @@ dummy_pkg.news = dummy_news_pkg
 
 dummy_config = types.ModuleType("sentimental_cap_predictor.config")
 dummy_config.GDELT_API_URL = "https://example.com"
+dummy_config.SENTIMENT_MODEL = "distilbert"
 sys.modules.setdefault("sentimental_cap_predictor.config", dummy_config)
 dummy_pkg.config = dummy_config
 
@@ -158,9 +159,7 @@ def test_read_cli_summarize_non_english(monkeypatch):
         catch_exceptions=False,
     )
     assert result.exit_code == 0
-    data = json.loads(result.stdout.strip())
-    assert data["text"] == "cuerpo"
-    assert data["summary"] == "translated"
+    assert result.stdout.strip() == "translated"
 
 
 def test_read_cli_translation_missing(monkeypatch):

@@ -112,6 +112,9 @@ When `--summarize` is supplied without other processing flags, `news.read`
 prints only the summary text. Add `--json` to receive the response as a JSON
 object instead.
 
+GDELT domain filters can be configured via the `NEWS_ALLOWED_DOMAINS` and
+`NEWS_BLOCKED_DOMAINS` environment variables (comma-separated lists).
+
 ## GitHub Repository Data
 
 Utilities that pull information from the GitHub API can optionally use a
