@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -668,15 +669,13 @@ def _classify_and_route(message: str) -> str | None:
 
     try:
         text = qwen_intent.call_qwen(message)
-    except Exception:  # pragma: no cover - model failure
-        return None
-
-    m = qwen_intent._JSON_RE.search(text or "")  # type: ignore[attr-defined]
-    if not m:
-        return None
-    try:
+        m = qwen_intent._JSON_RE.search(text or "")  # type: ignore[attr-defined]
+        if not m:
+            raise ValueError("no json")
         data = json.loads(m.group(1))
-    except json.JSONDecodeError:
+    except Exception:  # model or parsing failure
+        if re.match(r"^[\w\s]+$", message):
+            return fetch_first_gdelt_article(message)
         return None
 
     intent = data.get("intent")
